@@ -40,3 +40,9 @@ def test_series_run_gets_a_stage_after_widened_films_of_the_same_day():
     m = pd.DataFrame({"relaxed_gate": [False] * 4, "franchise_rule": [False] * 4,
                       "added_on": ["2026-11-09", "2026-11-10", "2026-11-10~series", "2026-12-10"]})
     assert catalog_stage(m).tolist() == [3, 4, 5, 6]
+
+
+def test_new_releases_of_the_same_day_get_the_last_stage():
+    m = pd.DataFrame({"relaxed_gate": [False] * 4, "franchise_rule": [False] * 4,
+                      "added_on": ["2026-11-10", "2026-11-10~series", "2026-11-10~~new", "2026-11-11"]})
+    assert catalog_stage(m).tolist() == [3, 4, 5, 6]

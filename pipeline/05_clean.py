@@ -195,13 +195,15 @@ def main() -> None:
     catalog = pd.concat([catalog, sr.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False,
                                             added_on=sr["found_on"] + "~series")], ignore_index=True)
     log.info("series and anime added %d", len(sr))
-    # Then the monthly new releases (pipeline/new_releases.py), as part C, after the build date.
+    # Then the monthly new releases (pipeline/new_releases.py), as part C, after the build date. "~~new" sorts after
+    # the widened films ("<date>") and the series ("<date>~series") of the same run date, so they get a stage of their
+    # own and never move the content columns of films added earlier (see catalog_stage).
     nr_gated, nr_details = load_new_release_candidates()
     details |= nr_details
     nr = nr_gated[nr_gated["passed"].fillna(False).astype(bool) & (nr_gated["status"] == "Released")
                   & (pd.to_datetime(nr_gated["release_date"]).dt.date <= date.today())
                   & ~nr_gated["tmdb_id"].isin(catalog["tmdb_id"])].drop_duplicates("tmdb_id")
-    catalog = pd.concat([catalog, nr.assign(part="C", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False, added_on=nr["found_on"])],
+    catalog = pd.concat([catalog, nr.assign(part="C", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False, added_on=nr["found_on"] + "~~new")],
                         ignore_index=True)
     log.info("new releases added %d", len(nr))
     log.info("selected %s with %s; relaxed gate added %s; franchise rule added %d", base["part"].value_counts().to_dict(),
