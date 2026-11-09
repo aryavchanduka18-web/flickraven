@@ -158,3 +158,26 @@ class MovieAward(Base):
     year: Mapped[int | None] = mapped_column(SmallInteger)
     result: Mapped[str] = mapped_column(Text, nullable=False)
     wikidata_id: Mapped[str | None] = mapped_column(Text)
+
+
+class MovieWatchProvider(Base):
+    """Where a film can be watched (TMDB watch/providers, data by JustWatch), one row per service and kind.
+
+    Only one region is kept per film: India when TMDB lists any service there, else the fallback region
+    (pipeline/watch_providers.py). Refreshed monthly; `link` is TMDB's page for that film and region,
+    which links on to the services. The site only links out and never claims a film is available
+    anywhere TMDB does not list it."""
+    __tablename__ = "movie_watch_providers"
+    __table_args__ = (
+        CheckConstraint("kind IN ('flatrate','free','ads','rent','buy')", name="ck_movie_watch_providers_kind"),
+    )
+
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    region: Mapped[str] = mapped_column(CHAR(2), nullable=False)
+    provider_name: Mapped[str] = mapped_column(Text, nullable=False)
+    logo_path: Mapped[str | None] = mapped_column(Text)
+    display_priority: Mapped[int | None] = mapped_column(Integer)
+    link: Mapped[str | None] = mapped_column(Text)
+    fetched_on: Mapped[date] = mapped_column(Date, nullable=False)

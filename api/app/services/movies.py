@@ -74,6 +74,21 @@ def cards(db: Session, ids: list[int], user_id: int | None = None, extra: dict[i
     return out
 
 
+def where_to_watch(db: Session, movie_id: int) -> dict | None:
+    """Streaming, free, rent and buy services for the film's stored region (TMDB, data by JustWatch).
+    None when TMDB lists no service, so the page never suggests availability it does not know about."""
+    rows = db.execute(text("""SELECT region, kind, provider_name AS name, logo_path AS logo, link, fetched_on
+        FROM movie_watch_providers WHERE movie_id = :m
+        ORDER BY display_priority NULLS LAST, provider_name"""), {"m": movie_id}).mappings().all()
+    if not rows:
+        return None
+    by_kind: dict[str, list[dict]] = {}
+    for r in rows:
+        by_kind.setdefault(r["kind"], []).append({"name": r["name"], "logo": r["logo"]})
+    return {"region": rows[0]["region"], "link": rows[0]["link"], "updated": rows[0]["fetched_on"].isoformat(),
+            "providers": by_kind}
+
+
 def detail(db: Session, movie_id: int, user_id: int | None) -> dict | None:
     m = db.execute(text("SELECT * FROM movies WHERE id = :m"), {"m": movie_id}).mappings().first()
     if m is None:
@@ -94,6 +109,7 @@ def detail(db: Session, movie_id: int, user_id: int | None) -> dict | None:
     hist = [h + site_hist.get(i + 1, 0) for i, h in enumerate(hist)]
     by_role = lambda role: [dict(c) for c in credits if c["role"] == role]
     return {
+        "watch": where_to_watch(db, movie_id),
         "id": m["id"], "tmdb_id": m["tmdb_id"], "imdb_id": m["imdb_id"], "title": m["title"],
         "original_title": m["original_title"], "overview": m["overview"], "tagline": m["tagline"],
         "release_date": m["release_date"].isoformat() if m["release_date"] else None, "year": m["year"],
