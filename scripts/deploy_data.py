@@ -121,6 +121,9 @@ def refresh_catalog(engine) -> None:
     if (processed / "watch_providers.parquet").exists():
         from pipeline.watch_providers import load as load_watch
         print(f"    where to watch: {load_watch(engine, pd.read_parquet(processed / 'watch_providers.parquet')):,} rows")
+    if (processed / "imdb_ratings.parquet").exists():
+        from pipeline.imdb_ratings import load as load_imdb
+        print(f"    IMDb ratings: {load_imdb(engine, pd.read_parquet(processed / 'imdb_ratings.parquet')):,} films")
 
 
 CHUNK_BYTES = 2 * 1024 * 1024        # one insert per 2 MB survives connections that drop on large statements

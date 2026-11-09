@@ -46,3 +46,21 @@ def test_movie_page_shows_stored_services_and_nothing_otherwise(client, test_eng
     # A later fetch replaces the old one: a film that left every service has no rows left.
     assert load(test_engine, pd.DataFrame(rows[:0], columns=list(rows[0]))) == 0
     assert client.get(f"/api/movies/{movie_id(test_engine, 920001)}").json()["watch"] is None
+
+
+def test_imdb_rating_shown_as_imdb_and_switch_hides_it(client, test_engine):
+    from app.config import get_settings
+    from pipeline.imdb_ratings import load as load_imdb
+    assert load_imdb(test_engine, pd.DataFrame({"imdb_id": ["tt920001"], "imdb_rating": [8.4], "imdb_votes": [1234]})) == 1
+    mid, other = movie_id(test_engine, 920001), movie_id(test_engine, 920002)
+    page = client.get(f"/api/movies/{mid}").json()
+    assert (page["imdb_rating"], page["imdb_votes"]) == (8.4, 1234)
+    assert client.get(f"/api/movies/{other}").json()["imdb_rating"] is None     # never a MovieLens number instead
+    get_settings().imdb_ratings = False
+    try:
+        assert client.get(f"/api/movies/{mid}").json()["imdb_rating"] is None
+    finally:
+        get_settings().imdb_ratings = True
+    # A film that drops out of IMDb's file loses its old rating.
+    load_imdb(test_engine, pd.DataFrame({"imdb_id": [], "imdb_rating": [], "imdb_votes": []}))
+    assert client.get(f"/api/movies/{mid}").json()["imdb_rating"] is None
