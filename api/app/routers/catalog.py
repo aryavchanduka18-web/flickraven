@@ -1,4 +1,6 @@
 """Movies, search and genres."""
+import re
+
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
@@ -158,35 +160,51 @@ FUZZY_MIN_CHARS = 3       # shorter queries have too few trigrams to compare
 FUZZY_THRESHOLD = 0.6     # pg_trgm word_similarity of the query to the closest part of a title
 
 
+def prefix_words(q: str) -> list[str]:
+    """The query's words for a prefix tsquery, normalized like titles: lower case, dots and apostrophes
+    dropped, anything that is not a letter or digit splits words."""
+    q = re.sub(r"[.'’`]", "", q.lower())
+    return [w for w in re.split(r"[\W_]+", q) if w][:8]
+
+
 @router.get("/search")
 def search(q: str, request: Request, db: Session = Depends(get_db)) -> dict:
-    """Title, cast and director through the search_vector; genre and language by name.
+    """Search as you type: titles, cast and director, genre and language by name.
 
-    Titles are also compared after normalization (no dots or apostrophes, punctuation as spaces), so
-    "LA confidential" finds "L.A. Confidential". Exact title matches rank first, then titles that start
-    with the query (a leading "The" is optional), most-voted first within each; the rest by text rank.
-    If that finds fewer than FUZZY_BELOW films, trigram similarity on the normalized title adds typo
-    matches ("horrible bossses"), best match first, with TMDB vote count as the tie-break."""
+    Every word of the query also matches as the start of a word, so "dar" finds "The Dark Knight" and
+    "nol" finds Christopher Nolan's films. Titles are compared after normalization (no dots or
+    apostrophes, punctuation as spaces), so "LA confidential" finds "L.A. Confidential".
+    Ranking: exact title, then titles that start with the query (a leading "The" is optional), then
+    titles with a word that starts with it; most-voted (TMDB) first within each of those. Everything
+    else (cast, director, genre, mid-word matches) follows by text rank, then votes. If that finds fewer
+    than FUZZY_BELOW films, trigram similarity on the normalized title adds typo matches
+    ("horrible bossses"), best match first, with TMDB vote count as the tie-break."""
     q = q.strip()
     if not q:
         return {"items": []}
     # text() would read ":alnum" in the regex as a bind parameter, so those colons are escaped.
     qn = "(" + normalize_sql(":q").replace("[:alnum:]", r"[\:alnum\:]") + ")"
+    words = prefix_words(q)
+    # 'dar':* & 'kni':* -- only letters and digits reach the tsquery, so nothing in it needs escaping.
+    # A query of only punctuation gives an empty tsquery, which matches nothing (Postgres only notes it).
+    tsq = " & ".join(f"'{w}':*" for w in words)
     ids = [r[0] for r in db.execute(text(f"""
         WITH hits AS (
             SELECT m.id, m.tmdb_vote_count AS votes,
-                   ts_rank(m.search_vector, plainto_tsquery('simple', :q)) AS rank,
+                   ts_rank(m.search_vector, to_tsquery('simple', :tsq)) AS rank,
                    CASE WHEN m.title_norm IN ({qn}, 'the ' || {qn}) THEN 0
-                        WHEN m.title_norm LIKE {qn} || ' %' OR m.title_norm LIKE 'the ' || {qn} || ' %' THEN 1
-                        ELSE 2 END AS tier
+                        WHEN m.title_norm LIKE {qn} || '%' OR m.title_norm LIKE 'the ' || {qn} || '%' THEN 1
+                        WHEN ' ' || m.title_norm LIKE '% ' || {qn} || '%' THEN 2
+                        ELSE 3 END AS tier
             FROM movies m
-            WHERE m.search_vector @@ plainto_tsquery('simple', :q)
+            WHERE (:has_words AND m.search_vector @@ to_tsquery('simple', :tsq))
                OR m.id IN (SELECT mg.movie_id FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE g.name ILIKE :like)
                OR m.title ILIKE :like
                OR ({qn} <> '' AND m.title_norm LIKE '%' || {qn} || '%'))
         SELECT id FROM hits
-        ORDER BY tier, CASE WHEN tier < 2 THEN votes END DESC NULLS LAST, rank DESC, votes DESC NULLS LAST
-        LIMIT :limit"""), {"q": q, "like": f"%{q}%", "limit": SEARCH_LIMIT})]
+        ORDER BY tier, CASE WHEN tier < 3 THEN votes END DESC NULLS LAST, rank DESC, votes DESC NULLS LAST
+        LIMIT :limit"""), {"q": q, "tsq": tsq, "has_words": bool(words), "like": f"%{q}%",
+                             "limit": SEARCH_LIMIT})]
     if len(ids) < FUZZY_BELOW and len(q) >= FUZZY_MIN_CHARS:
         # Sets the threshold of the indexed <% operator for this transaction only.
         db.execute(text("SELECT set_config('pg_trgm.word_similarity_threshold', :t, true)"),
