@@ -45,6 +45,23 @@ def _settings(name: str) -> dict:
     return json.loads((MODELS / f"{name}.json").read_text())["settings"]
 
 
+def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
+    """Learned series-to-series similarities (artifacts/models/drama_neighbors.json, made by pipeline/drama_cf.py
+    from real MyDramaList lists; only the similarities are kept) as an n x n matrix over the catalog rows, or None."""
+    path = MODELS / "drama_neighbors.json"
+    if not path.exists():
+        return None
+    row_of = {t: i for i, t in enumerate(tmdb_ids)}
+    rows, cols, vals = [], [], []
+    for a, nbs in json.loads(path.read_text())["neighbors"].items():
+        for b, v in nbs:
+            if int(a) in row_of and b in row_of:
+                rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
+    n = len(tmdb_ids)
+    sim = sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32)
+    return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
+
+
 def load_engine(db: Session) -> OnlineEngine:
     global _engine
     with _lock:
@@ -71,6 +88,7 @@ def load_engine(db: Session) -> OnlineEngine:
         f = np.load(MODELS / "fitted.npz")
         tmdb_to_row = {t: i for i, t in enumerate(movies["tmdb_id"])}
         universe_rows = np.array([tmdb_to_row[t] for t in f["item_tmdb"]])
+        series_sim = _series_similarities(movies["tmdb_id"].tolist())
         catalog = Catalog(
             movie_ids=movies["id"].to_numpy(), titles=movies["title"].tolist(),
             genres=[list(g) for g in movies["genres"]], keywords=[list(k) for k in movies["keywords"]],
@@ -79,7 +97,7 @@ def load_engine(db: Session) -> OnlineEngine:
             part=movies["catalog_part"].to_numpy(), popularity=movies["popularity"].astype(float).to_numpy(),
             votes=movies["votes"].astype(float).to_numpy(), has_award=movies["has_award"].fillna(False).to_numpy(),
             content=content, universe_rows=universe_rows, recent=(movies["catalog_part"] == "C").to_numpy(),
-            kind=movies["title_type"].to_numpy(dtype=object))
+            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim)
         train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
         uc, ic, sv, al = _settings("user_cf"), _settings("item_cf"), _settings("svd"), _settings("als")
         sources = SourceModels(
