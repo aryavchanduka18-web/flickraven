@@ -10,16 +10,10 @@ export type Watch = {
 const KINDS = [["flatrate", "Stream"], ["free", "Free"], ["ads", "Free with ads"], ["rent", "Rent"], ["buy", "Buy"]] as const;
 const COUNTRY: Record<string, string> = { IN: "India", US: "the US" };
 
-/** Services TMDB lists for this film (data by JustWatch). Only links out; shows nothing it does not know. */
-export default function WhereToWatch({ watch, title }: { watch: Watch | null | undefined; title: string }) {
-  if (!watch) {
-    return (
-      <section>
-        <h2 className="font-display text-xl font-bold">Where to watch</h2>
-        <p className="mt-2 text-sm text-muted">No streaming, rental or purchase options are listed for {title} in India or the US right now.</p>
-      </section>
-    );
-  }
+/** Services TMDB lists for this film (data by JustWatch). Only links out; the section is hidden when TMDB lists none. */
+export default function WhereToWatch({ watch }: { watch: Watch | null | undefined; title?: string }) {
+  // Nothing is listed (or the data has not been loaded yet): show nothing, never a claim about availability.
+  if (!watch) return null;
   const where = COUNTRY[watch.region] ?? watch.region;
   return (
     <section>
