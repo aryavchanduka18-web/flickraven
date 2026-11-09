@@ -19,6 +19,7 @@ try {
     Write-Host "== 0. Back up the live database first ==" -ForegroundColor Cyan
     & "$PSScriptRoot\backup.ps1"
     Step "1. Find new releases on TMDB" @("-m", "pipeline.new_releases")
+    Step "1b. Widen the catalog (Indian, Hollywood, Korean and Japanese films)" @("-m", "pipeline.widen_catalog")
     Step "2. Rebuild the catalog (step 5)" @("-m", "pipeline.run_all", "--only", "5")
     Step "3. Load it into the local database (step 12)" @("-m", "pipeline.run_all", "--only", "12")
     Step "3b. Where to watch (TMDB / JustWatch, India first)" @("-m", "pipeline.watch_providers")

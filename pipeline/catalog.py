@@ -64,6 +64,8 @@ def original_gate_mask(movies: pd.DataFrame) -> np.ndarray:
     for flag in ("relaxed_gate", "franchise_rule"):
         if flag in movies:
             later |= movies[flag].fillna(False).astype(bool).to_numpy()
+    if "added_on" in movies:            # widened catalog and monthly new releases (one stage per run date)
+        later |= movies["added_on"].notna().to_numpy()
     return ~later
 
 
