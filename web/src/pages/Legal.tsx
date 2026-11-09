@@ -102,8 +102,10 @@ export function Terms() {
         <p>
           Film details and images come from <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer">TMDB</a>.
           This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings used to train the models come
-          from MovieLens (GroupLens Research) and awards from Wikidata. All film titles, posters and artwork belong to
-          their owners.
+          from MovieLens (GroupLens Research) and awards from Wikidata. Which Asian dramas go together was learned from
+          the public "MyDramaList ratings" dataset on Kaggle (lists originating from MyDramaList.com); only the learned
+          similarities between shows are kept here, none of that dataset's users. All film titles, posters and artwork
+          belong to their owners.
         </p>
       </section>
       <section>
