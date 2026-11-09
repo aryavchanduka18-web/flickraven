@@ -186,13 +186,14 @@ def main() -> None:
     catalog = pd.concat([catalog, wd.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False, added_on=wd["found_on"])],
                         ignore_index=True)
     log.info("wider catalog added %d", len(wd))
-    # Then TV series and anime (pipeline/series.py), as part D.
+    # Then TV series and anime (pipeline/series.py), as part D. "~series" sorts after the widened films of the same
+    # run date, so they get a content stage of their own (see catalog_stage).
     sr_gated, sr_details = load_series_candidates()
     details |= sr_details
     sr = sr_gated[sr_gated["passed"].fillna(False).astype(bool) & (sr_gated["status"] == "Released")
                   & ~sr_gated["tmdb_id"].isin(catalog["tmdb_id"])].drop_duplicates("tmdb_id")
     catalog = pd.concat([catalog, sr.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False,
-                                            added_on=sr["found_on"])], ignore_index=True)
+                                            added_on=sr["found_on"] + "~series")], ignore_index=True)
     log.info("series and anime added %d", len(sr))
     # Then the monthly new releases (pipeline/new_releases.py), as part C, after the build date.
     nr_gated, nr_details = load_new_release_candidates()

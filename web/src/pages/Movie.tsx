@@ -115,7 +115,7 @@ export default function Movie() {
         </div>
         <aside className="min-w-0 space-y-8">
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-muted">Community ratings (MovieLens)</h3>
+            <h3 className="mb-3 text-sm font-semibold text-muted">{m.title_type && m.title_type !== "movie" ? "FlickRaven ratings" : "Community ratings (MovieLens)"}</h3>
             <RatingDistribution hist={m.rating_hist} />
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">

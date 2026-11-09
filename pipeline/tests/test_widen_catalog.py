@@ -34,3 +34,9 @@ def test_every_discover_query_is_bounded_and_keyed():
     assert len({k for _, k, *_ in qs}) == len(qs)                 # cache keys are unique
     assert all(0 < limit <= 10000 for _, _, limit, _, _ in qs)     # TMDB returns at most 10,000 per query
     assert {g for g, *_ in qs} == {"indian", "hollywood", "korean_japanese", "everything_else"}
+
+
+def test_series_run_gets_a_stage_after_widened_films_of_the_same_day():
+    m = pd.DataFrame({"relaxed_gate": [False] * 4, "franchise_rule": [False] * 4,
+                      "added_on": ["2026-11-09", "2026-11-10", "2026-11-10~series", "2026-12-10"]})
+    assert catalog_stage(m).tolist() == [3, 4, 5, 6]
