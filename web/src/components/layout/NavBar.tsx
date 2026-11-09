@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "../../api/hooks";
 import { send } from "../../api/client";
+import SearchBox from "./SearchBox";
 
 export const TABS = [
   { to: "/", label: "Home" },
@@ -34,8 +35,6 @@ export function Logo() {
 
 export default function NavBar() {
   const scrolled = useScrolled();
-  const navigate = useNavigate();
-  const [q, setQ] = useState("");
   return (
     <header
       className={`fixed inset-x-0 top-0 z-40 transition-colors duration-200 ${
@@ -60,22 +59,7 @@ export default function NavBar() {
             </NavLink>
           ))}
         </nav>
-        <form
-          className="ml-auto"
-          role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`);
-          }}
-        >
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search titles, people, genres"
-            aria-label="Search"
-            className="w-36 rounded-full border border-white/15 bg-black/40 px-4 py-1.5 text-sm text-white placeholder:text-white/45 focus:w-56 focus:outline-none md:w-56 md:focus:w-72 transition-[width] duration-200"
-          />
-        </form>
+        <SearchBox />
         <AvatarMenu />
       </div>
     </header>
