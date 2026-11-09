@@ -66,6 +66,7 @@ class Catalog:
     universe_rows: np.ndarray        # catalog row of each universe item
     recent: np.ndarray               # part C (released in the 18 months before the build date)
     kind: np.ndarray | None = None   # 'movie', 'series' or 'anime' per film (all 'movie' when not given)
+    series_sim: sp.csr_matrix | None = None   # learned series-to-series similarity (n x n, mostly empty), see kind_rank
 
     def __post_init__(self):
         if self.kind is None:
@@ -173,9 +174,12 @@ class OnlineEngine:
         return np.union1d(np.array(sorted(rows), dtype=np.int64), self.cat.non_movie_rows)
 
     def kind_rank(self, st: UserState, kind: str) -> tuple[np.ndarray, np.ndarray]:
-        """Series or anime for this user, best first: (catalog rows, scores 0..1). They have no ratings, so the
-        score is content similarity to what the user rated, liked or picked (0.65) plus TMDB popularity (0.35);
-        popularity alone when the user has no taste signal yet. Titles the user already acted on are left out."""
+        """Series or anime for this user, best first: (catalog rows, scores 0..1). They have no FlickRaven ratings, so
+        the score is content similarity to what the user rated, liked or picked (0.65) plus TMDB popularity (0.35);
+        popularity alone when the user has no taste signal yet. For series with learned similarities (real
+        MyDramaList lists, see pipeline/drama_cf.py) the score is 0.45 learned + 0.30 content + 0.25 popularity,
+        the learned part coming from the series the user rated 7+, liked or picked. Titles the user already acted
+        on are left out."""
         cat = self.cat
         rows = np.nonzero(np.asarray(cat.kind) == kind)[0]
         gone = set(st.ratings) | st.watched | st.dislikes | st.picks | st.likes
@@ -189,8 +193,28 @@ class OnlineEngine:
         if len(rows) and np.isfinite(content).any():
             c = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]))
             score = 0.65 * pct(c) + 0.35 * score
+            learned = self.learned_series(st, rows)
+            if learned is not None:
+                covered = learned > 0
+                blended = 0.45 * pct(np.where(covered, learned, 0.0)) + 0.30 * pct(c) + 0.25 * pct(cat.popularity[rows])
+                score = np.where(covered, blended, score)
         order = np.argsort(-score, kind="stable")
         return rows[order], score[order].astype(float)
+
+    def learned_series(self, st: UserState, rows: np.ndarray) -> np.ndarray | None:
+        """Learned similarity of each of `rows` to the series the user rated 7+, liked or picked (weights 0.25..1),
+        or None when there is no model or no such series. Zero for series the model has no data on."""
+        sim = self.cat.series_sim
+        if sim is None:
+            return None
+        weight = {r: (v - 6) / 4 for r, v in st.ratings.items() if v >= 7}
+        weight.update({r: 1.0 for r in st.likes | st.picks})
+        liked = [r for r in weight if sim[r].nnz]
+        if not liked:
+            return None
+        v = sp.csr_matrix(([weight[r] for r in liked], ([0] * len(liked), liked)), shape=(1, self.cat.n))
+        out = np.asarray((v @ sim[:, rows]).todense()).ravel()
+        return out if out.max() > 0 else None
 
     # ------------------------------------------------------------------ top picks (pool, blend, Match %, MMR)
     def onboarding_constraint(self, st: UserState) -> np.ndarray:

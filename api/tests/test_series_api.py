@@ -63,3 +63,14 @@ def test_search_understands_series_and_anime_words(client):
     assert names("tv shows drama")[0] == {"Breaking Bad"}
     assert names("anime") [1]["kind"] == "anime"
     assert "A Film" in names("a film")[0]
+
+
+def test_onboarding_offers_films_and_series_but_not_anime(client):
+    guest = client.post("/api/auth/guest")
+    assert guest.status_code == 200
+    d = client.get("/api/onboarding/candidates").json()
+    kinds = lambda key: {i["movie"]["title_type"] for i in d[key]}
+    assert kinds("movies") <= {"movie"} and kinds("series") == {"series"} and "anime" not in d
+    assert [i["movie"]["title"] for i in d["series"]] == ["Breaking Bad"]
+    assert "Moon Blade" not in {i["movie"]["title"] for i in d["movies"]}
+    assert d["genres"] and "languages" in d

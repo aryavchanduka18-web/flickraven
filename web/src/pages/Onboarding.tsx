@@ -6,13 +6,20 @@ import type { RecItem } from "../api/types";
 import { CardArtwork } from "../components/card/MovieCard";
 import { languageName } from "../lib/format";
 
-type Candidates = { movies: RecItem[]; languages: { code: string; films: number }[]; genres: { id: number; name: string }[] };
-const STEPS = ["Films you love", "Your languages", "Genres you like", "Genres to avoid"];
+type Candidates = {
+  movies: RecItem[];
+  series: RecItem[];
+  languages: { code: string; films: number }[];
+  genres: { id: number; name: string }[];
+};
+const STEPS = ["Titles you love", "Your languages", "Genres"];
+const KINDS = [["movies", "Films"], ["series", "Series"]] as const;
 
 /** Onboarding: preference signals, not behavior. The user stays "cold" until 3 real actions (spec 6.1). */
 export default function Onboarding() {
   const data = useQuery({ queryKey: ["onboarding"], queryFn: () => api<Candidates>("/onboarding/candidates") });
   const [step, setStep] = useState(0);
+  const [kind, setKind] = useState<"movies" | "series">("movies");
   const [picks, setPicks] = useState<number[]>([]);
   const [langs, setLangs] = useState<string[]>(["en"]);
   const [liked, setLiked] = useState<number[]>([]);
@@ -28,23 +35,33 @@ export default function Onboarding() {
   });
   const toggle = <T,>(list: T[], set: (v: T[]) => void, v: T, max = 99) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : list.length < max ? [...list, v] : list);
-  const canNext = [picks.length >= 5, langs.length >= 1, true, true][step];
+  const canNext = [picks.length >= 5, langs.length >= 1, true][step];
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-24 md:px-10">
-      <p className="text-sm text-muted">Step {step + 1} of 4</p>
+      <p className="text-sm text-muted">Step {step + 1} of 3</p>
       <h1 className="mt-1 font-display text-3xl font-extrabold">{STEPS[step]}</h1>
       {step === 0 && (
         <p className="mt-2 text-sm text-muted">
-          Pick 5 to 10 films you like. {picks.length}/10 picked. Use Letterboxd or IMDb? You can also{" "}
+          Pick 5 to 10 films or series you like. {picks.length}/10 picked. Use Letterboxd or IMDb? You can also{" "}
           <Link to="/account#import" className="text-white underline">import your ratings</Link> after this.
         </p>
       )}
       <div className="mt-6">
         {data.isLoading && <p className="text-muted">Loading films…</p>}
         {step === 0 && data.data && (
+          <div className="mb-4 flex gap-2" role="tablist" aria-label="Type">
+            {KINDS.map(([k, label]) => (
+              <button key={k} role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
+                className={`rounded-full px-4 py-1.5 text-sm ${kind === k ? "bg-white font-medium text-black" : "border border-white/20 text-white/85 hover:bg-white/10"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {step === 0 && data.data && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
-            {data.data.movies.map((it) => {
+            {data.data[kind].map((it) => {
               const on = picks.includes(it.movie.id);
               return (
                 <button key={it.movie.id} onClick={() => toggle(picks, setPicks, it.movie.id, 10)} aria-pressed={on}
@@ -62,18 +79,30 @@ export default function Onboarding() {
             selected={langs} onToggle={(k) => toggle(langs, setLangs, k)} />
         )}
         {step === 2 && data.data && (
-          <Chips items={data.data.genres.map((g) => ({ key: g.id, label: g.name }))} selected={liked}
-            onToggle={(k) => { toggle(liked, setLiked, k); setDisliked(disliked.filter((d) => d !== k)); }} />
-        )}
-        {step === 3 && data.data && (
-          <Chips items={data.data.genres.filter((g) => !liked.includes(g.id)).map((g) => ({ key: g.id, label: g.name }))}
-            selected={disliked} onToggle={(k) => toggle(disliked, setDisliked, k)} />
+          <>
+            <p className="mb-4 text-sm text-muted">Tap a genre once if you like it, twice if you want to avoid it, three times to clear it.</p>
+            <div className="flex flex-wrap gap-2">
+              {data.data.genres.map((g) => {
+                const state = liked.includes(g.id) ? "like" : disliked.includes(g.id) ? "avoid" : "none";
+                const next = () => {
+                  setLiked(state === "none" ? [...liked, g.id] : liked.filter((x) => x !== g.id));
+                  setDisliked(state === "like" ? [...disliked, g.id] : disliked.filter((x) => x !== g.id));
+                };
+                return (
+                  <button key={g.id} onClick={next} aria-pressed={state !== "none"}
+                    className={`rounded-full border px-4 py-2 text-sm transition-colors ${state === "like" ? "border-white bg-white text-black" : state === "avoid" ? "border-red-400/70 bg-red-500/15 text-red-200 line-through" : "border-white/20 hover:border-white/50"}`}>
+                    {g.name}{state === "like" && <span className="ml-2 text-xs text-black/60">like</span>}{state === "avoid" && <span className="ml-2 text-xs no-underline">avoid</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-bg/95 px-4 py-3 md:px-10">
         <div className="mx-auto flex max-w-[1400px] justify-between">
           <button disabled={step === 0} onClick={() => setStep(step - 1)} className="rounded-md px-4 py-2 text-sm text-muted disabled:opacity-30">Back</button>
-          {step < 3 ? (
+          {step < 2 ? (
             <button disabled={!canNext} onClick={() => setStep(step + 1)} className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-black disabled:opacity-40">Next</button>
           ) : (
             <button disabled={save.isPending} onClick={() => save.mutate()} className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-black disabled:opacity-40">
