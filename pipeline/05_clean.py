@@ -77,6 +77,9 @@ def load_new_release_candidates() -> tuple[pd.DataFrame, dict]:
 
 
 def gate(cand: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    if cand.empty:          # e.g. a monthly run that found no new releases: nothing to gate, nothing to add
+        return cand.assign(passed=pd.Series(dtype=bool), status=pd.Series(dtype=object),
+                           release_date=pd.Series(dtype=object)), {}
     details, rows = {}, []
     for tmdb_id in cand["tmdb_id"].unique():
         path = TMDB_DIR / f"{tmdb_id}.json"
