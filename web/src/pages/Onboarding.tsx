@@ -9,18 +9,17 @@ import { languageName } from "../lib/format";
 type Candidates = {
   movies: RecItem[];
   series: RecItem[];
-  anime: RecItem[];
   languages: { code: string; films: number }[];
   genres: { id: number; name: string }[];
 };
 const STEPS = ["Titles you love", "Your languages", "Genres"];
-const KINDS = [["movies", "Films"], ["series", "Series"], ["anime", "Anime"]] as const;
+const KINDS = [["movies", "Films"], ["series", "Series"]] as const;
 
 /** Onboarding: preference signals, not behavior. The user stays "cold" until 3 real actions (spec 6.1). */
 export default function Onboarding() {
   const data = useQuery({ queryKey: ["onboarding"], queryFn: () => api<Candidates>("/onboarding/candidates") });
   const [step, setStep] = useState(0);
-  const [kind, setKind] = useState<"movies" | "series" | "anime">("movies");
+  const [kind, setKind] = useState<"movies" | "series">("movies");
   const [picks, setPicks] = useState<number[]>([]);
   const [langs, setLangs] = useState<string[]>(["en"]);
   const [liked, setLiked] = useState<number[]>([]);
@@ -44,7 +43,7 @@ export default function Onboarding() {
       <h1 className="mt-1 font-display text-3xl font-extrabold">{STEPS[step]}</h1>
       {step === 0 && (
         <p className="mt-2 text-sm text-muted">
-          Pick 5 to 10 films, series or anime you like. {picks.length}/10 picked. Use Letterboxd or IMDb? You can also{" "}
+          Pick 5 to 10 films or series you like. {picks.length}/10 picked. Use Letterboxd or IMDb? You can also{" "}
           <Link to="/account#import" className="text-white underline">import your ratings</Link> after this.
         </p>
       )}
