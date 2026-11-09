@@ -21,6 +21,7 @@ def engine(c, content_scores=None):
     e = SimpleNamespace(cat=c)
     e.scores = lambda st: {"content": np.array(content_scores if content_scores is not None else [-np.inf] * c.n, dtype=np.float32)}
     e.excluded = lambda st: OnlineEngine.excluded(e, st)
+    e.learned_series = lambda st, rows: OnlineEngine.learned_series(e, st, rows)
     return e
 
 
@@ -52,3 +53,18 @@ def test_taste_signal_moves_similar_series_up_and_hides_seen_ones():
     seen, _ = OnlineEngine.kind_rank(e, UserState(watched={1}), "series")
     assert 1 not in seen.tolist()
     assert OnlineEngine.kind_rank(e, UserState(), "anime")[0].tolist() == [3]
+
+
+def test_learned_series_similarity_lifts_covered_series_for_a_user_who_liked_a_neighbour():
+    c = cat(["movie", "series", "series", "series", "series"], [9.0, 5.0, 8.0, 6.0, 7.0])
+    sim = sp.lil_matrix((5, 5), dtype=np.float32)
+    sim[1, 3] = sim[3, 1] = 0.9                                   # real viewers who liked 1 also liked 3
+    c.series_sim = sim.tocsr()
+    e = engine(c, content_scores=[0.0, 0.5, 0.3, 0.5, 0.2])
+    rows, _ = OnlineEngine.kind_rank(e, UserState(likes={1}), "series")
+    assert rows.tolist()[0] == 3                                   # the covered neighbour beats the more popular ones
+    # a user with nothing the model knows about is ranked as before
+    base, _ = OnlineEngine.kind_rank(engine(cat(["movie", "series", "series", "series", "series"], [9.0, 5.0, 8.0, 6.0, 7.0]),
+                                            content_scores=[0.0, 0.5, 0.3, 0.5, 0.2]), UserState(likes={2}), "series")
+    other, _ = OnlineEngine.kind_rank(e, UserState(likes={2}), "series")
+    assert other.tolist() == base.tolist()
