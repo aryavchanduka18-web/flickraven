@@ -19,12 +19,12 @@ export function CardArtwork({ item, eager = false }: { item: RecItem; eager?: bo
   const m = item.movie;
   const img = m.backdrop ? tmdbImage(m.backdrop, "w780") : tmdbImage(m.poster, "w500");
   return (
-    <div className="relative aspect-video overflow-hidden rounded-md bg-surface-2">
+    <div className="relative aspect-video overflow-hidden rounded-md bg-surface-2" style={m.dominant_color ? { backgroundColor: m.dominant_color } : undefined}>
       {img && (
         <img
           src={img}
           srcSet={m.backdrop ? backdropSrcSet(m.backdrop) : undefined}
-          sizes="(min-width: 1280px) 40vw, (min-width: 768px) 48vw, 80vw"
+          sizes="(min-width: 1536px) 30vw, (min-width: 1280px) 34vw, (min-width: 1024px) 38vw, (min-width: 640px) 46vw, 78vw"
           alt=""
           loading={eager ? "eager" : "lazy"}
           decoding="async"
