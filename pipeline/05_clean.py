@@ -45,8 +45,17 @@ def load_franchise_candidates() -> tuple[pd.DataFrame, dict]:
     Kept apart from the main pool so the original selection cannot change."""
     path = PROCESSED / "franchise_candidates.csv"
     if not path.exists():
-        return pd.DataFrame(columns=["tmdb_id", "passed", "status", "release_date", "part"]), {}
+        return pd.DataFrame(columns=["tmdb_id", "passed", "status", "release_date", "part", "found_on"]), {}
     return gate(pd.read_csv(path).drop(columns=["franchise"], errors="ignore"))
+
+
+def load_widen_candidates() -> tuple[pd.DataFrame, dict]:
+    """Well-known films found by pipeline/widen_catalog.py, gated like the other candidates and kept apart
+    from the main pool, so the original selection cannot change."""
+    path = PROCESSED / "widen_candidates.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=["tmdb_id", "passed", "status", "release_date", "part", "found_on"]), {}
+    return gate(pd.read_csv(path)[["tmdb_id", "tmdb_vote_count", "part", "found_on"]])
 
 
 def load_new_release_candidates() -> tuple[pd.DataFrame, dict]:
@@ -54,8 +63,8 @@ def load_new_release_candidates() -> tuple[pd.DataFrame, dict]:
     the main pool, like the franchise candidates, so the original selection cannot change."""
     path = PROCESSED / "new_release_candidates.csv"
     if not path.exists():
-        return pd.DataFrame(columns=["tmdb_id", "passed", "status", "release_date", "part"]), {}
-    return gate(pd.read_csv(path)[["tmdb_id", "tmdb_vote_count", "part"]])
+        return pd.DataFrame(columns=["tmdb_id", "passed", "status", "release_date", "part", "found_on"]), {}
+    return gate(pd.read_csv(path)[["tmdb_id", "tmdb_vote_count", "part", "found_on"]])
 
 
 def gate(cand: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
@@ -156,23 +165,32 @@ def main() -> None:
     fr = fr_gated[fr_gated["passed"].fillna(False).astype(bool) & (fr_gated["status"] == "Released")
                   & (pd.to_datetime(fr_gated["release_date"]).dt.date <= end)
                   & ~fr_gated["tmdb_id"].isin(catalog["tmdb_id"])].drop_duplicates("tmdb_id")
-    catalog = pd.concat([catalog.assign(franchise_rule=False),
-                         fr.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=True)],
+    catalog = pd.concat([catalog.assign(franchise_rule=False, added_on=None),
+                         fr.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=True, added_on=None)],
                         ignore_index=True)
+    # Then the wider catalog (pipeline/widen_catalog.py), as part D.
+    wd_gated, wd_details = load_widen_candidates()
+    details |= wd_details
+    wd = wd_gated[wd_gated["passed"].fillna(False).astype(bool) & (wd_gated["status"] == "Released")
+                  & (pd.to_datetime(wd_gated["release_date"]).dt.date <= date.today())
+                  & ~wd_gated["tmdb_id"].isin(catalog["tmdb_id"])].drop_duplicates("tmdb_id")
+    catalog = pd.concat([catalog, wd.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False, added_on=wd["found_on"])],
+                        ignore_index=True)
+    log.info("wider catalog added %d", len(wd))
     # Then the monthly new releases (pipeline/new_releases.py), as part C, after the build date.
     nr_gated, nr_details = load_new_release_candidates()
     details |= nr_details
     nr = nr_gated[nr_gated["passed"].fillna(False).astype(bool) & (nr_gated["status"] == "Released")
                   & (pd.to_datetime(nr_gated["release_date"]).dt.date <= date.today())
                   & ~nr_gated["tmdb_id"].isin(catalog["tmdb_id"])].drop_duplicates("tmdb_id")
-    catalog = pd.concat([catalog, nr.assign(part="C", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False)],
+    catalog = pd.concat([catalog, nr.assign(part="C", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False, added_on=nr["found_on"])],
                         ignore_index=True)
     log.info("new releases added %d", len(nr))
     log.info("selected %s with %s; relaxed gate added %s; franchise rule added %d", base["part"].value_counts().to_dict(),
              chosen, extra["part"].value_counts().to_dict(), len(fr))
 
     movies = pd.DataFrame([parse_movie(details[t]) for t in catalog["tmdb_id"]])
-    movies = movies.merge(catalog[["tmdb_id", "part", "ml_movie_id", "relaxed_gate", "franchise_rule"]]
+    movies = movies.merge(catalog[["tmdb_id", "part", "ml_movie_id", "relaxed_gate", "franchise_rule", "added_on"]]
                           .rename(columns={"part": "catalog_part"}), on="tmdb_id")
     movies["ml_movie_id"] = movies["ml_movie_id"].astype("Int64")
     # Same IMDb id under two TMDB ids is a duplicate: keep the first (highest-priority part).
@@ -186,7 +204,7 @@ def main() -> None:
     credits = pd.DataFrame([row for t in movies["tmdb_id"] for row in parse_credits(details[t])])
     movies.to_parquet(PROCESSED / "movies_clean.parquet", index=False)
     credits.to_parquet(PROCESSED / "credits_clean.parquet", index=False)
-    movies[["tmdb_id", "catalog_part", "ml_movie_id", "imdb_id", "relaxed_gate", "franchise_rule"]].to_csv(PROCESSED / "catalog_ids.csv", index=False)
+    movies[["tmdb_id", "catalog_part", "ml_movie_id", "imdb_id", "relaxed_gate", "franchise_rule", "added_on"]].to_csv(PROCESSED / "catalog_ids.csv", index=False)
 
     dropped = relevant_drops(gated)
     write_json(PROCESSED / "metadata_report.json", {

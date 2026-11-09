@@ -36,11 +36,15 @@ def content_features() -> tuple[sp.csr_matrix, np.ndarray, np.ndarray]:
 
 
 def catalog_stage(movies: pd.DataFrame) -> np.ndarray:
-    """When a film joined the catalog: 0 first build, 1 relaxed metadata gate, 2 franchise rule."""
+    """When a film joined the catalog: 0 first build, 1 relaxed metadata gate, 2 franchise rule, then one stage per run date of the widened catalog and
+    monthly new releases (3 for the earliest run, 4 for the next, ...), so a later run never moves columns."""
     stage = np.zeros(len(movies), dtype=int)
     for k, flag in ((1, "relaxed_gate"), (2, "franchise_rule")):
         if flag in movies:
             stage[movies[flag].fillna(False).astype(bool).to_numpy()] = k
+    if "added_on" in movies:
+        for rank, day in enumerate(sorted(movies["added_on"].dropna().unique())):
+            stage[(movies["added_on"] == day).to_numpy()] = 3 + rank
     return stage
 
 
