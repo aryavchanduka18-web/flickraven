@@ -27,6 +27,12 @@ export default function Hero({ items }: { items: RecItem[] }) {
     const t = window.setTimeout(() => setI((x) => (x + 1) % Math.max(items.length, 1)), 9000);
     return () => window.clearTimeout(t);
   }, [i, items.length]);
+  // Load the next slide's picture while this one shows, so the fade does not wait on the network.
+  useEffect(() => {
+    const next = items[(i + 1) % Math.max(items.length, 1)]?.movie;
+    const src = next && tmdbImage(next.backdrop ?? next.poster, "w1280");
+    if (src) new Image().src = src;
+  }, [i, items]);
   if (!item) return null;
   const m = item.movie;
   const tint = m.dominant_color ?? "#141414";
@@ -35,7 +41,7 @@ export default function Hero({ items }: { items: RecItem[] }) {
       <AnimatePresence initial={false}>
         <motion.div key={m.id} className="absolute inset-0" style={{ y: artY, scale: artScale }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.5 }}>
-          <img src={tmdbImage(m.backdrop ?? m.poster, "w1280")} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={tmdbImage(m.backdrop ?? m.poster, "w1280")} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${tint}cc 0%, ${tint}55 35%, transparent 70%)` }} />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/30 to-black/30" />
         </motion.div>

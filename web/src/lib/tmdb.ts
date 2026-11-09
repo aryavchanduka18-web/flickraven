@@ -8,5 +8,6 @@ export function tmdbImage(path: string | null | undefined, size: ImageSize): str
 }
 
 export function backdropSrcSet(path: string | null | undefined): string | undefined {
-  return path ? `${tmdbImage(path, "w780")} 780w, ${tmdbImage(path, "w1280")} 1280w` : undefined;
+  // Cards never need more than 780 px wide: w1280 is about 2.5x the bytes for a picture shown at 300-580 px.
+  return path ? `${tmdbImage(path, "w300")} 300w, ${tmdbImage(path, "w780")} 780w` : undefined;
 }
