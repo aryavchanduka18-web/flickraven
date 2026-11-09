@@ -21,7 +21,6 @@ export default function Onboarding() {
   const data = useQuery({ queryKey: ["onboarding"], queryFn: () => api<Candidates>("/onboarding/candidates") });
   const [step, setStep] = useState(0);
   const [kind, setKind] = useState<"movies" | "series" | "anime">("movies");
-  const [anime, setAnime] = useState(false);
   const [picks, setPicks] = useState<number[]>([]);
   const [langs, setLangs] = useState<string[]>(["en"]);
   const [liked, setLiked] = useState<number[]>([]);
@@ -29,10 +28,7 @@ export default function Onboarding() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const save = useMutation({
-    mutationFn: async () => {
-      await send("POST", "/onboarding", { movie_ids: picks, languages: langs, liked_genre_ids: liked, disliked_genre_ids: disliked });
-      if (anime) await send("PUT", "/me/preferences", { show_anime: true });
-    },
+    mutationFn: () => send("POST", "/onboarding", { movie_ids: picks, languages: langs, liked_genre_ids: liked, disliked_genre_ids: disliked }),
     onSuccess: () => {
       qc.invalidateQueries();
       navigate("/");
@@ -56,16 +52,12 @@ export default function Onboarding() {
         {data.isLoading && <p className="text-muted">Loading films…</p>}
         {step === 0 && data.data && (
           <div className="mb-4 flex gap-2" role="tablist" aria-label="Type">
-            {KINDS.filter(([k]) => k !== "anime" || anime).map(([k, label]) => (
+            {KINDS.map(([k, label]) => (
               <button key={k} role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
                 className={`rounded-full px-4 py-1.5 text-sm ${kind === k ? "bg-white font-medium text-black" : "border border-white/20 text-white/85 hover:bg-white/10"}`}>
                 {label}
               </button>
             ))}
-            <label className="ml-2 flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" checked={anime} onChange={(e) => { setAnime(e.target.checked); if (!e.target.checked && kind === "anime") setKind("movies"); }} />
-              I also watch anime
-            </label>
           </div>
         )}
         {step === 0 && data.data && (

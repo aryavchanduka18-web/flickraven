@@ -43,7 +43,6 @@ export type Me = {
   is_guest: boolean;
   onboarded: boolean;
   discovery_mode: Mode;
-  show_anime?: boolean;
   counts: Record<string, number | string>;
 };
 

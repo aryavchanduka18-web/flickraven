@@ -21,7 +21,6 @@ export default function Home() {
   const collections = useCollections();
   const series = useKindRail("series");
   const anime = useKindRail("anime");
-  const showAnime = !!me.data?.show_anime;
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
@@ -72,7 +71,7 @@ export default function Home() {
             <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
               items={series.data.items} source="rail:series" personal={false} />
           )}
-          {home.data && showAnime && anime.data && anime.data.items.length > 0 && (
+          {home.data && anime.data && anime.data.items.length > 0 && (
             <Rail title="Anime for you" subtitle="From what you like and what is popular."
               items={anime.data.items} source="rail:anime" personal={false} />
           )}

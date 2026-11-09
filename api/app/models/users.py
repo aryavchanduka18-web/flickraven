@@ -6,7 +6,7 @@ of events lives in the append-only interactions table (see activity.py).
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, SmallInteger, Text, false, func, text,
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, SmallInteger, Text, func, text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -54,8 +54,6 @@ class UserPreferences(Base):
     languages: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     liked_genre_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     disliked_genre_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
-    # Anime rows, tabs and onboarding picks are optional; anime stays searchable either way.
-    show_anime: Mapped[bool] = mapped_column(Boolean, server_default=false(), nullable=False)
     # Tune sliders {adventurous, hidden, international, length}, 0-100, 50 = neutral (engine Tuning).
     tuning: Mapped[dict | None] = mapped_column(JSONB)
     discovery_mode: Mapped[str] = mapped_column(Text, server_default="balanced", nullable=False)
