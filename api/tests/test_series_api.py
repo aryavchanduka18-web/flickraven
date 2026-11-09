@@ -51,3 +51,15 @@ def test_series_page_has_type_seasons_episodes_and_creators(client):
 def test_search_finds_series_and_cards_carry_the_type(client):
     items = client.get("/api/search", params={"q": "breaking"}).json()["items"]
     assert items[0]["movie"]["title"] == "Breaking Bad" and items[0]["movie"]["title_type"] == "series"
+
+
+def test_search_understands_series_and_anime_words(client):
+    def names(q):
+        r = client.get("/api/search", params={"q": q}).json()
+        return {i["movie"]["title"] for i in r["items"]}, r["understood"]
+    got, u = names("series")
+    assert got == {"Breaking Bad"} and u["kind"] == "series"
+    assert names("anime")[0] == {"Moon Blade"}
+    assert names("tv shows drama")[0] == {"Breaking Bad"}
+    assert names("anime") [1]["kind"] == "anime"
+    assert "A Film" in names("a film")[0]

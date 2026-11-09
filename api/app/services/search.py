@@ -28,6 +28,9 @@ LANGUAGES = {
     "arabic": "ar", "indonesian": "id", "punjabi": "pa", "urdu": "ur", "gujarati": "gu",
 }
 FILLER = {"movie", "movies", "film", "films", "cinema"}
+# Words that name a kind of title: series (TV shows) or anime. Nothing is filtered when none is given.
+KINDS = {"series": "series", "shows": "series", "tv series": "series", "tv show": "series", "tv shows": "series",
+         "web series": "series", "anime": "anime", "animes": "anime"}
 # Spellings of genres that are not the stored name (stored: "Science Fiction", "TV Movie", ...).
 GENRE_ALIASES = {
     "scifi": ["Science Fiction"], "sci-fi": ["Science Fiction"], "sci fi": ["Science Fiction"],
@@ -45,14 +48,15 @@ class Parsed:
     language: str | None = None
     year: int | None = None
     decade: tuple[int, int] | None = None
+    kind: str | None = None             # series or anime
     text: str = ""
 
     @property
     def has_filters(self) -> bool:
-        return bool(self.genres or self.language or self.year or self.decade)
+        return bool(self.genres or self.language or self.year or self.decade or self.kind)
 
     def understood(self) -> dict:
-        return {"genres": self.genres, "language": self.language, "year": self.year,
+        return {"genres": self.genres, "language": self.language, "year": self.year, "kind": self.kind,
                 "decade": list(self.decade) if self.decade else None, "text": self.text}
 
 
@@ -65,6 +69,10 @@ def parse(q: str, genre_names: list[str]) -> Parsed:
         w, pair = words[i], " ".join(words[i:i + 2])
         decade = re.fullmatch(r"(?:(19|20))?(\d)0s", w)
         gs, step = None, 1
+        if not out.kind and (pair in KINDS or w in KINDS):
+            out.kind = KINDS.get(pair) or KINDS[w]
+            i += 2 if pair in KINDS else 1
+            continue
         if pair in GENRE_ALIASES:
             gs, step = GENRE_ALIASES[pair], 2
         elif w in GENRE_ALIASES:
@@ -112,6 +120,9 @@ def _filters(p: Parsed) -> tuple[str, dict]:
         sql.append(f"EXISTS (SELECT 1 FROM movie_genres fg{k} JOIN genres fgg{k} ON fgg{k}.id = fg{k}.genre_id "
                    f"WHERE fg{k}.movie_id = m.id AND fgg{k}.name = :fg{k})")
         params[f"fg{k}"] = g
+    if p.kind:
+        sql.append("m.title_type = :fkind")
+        params["fkind"] = p.kind
     if p.language:
         sql.append("m.original_language = :flang")
         params["flang"] = p.language
