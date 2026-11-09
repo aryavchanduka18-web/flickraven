@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
+import { useMe } from "../api/hooks";
 import PagedGrid from "../components/card/PagedGrid";
 import SurpriseMeButton from "../components/discovery/SurpriseMeButton";
 import TonightPanel from "../components/discovery/TonightPanel";
@@ -18,6 +19,7 @@ const SORTS: [string, string, string][] = [
 ];
 
 export default function Discover() {
+  const me = useMe();
   const [f, setF] = useState({ type: "movie", genre: "", lang: "", decade: "", runtime: "", min_rating: "", sort: "recommended" });
   const [total, setTotal] = useState<number | null>(null);
   const genres = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { slug: string; name: string }[] }>("/genres") });
@@ -35,7 +37,7 @@ export default function Discover() {
       </div>
       <div className="mt-6"><TonightPanel /></div>
       <div className="mt-8 flex gap-2" role="tablist" aria-label="Type">
-        {[["movie", "Movies"], ["series", "Series"], ["anime", "Anime"], ["all", "All"]].map(([v, l]) => (
+        {[["movie", "Movies"], ["series", "Series"], ...(me.data?.show_anime ? [["anime", "Anime"]] : []), ["all", "All"]].map(([v, l]) => (
           <button key={v} role="tab" aria-selected={f.type === v} onClick={() => pickType(v)}
             className={`rounded-full px-4 py-1.5 text-sm ${f.type === v ? "bg-white font-medium text-black" : "border border-white/20 text-white/85 hover:bg-white/10"}`}>{l}</button>
         ))}

@@ -25,10 +25,11 @@ def counts(db: Session, uid: int) -> dict:
 
 @router.get("/me")
 def me(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    pref = db.execute(text("SELECT discovery_mode FROM user_preferences WHERE user_id = :u"), {"u": user["id"]}).first()
+    pref = db.execute(text("SELECT discovery_mode, show_anime FROM user_preferences WHERE user_id = :u"), {"u": user["id"]}).first()
     user.pop("token_issued_ms", None)
     return {**user, "onboarded": user["onboarded_at"] is not None,
-            "discovery_mode": pref[0] if pref else "balanced", "counts": counts(db, user["id"])}
+            "discovery_mode": pref[0] if pref else "balanced", "show_anime": bool(pref[1]) if pref else False,
+            "counts": counts(db, user["id"])}
 
 
 class AccountUpdate(BaseModel):
@@ -70,13 +71,15 @@ class Preferences(BaseModel):
     liked_genre_ids: list[int] | None = None
     disliked_genre_ids: list[int] | None = None
     discovery_mode: str | None = None
+    show_anime: bool | None = None
 
 
 @router.get("/me/preferences")
 def get_preferences(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    row = db.execute(text("SELECT languages, liked_genre_ids, disliked_genre_ids, discovery_mode FROM user_preferences WHERE user_id = :u"),
+    row = db.execute(text("SELECT languages, liked_genre_ids, disliked_genre_ids, discovery_mode, show_anime FROM user_preferences WHERE user_id = :u"),
                      {"u": user["id"]}).mappings().first()
-    return dict(row) if row else {"languages": [], "liked_genre_ids": [], "disliked_genre_ids": [], "discovery_mode": "balanced"}
+    return dict(row) if row else {"languages": [], "liked_genre_ids": [], "disliked_genre_ids": [], "discovery_mode": "balanced",
+                                  "show_anime": False}
 
 
 @router.put("/me/preferences")
@@ -85,11 +88,12 @@ def put_preferences(body: Preferences, user=Depends(current_user), db: Session =
         raise HTTPException(422, "discovery_mode must be familiar, balanced or discover")
     current = get_preferences(user, db)
     new = {k: v if v is not None else current.get(k) for k, v in body.model_dump().items()}
-    db.execute(text("""INSERT INTO user_preferences (user_id, languages, liked_genre_ids, disliked_genre_ids, discovery_mode, updated_at)
-        VALUES (:u, :l, :lg, :dg, :dm, now()) ON CONFLICT (user_id) DO UPDATE SET languages = :l, liked_genre_ids = :lg,
-        disliked_genre_ids = :dg, discovery_mode = :dm, updated_at = now()"""),
+    db.execute(text("""INSERT INTO user_preferences (user_id, languages, liked_genre_ids, disliked_genre_ids, discovery_mode, show_anime, updated_at)
+        VALUES (:u, :l, :lg, :dg, :dm, :sa, now()) ON CONFLICT (user_id) DO UPDATE SET languages = :l, liked_genre_ids = :lg,
+        disliked_genre_ids = :dg, discovery_mode = :dm, show_anime = :sa, updated_at = now()"""),
                {"u": user["id"], "l": new["languages"] or [], "lg": new["liked_genre_ids"] or [],
-                "dg": new["disliked_genre_ids"] or [], "dm": new["discovery_mode"] or "balanced"})
+                "dg": new["disliked_genre_ids"] or [], "dm": new["discovery_mode"] or "balanced",
+                "sa": bool(new["show_anime"])})
     db.commit()
     return new
 

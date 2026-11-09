@@ -88,6 +88,18 @@ export function useLogEvent() {
     send("POST", "/events", { event_type, movie_id, source, position }).catch(() => undefined);
 }
 
+/** Anime rows, tabs and onboarding picks are optional (off by default); anime stays searchable either way. */
+export function useSetShowAnime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => send("PUT", "/me/preferences", { show_anime: on }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me"] });
+      qc.invalidateQueries({ queryKey: ["kind"] });
+    },
+  });
+}
+
 export function useSetMode() {
   const qc = useQueryClient();
   return useMutation({

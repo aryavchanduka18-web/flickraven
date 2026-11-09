@@ -73,3 +73,17 @@ def test_onboarding_offers_films_series_and_anime(client):
     assert kinds("movies") <= {"movie"} and kinds("series") == {"series"} and kinds("anime") == {"anime"}
     assert [i["movie"]["title"] for i in d["series"]] == ["Breaking Bad"] and [i["movie"]["title"] for i in d["anime"]] == ["Moon Blade"]
     assert d["genres"] and "languages" in d
+
+
+def test_anime_is_optional_and_off_by_default(client):
+    client.post("/api/auth/guest")
+    assert client.get("/api/me").json()["show_anime"] is False
+    assert client.get("/api/me/preferences").json()["show_anime"] is False
+    assert client.put("/api/me/preferences", json={"show_anime": True}).json()["show_anime"] is True
+    assert client.get("/api/me").json()["show_anime"] is True
+    # other preferences are not disturbed, and the switch can be turned off again
+    assert client.put("/api/me/preferences", json={"discovery_mode": "discover"}).json()["show_anime"] is True
+    assert client.put("/api/me/preferences", json={"show_anime": False}).json()["show_anime"] is False
+    # anime is still found by name whatever the setting
+    names = {i["movie"]["title"] for i in client.get("/api/search", params={"q": "moon blade"}).json()["items"]}
+    assert "Moon Blade" in names

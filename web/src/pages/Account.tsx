@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { send } from "../api/client";
-import { useMe } from "../api/hooks";
+import { useMe, useSetShowAnime } from "../api/hooks";
 import { ImportRatings } from "../components/account/ImportRatings";
 import { PasswordChecklist } from "../components/account/PasswordChecklist";
 import { PageMessage } from "../components/Loading";
@@ -35,6 +35,7 @@ export default function Account() {
   const [confirm, setConfirm] = useState("");
   const [deletePw, setDeletePw] = useState("");
   const [sure, setSure] = useState(false);
+  const setAnime = useSetShowAnime();
 
   useEffect(() => setName(me?.display_name ?? ""), [me?.display_name]);
   const { hash } = useLocation();
@@ -99,6 +100,14 @@ export default function Account() {
           <ImportRatings />
         </Section>
       </div>
+
+      <Section title="Anime">
+        <label className="flex items-center gap-3 text-sm">
+          <input type="checkbox" checked={!!me.show_anime} disabled={setAnime.isPending} onChange={(e) => setAnime.mutate(e.target.checked)} />
+          Show anime in my recommendations, Discover and the first picks
+        </label>
+        <p className="mt-2 text-xs text-muted">Off by default. Anime is always found when you search for it by name.</p>
+      </Section>
 
       {!me.is_guest && (
         <Section title="Change password">
