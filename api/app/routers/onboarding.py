@@ -17,7 +17,7 @@ MIN_LANGUAGE_FILMS = 150
 @router.get("/candidates")
 def candidates(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     """~60 films to pick from (the most voted overall plus the most voted per onboarding language), and the
-    most voted series and anime, so a new user can start from TV as well."""
+    most voted series, so a new user can start from TV as well. Anime is left out of the first picks."""
     popular = [r[0] for r in db.execute(text(
         "SELECT id FROM movies WHERE title_type = 'movie' AND backdrop_path IS NOT NULL "
         "ORDER BY tmdb_vote_count DESC NULLS LAST LIMIT 30"))]
@@ -30,7 +30,7 @@ def candidates(user=Depends(current_user), db: Session = Depends(get_db)) -> dic
     ids = list(dict.fromkeys(popular + intl))[:60]
     random.Random(42).shuffle(ids)
     return {"movies": cards(db, ids, user["id"]), "series": cards(db, top_of(db, "series", 24), user["id"]),
-            "anime": cards(db, top_of(db, "anime", 18), user["id"]), "languages": languages(db), "genres": genres(db)}
+            "languages": languages(db), "genres": genres(db)}
 
 
 def top_of(db: Session, kind: str, n: int) -> list[int]:
