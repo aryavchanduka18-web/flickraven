@@ -65,8 +65,13 @@ class Catalog:
     content: sp.csr_matrix           # tuned content features, one L2-normalized row per film
     universe_rows: np.ndarray        # catalog row of each universe item
     recent: np.ndarray               # part C (released in the 18 months before the build date)
+    kind: np.ndarray | None = None   # 'movie', 'series' or 'anime' per film (all 'movie' when not given)
 
     def __post_init__(self):
+        if self.kind is None:
+            self.kind = np.full(len(self.movie_ids), "movie", dtype=object)
+        # Series and anime have no ratings, so the movie rails never pick them; they get rails of their own.
+        self.non_movie_rows = np.nonzero(np.asarray(self.kind) != "movie")[0].astype(np.int64)
         self.row_of = {int(m): r for r, m in enumerate(self.movie_ids)}
         self.n = len(self.movie_ids)
         self.universe_of_row = np.full(self.n, -1, dtype=np.int64)
@@ -165,7 +170,27 @@ class OnlineEngine:
         if st.disliked_genres:
             bad = set(st.disliked_genres)
             rows |= {r for r in range(self.cat.n) if bad & set(self.cat.genres[r])}
-        return np.array(sorted(rows), dtype=np.int64)
+        return np.union1d(np.array(sorted(rows), dtype=np.int64), self.cat.non_movie_rows)
+
+    def kind_rank(self, st: UserState, kind: str) -> tuple[np.ndarray, np.ndarray]:
+        """Series or anime for this user, best first: (catalog rows, scores 0..1). They have no ratings, so the
+        score is content similarity to what the user rated, liked or picked (0.65) plus TMDB popularity (0.35);
+        popularity alone when the user has no taste signal yet. Titles the user already acted on are left out."""
+        cat = self.cat
+        rows = np.nonzero(np.asarray(cat.kind) == kind)[0]
+        gone = set(st.ratings) | st.watched | st.dislikes | st.picks | st.likes
+        if st.disliked_genres:
+            bad = set(st.disliked_genres)
+            gone |= {int(r) for r in rows if bad & set(cat.genres[r])}
+        rows = rows[~np.isin(rows, list(gone))] if gone else rows
+        pct = lambda v: (np.argsort(np.argsort(v)) + 1) / max(len(v), 1)
+        score = pct(cat.popularity[rows])
+        content = self.scores(st)["content"][rows]
+        if len(rows) and np.isfinite(content).any():
+            c = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]))
+            score = 0.65 * pct(c) + 0.35 * score
+        order = np.argsort(-score, kind="stable")
+        return rows[order], score[order].astype(float)
 
     # ------------------------------------------------------------------ top picks (pool, blend, Match %, MMR)
     def onboarding_constraint(self, st: UserState) -> np.ndarray:

@@ -47,6 +47,7 @@ class Movie(Base):
     __tablename__ = "movies"
     __table_args__ = (
         CheckConstraint("catalog_part IN ('A','B','C','D')", name="ck_movies_catalog_part"),
+        CheckConstraint("title_type IN ('movie','series','anime')", name="ck_movies_title_type"),
         Index("ix_movies_search_vector", "search_vector", postgresql_using="gin"),
         Index("ix_movies_title_norm_trgm", "title_norm", postgresql_using="gin",
               postgresql_ops={"title_norm": "gin_trgm_ops"}),
@@ -83,6 +84,11 @@ class Movie(Base):
     # sorting and filters never read these; switch the display off with IMDB_RATINGS=false.
     imdb_rating: Mapped[float | None] = mapped_column(Numeric(3, 1))
     imdb_votes: Mapped[int | None] = mapped_column(Integer)
+    # movie, series or anime. A series is stored with tmdb_id = 10,000,000 + its TV id (pipeline/series.py).
+    title_type: Mapped[str] = mapped_column(Text, server_default="movie", nullable=False, index=True)
+    seasons: Mapped[int | None] = mapped_column(SmallInteger)
+    episodes: Mapped[int | None] = mapped_column(Integer)
+    series_status: Mapped[str | None] = mapped_column(Text)
     # TMDB collection (franchise), for "More from <collection>" on the film page.
     collection_id: Mapped[int | None] = mapped_column(Integer, index=True)
     collection_name: Mapped[str | None] = mapped_column(Text)

@@ -8,7 +8,7 @@ SITE_PRIOR = 20          # community rating: popularity_score acts as 20 prior v
 
 CARD_SQL = """
 SELECT m.id, m.title, m.year, m.poster_path, m.backdrop_path, m.logo_path, m.original_language, m.runtime_min,
-       m.dominant_color, m.overview, m.popularity_score, m.catalog_part, m.imdb_rating, m.imdb_votes,
+       m.dominant_color, m.overview, m.popularity_score, m.catalog_part, m.imdb_rating, m.imdb_votes, m.title_type,
        coalesce(array_agg(g.name ORDER BY g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
        (SELECT count(*) FROM ratings r WHERE r.movie_id = m.id) AS site_n,
        (SELECT coalesce(sum(r.rating), 0) FROM ratings r WHERE r.movie_id = m.id) AS site_sum
@@ -76,7 +76,7 @@ def cards(db: Session, ids: list[int], user_id: int | None = None, extra: dict[i
                       "community_rating": community_rating(r["popularity_score"], r["site_n"], r["site_sum"]),
                       **imdb(r),
                       "dominant_color": r["dominant_color"], "overview_short": short(r["overview"]),
-                      "catalog_part": r["catalog_part"]},
+                      "catalog_part": r["catalog_part"], "title_type": r["title_type"]},
             "score": e.get("score"), "match_pct": e.get("match_pct"), "reasons": e.get("reasons", []),
             "agreement": e.get("agreement"),
             "user_state": states[i],
@@ -128,7 +128,8 @@ def detail(db: Session, movie_id: int, user_id: int | None) -> dict | None:
         "backdrop": m["backdrop_path"], "logo": m["logo_path"], "dominant_color": m["dominant_color"],
         "studios": m["studios"], "genres": genres, "keywords": keywords, "awards": awards,
         "directors": by_role("director"), "writers": by_role("writer"), "cast": by_role("cast"),
-        "catalog_part": m["catalog_part"],
+        "catalog_part": m["catalog_part"], "title_type": m["title_type"], "seasons": m["seasons"],
+        "episodes": m["episodes"], "series_status": m["series_status"],
         "collection": {"id": m["collection_id"], "name": m["collection_name"]} if m["collection_id"] else None,
         "community_rating": community_rating(m["popularity_score"], site[0], site[1]), **imdb(m),
         "rating_count": int((m["ml_rating_count"] or 0) + site[0]), "rating_hist": hist,

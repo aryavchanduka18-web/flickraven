@@ -58,6 +58,15 @@ def load_widen_candidates() -> tuple[pd.DataFrame, dict]:
     return gate(pd.read_csv(path)[["tmdb_id", "tmdb_vote_count", "part", "found_on"]])
 
 
+def load_series_candidates() -> tuple[pd.DataFrame, dict]:
+    """TV series and anime found by pipeline/series.py (stored with tmdb_id = 10,000,000 + TV id), gated like
+    the other candidates and kept apart from the main pool, so the original selection cannot change."""
+    path = PROCESSED / "series_candidates.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=["tmdb_id", "passed", "status", "release_date", "part", "found_on"]), {}
+    return gate(pd.read_csv(path)[["tmdb_id", "tmdb_vote_count", "part", "found_on"]])
+
+
 def load_new_release_candidates() -> tuple[pd.DataFrame, dict]:
     """Recent films found by pipeline/new_releases.py, gated like the other candidates. Kept apart from
     the main pool, like the franchise candidates, so the original selection cannot change."""
@@ -177,6 +186,14 @@ def main() -> None:
     catalog = pd.concat([catalog, wd.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False, added_on=wd["found_on"])],
                         ignore_index=True)
     log.info("wider catalog added %d", len(wd))
+    # Then TV series and anime (pipeline/series.py), as part D.
+    sr_gated, sr_details = load_series_candidates()
+    details |= sr_details
+    sr = sr_gated[sr_gated["passed"].fillna(False).astype(bool) & (sr_gated["status"] == "Released")
+                  & ~sr_gated["tmdb_id"].isin(catalog["tmdb_id"])].drop_duplicates("tmdb_id")
+    catalog = pd.concat([catalog, sr.assign(part="D", ml_movie_id=pd.NA, relaxed_gate=False, franchise_rule=False,
+                                            added_on=sr["found_on"])], ignore_index=True)
+    log.info("series and anime added %d", len(sr))
     # Then the monthly new releases (pipeline/new_releases.py), as part C, after the build date.
     nr_gated, nr_details = load_new_release_candidates()
     details |= nr_details

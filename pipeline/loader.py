@@ -14,6 +14,7 @@ MOVIE_COLUMNS = [
     "runtime_min", "original_language", "spoken_languages", "countries", "certification", "poster_path",
     "backdrop_path", "dominant_color", "tagline", "studios", "logo_path", "catalog_part",
     "ml_rating_count", "ml_rating_mean", "rating_hist", "tmdb_vote_count", "collection_id", "collection_name",
+    "title_type", "seasons", "episodes", "series_status",
 ]
 CHUNK = 2000
 USER_TABLES = ("onboarding_picks", "ratings", "reactions", "user_movie_list", "watched",
@@ -62,9 +63,13 @@ def load_catalog(engine: Engine, movies: pd.DataFrame, credits: pd.DataFrame,
     t = md.tables
 
     m = movies.merge(aggregates, on="ml_movie_id", how="left") if len(aggregates) else movies.copy()
-    for col, default in (("ml_rating_count", 0), ("ml_rating_mean", None), ("rating_hist", None)):
+    for col, default in (("ml_rating_count", 0), ("ml_rating_mean", None), ("rating_hist", None),
+                         ("title_type", "movie"), ("seasons", None), ("episodes", None), ("series_status", None)):
         if col not in m:
             m[col] = default
+    m["title_type"] = m["title_type"].fillna("movie")
+    for col in ("seasons", "episodes"):                 # whole numbers for the smallint / integer columns
+        m[col] = m[col].astype("Int64")
     m["ml_rating_count"] = m["ml_rating_count"].fillna(0).astype(int)
     m["ml_rating_mean"] = m["ml_rating_mean"].map(lambda v: None if v is None or pd.isna(v) else round(float(v), 2))
 

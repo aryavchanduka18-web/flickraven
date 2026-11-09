@@ -84,8 +84,12 @@ def franchise(movie_id: int, request: Request, db: Session = Depends(get_db)) ->
 @router.get("/movies")
 def discover(request: Request, genre: str | None = None, lang: str | None = None, decade: int | None = None,
              runtime: str | None = None, country: str | None = None, min_rating: float | None = None,
-             sort: str = "popular", page: int = 1, db: Session = Depends(get_db)) -> dict:
+             sort: str = "popular", page: int = 1, type: str | None = None,
+             db: Session = Depends(get_db)) -> dict:
+    """Browse the catalog. `type` is movie (the default), series, anime or all."""
     where, p = ["true"], {}
+    if type in ("movie", "series", "anime") or type is None:
+        where.append("m.title_type = :type"); p["type"] = type or "movie"
     if genre:
         where.append("m.id IN (SELECT mg.movie_id FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE g.slug = :genre)")
         p["genre"] = genre
@@ -103,6 +107,17 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     order = {"popular": "m.tmdb_vote_count DESC NULLS LAST", "rating": "m.popularity_score DESC NULLS LAST",
              "newest": "m.release_date DESC NULLS LAST", "title": "m.title"}.get(sort, "m.tmdb_vote_count DESC NULLS LAST")
     uid = user_id_from(request, db)
+    if type in ("series", "anime") and sort in ("recommended", "match") and uid is not None and rec.artifacts_ready():
+        # No ratings exist for series and anime: their order is content similarity to the user's taste plus popularity.
+        all_ids = [r[0] for r in db.execute(text(f"SELECT m.id FROM movies m WHERE {' AND '.join(where)}"), p)]
+        engine = rec.load_engine(db)
+        rows, scores = engine.kind_rank(rec.user_state(db, uid, engine), type)
+        allowed, rank = set(all_ids), [(int(engine.cat.movie_ids[r]), float(s)) for r, s in zip(rows, scores)]
+        ranked = [(i, s) for i, s in rank if i in allowed]
+        start = (max(page, 1) - 1) * 40
+        shown = ranked[start:start + 40]
+        return {"items": cards(db, [i for i, _ in shown], uid, {i: {"score": s} for i, s in shown}),
+                "total": len(ranked), "page": page, "sort": sort}
     if sort in PERSONAL_SORTS and uid is not None and rec.artifacts_ready():
         all_ids = [r[0] for r in db.execute(text(f"SELECT m.id FROM movies m WHERE {' AND '.join(where)} ORDER BY {order}"), p)]
         ranked, scores, engine, stage = personal_order(db, uid, all_ids, sort)

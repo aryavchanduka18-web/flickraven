@@ -18,11 +18,14 @@ const SORTS: [string, string, string][] = [
 ];
 
 export default function Discover() {
-  const [f, setF] = useState({ genre: "", lang: "", decade: "", runtime: "", min_rating: "", sort: "recommended" });
+  const [f, setF] = useState({ type: "movie", genre: "", lang: "", decade: "", runtime: "", min_rating: "", sort: "recommended" });
   const [total, setTotal] = useState<number | null>(null);
   const genres = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { slug: string; name: string }[] }>("/genres") });
   const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  // Series and anime have no ratings, so only these sorts apply to them (hidden gems and most novel need ratings).
+  const sorts = f.type === "movie" || f.type === "all" ? SORTS : SORTS.filter(([v]) => !["hidden", "novel"].includes(v));
+  const pickType = (type: string) => setF({ ...f, type, sort: ["hidden", "novel"].includes(f.sort) && type !== "movie" && type !== "all" ? "recommended" : f.sort });
   const sel = "rounded-md border border-white/15 bg-surface-2 px-3 py-2 text-sm";
   return (
     <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
@@ -31,7 +34,13 @@ export default function Discover() {
         <SurpriseMeButton />
       </div>
       <div className="mt-6"><TonightPanel /></div>
-      <div className="mt-8 flex flex-wrap gap-3" aria-label="Filters">
+      <div className="mt-8 flex gap-2" role="tablist" aria-label="Type">
+        {[["movie", "Movies"], ["series", "Series"], ["anime", "Anime"], ["all", "All"]].map(([v, l]) => (
+          <button key={v} role="tab" aria-selected={f.type === v} onClick={() => pickType(v)}
+            className={`rounded-full px-4 py-1.5 text-sm ${f.type === v ? "bg-white font-medium text-black" : "border border-white/20 text-white/85 hover:bg-white/10"}`}>{l}</button>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3" aria-label="Filters">
         <select className={sel} value={f.genre} onChange={set("genre")} aria-label="Genre">
           <option value="">All genres</option>
           {genres.data?.genres.map((g) => <option key={g.slug} value={g.slug}>{g.name}</option>)}
@@ -51,11 +60,11 @@ export default function Discover() {
           <option value="">Any rating</option>{[6, 7, 7.5, 8].map((r) => <option key={r} value={r}>{r}+</option>)}
         </select>
         <select className={sel} value={f.sort} onChange={set("sort")} aria-label="Sort">
-          {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {sorts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
       <p className="mt-4 text-sm text-muted">
-        {total != null ? `${total.toLocaleString()} films` : "Loading…"} · {SORTS.find(([v]) => v === f.sort)?.[2]}
+        {total != null ? `${total.toLocaleString()} ${f.type === "movie" ? "films" : "titles"}` : "Loading…"} · {SORTS.find(([v]) => v === f.sort)?.[2]}
       </p>
       <div className="mt-6">
         <PagedGrid queryKey={["discover", qs.toString()]} path={(p) => `/movies?${qs}${qs.toString() ? "&" : ""}page=${p}`}

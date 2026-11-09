@@ -38,6 +38,21 @@ def log_shown(db, uid, request_id, page_id, surface, mode, items):
                     "rc": it["reasons"][0]["code"] if it.get("reasons") else None, "mo": mode, "pg": page_id})
 
 
+@router.get("/kind/{kind}")
+def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_user),
+              db: Session = Depends(get_db)) -> dict:
+    """Series or anime for this user (Home rows). No ratings exist for them: content similarity to the user's
+    taste plus TMDB popularity, so there is no Match %."""
+    if kind not in ("series", "anime"):
+        raise HTTPException(404, "Unknown kind")
+    engine = engine_or_503(db)
+    st = rec.user_state(db, user["id"], engine)
+    rows, scores = engine.kind_rank(st, kind)
+    page = slice(max(offset, 0), max(offset, 0) + min(limit, 60))
+    extra = {int(engine.cat.movie_ids[r]): {"score": float(s)} for r, s in zip(rows[page], scores[page])}
+    return {"items": cards(db, list(extra), user["id"], extra), "total": int(len(rows))}
+
+
 @router.get("/home")
 def home(mode: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     engine = engine_or_503(db)

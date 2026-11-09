@@ -45,7 +45,7 @@ def gate_failures(detail: dict, min_words: int = MIN_OVERVIEW_WORDS, min_cast: i
         reasons.append("short_overview")
     if not detail.get("genres"):
         reasons.append("no_genre")
-    if not directors(detail):
+    if not directors(detail) and detail.get("_media") != "tv":      # a series has creators, not a director
         reasons.append("no_director")
     if len(detail.get("credits", {}).get("cast", [])) < min_cast:
         reasons.append("few_cast")
@@ -125,6 +125,10 @@ def parse_movie(detail: dict) -> dict:
         "logo_path": english_logo(detail),
         "tmdb_vote_count": detail.get("vote_count"),
         "status": detail.get("status"),
+        "title_type": detail.get("title_type") or "movie",
+        "seasons": detail.get("number_of_seasons"),
+        "episodes": detail.get("number_of_episodes"),
+        "series_status": detail.get("series_status"),
         "genres": [g["name"] for g in detail.get("genres", [])],
         "keywords": sorted({k["name"].strip().lower() for k in detail.get("keywords", {}).get("keywords", [])}),
     }

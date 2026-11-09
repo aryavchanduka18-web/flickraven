@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { useCollections, useHome, useMe, useSetMode } from "../api/hooks";
+import { useCollections, useHome, useKindRail, useMe, useSetMode } from "../api/hooks";
 import type { Mode } from "../api/types";
 import DiscoveryModeControl from "../components/discovery/DiscoveryModeControl";
 import TonightPanel from "../components/discovery/TonightPanel";
@@ -19,6 +19,8 @@ export default function Home() {
   const [tonight, setTonight] = useState(false);
   const [tune, setTune] = useState(false);
   const collections = useCollections();
+  const series = useKindRail("series");
+  const anime = useKindRail("anime");
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
@@ -65,6 +67,14 @@ export default function Home() {
             <Rail key={r.key} title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
               personal={PERSONAL.has(r.key) || r.items.some((i) => i.match_pct != null)} />
           ))}
+          {home.data && series.data && series.data.items.length > 0 && (
+            <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
+              items={series.data.items} source="rail:series" personal={false} />
+          )}
+          {home.data && anime.data && anime.data.items.length > 0 && (
+            <Rail title="Anime for you" subtitle="From what you like and what is popular."
+              items={anime.data.items} source="rail:anime" personal={false} />
+          )}
           {home.data && collections.data?.collections.map((c) => (
             <Rail key={c.key} title={c.title} subtitle={`${c.count.toLocaleString()} films`} items={c.items}
               source={`collection:${c.key}`} personal={c.items.some((i) => i.match_pct != null)} />
