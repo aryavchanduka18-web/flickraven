@@ -31,7 +31,7 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "deploy-out"
 CATALOG_TABLES = ["movies", "genres", "movie_genres", "people", "movie_credits", "keywords", "movie_keywords",
-                  "movie_awards"]
+                  "movie_awards", "movie_watch_providers"]
 DEMO_EMAIL = "demo@cinematch.local"
 # Tables that belong to one user, in insert order (the users row first, then the rows that point to it).
 USER_TABLES = ["user_preferences", "onboarding_picks", "ratings", "reactions", "user_movie_list", "watched",
@@ -118,6 +118,9 @@ def refresh_catalog(engine) -> None:
         conn.execute(text("INSERT INTO pop VALUES (:t, :s)"), pop)
         conn.execute(text("UPDATE movies m SET popularity_score = p.score FROM pop p WHERE p.tmdb_id = m.tmdb_id"))
     print(f"    films: {counts['movies']:,}; credits: {counts['movie_credits']:,}")
+    if (processed / "watch_providers.parquet").exists():
+        from pipeline.watch_providers import load as load_watch
+        print(f"    where to watch: {load_watch(engine, pd.read_parquet(processed / 'watch_providers.parquet')):,} rows")
 
 
 CHUNK_BYTES = 2 * 1024 * 1024        # one insert per 2 MB survives connections that drop on large statements

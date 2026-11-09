@@ -24,3 +24,7 @@ new_releases:
   min_votes_low_volume: 20          # part_b low_volume_languages and the boost languages (ta, te, ml, kn)
   max_per_language: 40              # newest month's most-voted films per language
   min_runtime_min: 60
+
+watch_providers:                    # where to watch (TMDB watch/providers; data by JustWatch)
+  region: IN                        # shown first
+  fallback_region: US               # used for a film only when TMDB lists no service in `region`

@@ -1,3 +1,4 @@
+import WhereToWatch from "../components/movie/WhereToWatch";
 import { useEffect } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ApiError } from "../api/client";
@@ -71,6 +72,7 @@ export default function Movie() {
       <div className="mx-auto grid max-w-[1800px] gap-10 px-4 md:grid-cols-[2fr_1fr] md:px-10">
         <div className="min-w-0 space-y-8">
           {m.overview && <p className="max-w-3xl text-base leading-relaxed text-white/90">{m.overview}</p>}
+          <WhereToWatch watch={m.watch} title={m.title} />
           {m.in_profile && (
             <p className="rounded-lg border border-white/10 bg-surface px-4 py-3 text-sm text-white/85">
               {m.user_state.rating != null ? `You rated this ${m.user_state.rating}/10. ` : m.user_state.reaction > 0 ? "You liked this. " : "You marked this as not for you. "}

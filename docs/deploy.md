@@ -100,6 +100,10 @@ already there, and finishes a bundle upload that stopped half way.
 
 If you skip a month nothing breaks; the catalog just stops getting newer.
 
+The refresh also updates **Where to watch** on film pages (step 3b): TMDB's list of streaming, rental and
+purchase services for each film, data by JustWatch. India is shown; a film with nothing listed in India
+shows the US instead, and a film with nothing in either says so. Only links out; the page credits JustWatch.
+
 ## Back up and restore
 
 `scripts\backup.ps1` saves the live database to `backups\flickraven-<date>.dump` on the laptop and keeps

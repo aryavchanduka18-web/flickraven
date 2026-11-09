@@ -72,6 +72,7 @@ export type MovieDetail = {
   community_rating: number | null;
   rating_count: number;
   rating_hist: number[];
+  watch?: import("../components/movie/WhereToWatch").Watch | null;
   user_state: UserState;
   match_pct?: number | null;
   why?: Reason[];
