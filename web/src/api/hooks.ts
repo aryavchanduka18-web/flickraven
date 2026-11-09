@@ -20,6 +20,10 @@ export type CollectionRail = { key: string; title: string; count: number; items:
 export const useCollections = () =>
   useQuery({ queryKey: ["collections"], queryFn: () => api<{ collections: CollectionRail[] }>("/collections"), staleTime: 60_000 });
 
+/** Series or anime for this user: content similarity to their taste plus popularity (no ratings exist for them). */
+export const useKindRail = (kind: "series" | "anime") =>
+  useQuery({ queryKey: ["kind", kind], queryFn: () => api<{ items: RecItem[]; total: number }>(`/recs/kind/${kind}?limit=24`), staleTime: 60_000 });
+
 type FeedbackAction =
   | { kind: "rate"; rating: number | null }
   | { kind: "react"; value: 1 | -1 | 0 }

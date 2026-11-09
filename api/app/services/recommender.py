@@ -53,7 +53,7 @@ def load_engine(db: Session) -> OnlineEngine:
         rows = pd.read_parquet(MODELS / "content_rows.parquet")
         content = sp.load_npz(MODELS / "content_matrix.npz").tocsr()
         movies = pd.DataFrame(db.execute(text("""
-            SELECT m.id, m.tmdb_id, m.title, m.original_language, m.runtime_min, m.year, m.catalog_part,
+            SELECT m.id, m.tmdb_id, m.title, m.original_language, m.runtime_min, m.year, m.catalog_part, m.title_type,
                    coalesce(m.popularity_score, 0) AS popularity, coalesce(m.tmdb_vote_count, 0) AS votes,
                    coalesce(array_agg(DISTINCT g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
                    coalesce(array_agg(DISTINCT k.name) FILTER (WHERE k.name IS NOT NULL), '{}') AS keywords,
@@ -78,7 +78,8 @@ def load_engine(db: Session) -> OnlineEngine:
             runtime=movies["runtime_min"].astype(float).to_numpy(), year=movies["year"].astype(float).to_numpy(),
             part=movies["catalog_part"].to_numpy(), popularity=movies["popularity"].astype(float).to_numpy(),
             votes=movies["votes"].astype(float).to_numpy(), has_award=movies["has_award"].fillna(False).to_numpy(),
-            content=content, universe_rows=universe_rows, recent=(movies["catalog_part"] == "C").to_numpy())
+            content=content, universe_rows=universe_rows, recent=(movies["catalog_part"] == "C").to_numpy(),
+            kind=movies["title_type"].to_numpy(dtype=object))
         train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
         uc, ic, sv, al = _settings("user_cf"), _settings("item_cf"), _settings("svd"), _settings("als")
         sources = SourceModels(

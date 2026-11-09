@@ -1,4 +1,5 @@
 import ImdbScore from "../components/movie/ImdbScore";
+import TypeBadge from "../components/movie/TypeBadge";
 import WhereToWatch from "../components/movie/WhereToWatch";
 import { useEffect } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -39,7 +40,8 @@ export default function Movie() {
   const m = movie.data;
   const tint = m.dominant_color ?? "#141414";
   const facts: [string, string | null | undefined][] = [
-    ["Release date", m.release_date], ["Runtime", runtime(m.runtime)], ["Language", languageName(m.language)],
+    [m.title_type && m.title_type !== "movie" ? "First aired" : "Release date", m.release_date], ["Status", m.series_status],
+    ["Runtime", runtime(m.runtime)], ["Language", languageName(m.language)],
     ["Country", m.countries?.join(", ")], ["Certification", m.certification], ["Studios", m.studios?.slice(0, 3).join(", ")],
   ];
   return (
@@ -56,9 +58,13 @@ export default function Movie() {
             {m.tagline && <p className="mt-2 text-lg italic text-white/75">{m.tagline}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/85">
               {m.match_pct != null && <span className="text-2xl font-extrabold text-accent">{m.match_pct}% match</span>}
+              <TypeBadge type={m.title_type} />
               <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
               {m.year && <span>{m.year}</span>}
-              {m.runtime && <span>{runtime(m.runtime)}</span>}
+              {m.title_type && m.title_type !== "movie" && m.seasons != null && (
+                <span>{m.seasons} season{m.seasons === 1 ? "" : "s"}{m.episodes ? ` · ${m.episodes} episodes` : ""}</span>
+              )}
+              {m.runtime && <span>{runtime(m.runtime)}{m.title_type && m.title_type !== "movie" ? " per episode" : ""}</span>}
               {m.certification && <span className="rounded border border-white/40 px-1.5 text-xs">{m.certification}</span>}
               <span>{m.genres.join(" · ")}</span>
             </div>
@@ -83,7 +89,7 @@ export default function Movie() {
           <WhyThis reasons={m.why} />
           <ConfidenceCard c={m.confidence} />
           <Credits title="Directed by" people={m.directors} />
-          <Credits title="Written by" people={m.writers} />
+          <Credits title={m.title_type && m.title_type !== "movie" ? "Created by" : "Written by"} people={m.writers} />
           <div>
             <h3 className="mb-3 text-sm font-semibold text-muted">Cast</h3>
             <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
@@ -109,7 +115,7 @@ export default function Movie() {
         </div>
         <aside className="min-w-0 space-y-8">
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-muted">Community ratings (MovieLens)</h3>
+            <h3 className="mb-3 text-sm font-semibold text-muted">{m.title_type && m.title_type !== "movie" ? "FlickRaven ratings" : "Community ratings (MovieLens)"}</h3>
             <RatingDistribution hist={m.rating_hist} />
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">

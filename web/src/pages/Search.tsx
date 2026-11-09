@@ -6,7 +6,7 @@ import MovieGrid from "../components/card/MovieGrid";
 import { languageName } from "../lib/format";
 import { tmdbImage } from "../lib/tmdb";
 
-type Understood = { genres: string[]; language: string | null; year: number | null; decade: [number, number] | null; text: string };
+type Understood = { genres: string[]; language: string | null; year: number | null; decade: [number, number] | null; kind?: string | null; text: string };
 type SearchRes = {
   items: RecItem[];
   understood: Understood;
@@ -16,10 +16,11 @@ type SearchRes = {
 
 /** "Hindi Comedy films from 2019", from the words the search understood. */
 function describe(u: Understood): string | null {
-  if (!u.genres.length && !u.language && !u.year && !u.decade) return null;
+  if (!u.genres.length && !u.language && !u.year && !u.decade && !u.kind) return null;
   const when = u.year ? ` from ${u.year}` : u.decade ? ` from the ${u.decade[0]}s` : "";
   const kind = [u.language ? languageName(u.language) : null, ...u.genres].filter(Boolean).join(" ");
-  return `${kind || "All"} films${when}${u.text ? ` matching "${u.text}"` : ", most popular first"}`;
+  const noun = u.kind === "anime" ? "anime" : u.kind === "series" ? "series" : "films";
+  return `${kind || "All"} ${noun}${when}${u.text ? ` matching "${u.text}"` : ", most popular first"}`;
 }
 
 export default function Search() {

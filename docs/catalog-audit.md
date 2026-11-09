@@ -14,7 +14,7 @@ US production (co-productions count), not already in A/B/C, metadata gate passed
 | ...meeting the part-D rule | 3,111 |
 | Already in part A | 3,708 |
 | Already in part B or C | 109 |
-| Added as part D | 686 |
+| Added as part D | 18,848 |
 | Failed the metadata gate | 0 |
 
 Gate failures by reason: none
@@ -36,39 +36,48 @@ Top 1000 US films by TMDB votes in the catalog: **1000 of 1000 (100.0%)**
 | A | 10,230 |
 | B | 3,370 |
 | C | 476 |
-| D | 686 |
-| **Total** | **14,762** |
+| D | 18,848 |
+| **Total** | **32,924** |
 
 Of these, 305 films (A 235, B 68, C 2) pass only the relaxed metadata gate (overview >= 10 words, >= 1 cast member). They were added on top of the cut made with the original gate (15 words, 3 cast), with its thresholds, and are outside the evaluation backbone.
 
 | Language | Films |
 |---|---|
-| en | 9,779 |
-| fr | 545 |
-| ja | 423 |
-| it | 396 |
-| es | 358 |
-| zh | 348 |
-| ko | 344 |
-| de | 342 |
-| hi | 320 |
-| pt | 316 |
-| cn | 303 |
-| tr | 281 |
-| te | 161 |
-| ml | 154 |
-| ta | 154 |
+| en | 18,737 |
+| ja | 2,875 |
+| fr | 2,036 |
+| hi | 1,535 |
+| ko | 1,212 |
+| es | 1,124 |
+| it | 1,122 |
+| de | 444 |
+| ta | 421 |
+| zh | 419 |
+| pt | 355 |
+| cn | 337 |
+| ml | 331 |
+| tr | 322 |
+| te | 283 |
+| ru | 219 |
+| bn | 136 |
 | kn | 133 |
-| ru | 69 |
-| sv | 51 |
-| da | 49 |
-| bn | 44 |
-| fa | 40 |
-| no | 21 |
-| fi | 17 |
-| pl | 16 |
-| nl | 13 |
-| cs | 13 |
-| th | 12 |
+| sv | 125 |
+| da | 111 |
+| pl | 98 |
+| no | 86 |
+| nl | 71 |
+| fa | 50 |
+| th | 47 |
+| fi | 34 |
+| mr | 27 |
+| cs | 22 |
+| ar | 22 |
+| is | 19 |
+| id | 17 |
+| el | 17 |
+| hu | 17 |
+| he | 16 |
+| ro | 15 |
+| sr | 11 |
 
 Languages with fewer than 10 films are listed in artifacts/metrics/catalog_audit.json.

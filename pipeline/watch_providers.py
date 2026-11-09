@@ -20,6 +20,7 @@ import yaml
 from sqlalchemy import Engine, create_engine, text
 
 from pipeline.common import PROCESSED, RAW, env, get_logger
+from pipeline.series import tv_id
 from pipeline.tmdb import TMDB
 
 log = get_logger("watch_providers")
@@ -47,11 +48,14 @@ def pick(tmdb_id: int, response: dict | None, region: str = CFG["region"],
 
 
 def fetch(today: date) -> pd.DataFrame:
-    ids = pd.read_parquet(PROCESSED / "movies_clean.parquet", columns=["tmdb_id"])["tmdb_id"].astype(int)
+    films = pd.read_parquet(PROCESSED / "movies_clean.parquet", columns=["tmdb_id", "title_type"])
+    ids = films["tmdb_id"].astype(int)
     tmdb, folder = TMDB(), CACHE / today.strftime("%Y-%m")
     rows = []
-    for n, tmdb_id in enumerate(ids, 1):
-        rows += pick(tmdb_id, tmdb.cached(folder / f"{tmdb_id}.json", f"/movie/{tmdb_id}/watch/providers"))
+    for n, (tmdb_id, kind) in enumerate(zip(ids, films["title_type"]), 1):
+        # A series is stored as 10,000,000 + its TV id and has its own TMDB endpoint.
+        path = f"/movie/{tmdb_id}/watch/providers" if kind == "movie" else f"/tv/{tv_id(tmdb_id)}/watch/providers"
+        rows += pick(tmdb_id, tmdb.cached(folder / f"{tmdb_id}.json", path))
         if n % 1000 == 0:
             log.info("%d / %d films", n, len(ids))
     df = pd.DataFrame(rows, columns=COLUMNS)

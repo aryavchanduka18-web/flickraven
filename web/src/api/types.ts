@@ -18,6 +18,7 @@ export type MovieSummary = {
   dominant_color: string | null;
   overview_short: string | null;
   catalog_part?: string;
+  title_type?: "movie" | "series" | "anime";
 };
 
 export type RecItem = {
@@ -75,6 +76,10 @@ export type MovieDetail = {
   imdb_rating?: number | null;
   imdb_votes?: number | null;
   rating_count: number;
+  title_type?: "movie" | "series" | "anime";
+  seasons?: number | null;
+  episodes?: number | null;
+  series_status?: string | null;
   rating_hist: number[];
   watch?: import("../components/movie/WhereToWatch").Watch | null;
   user_state: UserState;
