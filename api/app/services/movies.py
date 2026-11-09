@@ -2,11 +2,13 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
+
 SITE_PRIOR = 20          # community rating: popularity_score acts as 20 prior votes, site ratings add to it
 
 CARD_SQL = """
 SELECT m.id, m.title, m.year, m.poster_path, m.backdrop_path, m.logo_path, m.original_language, m.runtime_min,
-       m.dominant_color, m.overview, m.popularity_score, m.catalog_part,
+       m.dominant_color, m.overview, m.popularity_score, m.catalog_part, m.imdb_rating, m.imdb_votes,
        coalesce(array_agg(g.name ORDER BY g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
        (SELECT count(*) FROM ratings r WHERE r.movie_id = m.id) AS site_n,
        (SELECT coalesce(sum(r.rating), 0) FROM ratings r WHERE r.movie_id = m.id) AS site_sum
@@ -48,6 +50,13 @@ def user_states(db: Session, user_id: int | None, ids: list[int]) -> dict[int, d
     return states
 
 
+def imdb(row) -> dict:
+    """IMDb rating and vote count for display, or nulls when the film has none or IMDB_RATINGS is off."""
+    if not get_settings().imdb_ratings or row["imdb_rating"] is None:
+        return {"imdb_rating": None, "imdb_votes": None}
+    return {"imdb_rating": float(row["imdb_rating"]), "imdb_votes": row["imdb_votes"]}
+
+
 def cards(db: Session, ids: list[int], user_id: int | None = None, extra: dict[int, dict] | None = None) -> list[dict]:
     """Recommendation item shape (spec 11), in the order of `ids`."""
     if not ids:
@@ -65,6 +74,7 @@ def cards(db: Session, ids: list[int], user_id: int | None = None, extra: dict[i
                       "backdrop": r["backdrop_path"], "logo": r["logo_path"], "genres": list(r["genres"]),
                       "language": r["original_language"], "runtime": r["runtime_min"],
                       "community_rating": community_rating(r["popularity_score"], r["site_n"], r["site_sum"]),
+                      **imdb(r),
                       "dominant_color": r["dominant_color"], "overview_short": short(r["overview"]),
                       "catalog_part": r["catalog_part"]},
             "score": e.get("score"), "match_pct": e.get("match_pct"), "reasons": e.get("reasons", []),
@@ -120,7 +130,7 @@ def detail(db: Session, movie_id: int, user_id: int | None) -> dict | None:
         "directors": by_role("director"), "writers": by_role("writer"), "cast": by_role("cast"),
         "catalog_part": m["catalog_part"],
         "collection": {"id": m["collection_id"], "name": m["collection_name"]} if m["collection_id"] else None,
-        "community_rating": community_rating(m["popularity_score"], site[0], site[1]),
+        "community_rating": community_rating(m["popularity_score"], site[0], site[1]), **imdb(m),
         "rating_count": int((m["ml_rating_count"] or 0) + site[0]), "rating_hist": hist,
         "user_state": user_states(db, user_id, [movie_id])[movie_id],
     }

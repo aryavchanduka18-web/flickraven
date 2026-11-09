@@ -1,3 +1,4 @@
+import ImdbScore from "../../components/movie/ImdbScore";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
@@ -59,7 +60,7 @@ export function CardMeta({ item, personal }: { item: RecItem; personal?: boolean
       )}
       <div className="flex items-center gap-2 text-[13px] text-muted">
         {m.year && <span>{m.year}</span>}
-        {m.community_rating != null && <span>★ {m.community_rating.toFixed(1)}</span>}
+        <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
         {m.language && <span>{languageName(m.language)}</span>}
       </div>
     </div>

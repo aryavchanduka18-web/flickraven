@@ -1,3 +1,4 @@
+import ImdbScore from "../components/movie/ImdbScore";
 import WhereToWatch from "../components/movie/WhereToWatch";
 import { useEffect } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -55,7 +56,7 @@ export default function Movie() {
             {m.tagline && <p className="mt-2 text-lg italic text-white/75">{m.tagline}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/85">
               {m.match_pct != null && <span className="text-2xl font-extrabold text-accent">{m.match_pct}% match</span>}
-              {m.community_rating != null && <span>★ {m.community_rating.toFixed(1)} <span className="text-muted">({m.rating_count.toLocaleString()})</span></span>}
+              <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
               {m.year && <span>{m.year}</span>}
               {m.runtime && <span>{runtime(m.runtime)}</span>}
               {m.certification && <span className="rounded border border-white/40 px-1.5 text-xs">{m.certification}</span>}
@@ -108,7 +109,7 @@ export default function Movie() {
         </div>
         <aside className="min-w-0 space-y-8">
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-muted">Ratings</h3>
+            <h3 className="mb-3 text-sm font-semibold text-muted">Community ratings (MovieLens)</h3>
             <RatingDistribution hist={m.rating_hist} />
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">

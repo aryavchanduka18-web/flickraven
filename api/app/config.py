@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     run_cleanup: bool = False
     # Emails allowed to open the private /stats page, comma-separated (e.g. ADMIN_EMAILS=you@gmail.com).
     admin_emails: str = ""
+    # Show IMDb ratings (IMDb's dataset is licensed for non-commercial use; see docs/decisions-log.md).
+    # IMDB_RATINGS=false hides them everywhere at the next restart, without touching the data.
+    imdb_ratings: bool = True
 
     @field_validator("database_url")
     @classmethod

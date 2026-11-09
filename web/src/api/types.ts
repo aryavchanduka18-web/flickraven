@@ -13,6 +13,8 @@ export type MovieSummary = {
   language: string | null;
   runtime: number | null;
   community_rating: number | null;
+  imdb_rating?: number | null;
+  imdb_votes?: number | null;
   dominant_color: string | null;
   overview_short: string | null;
   catalog_part?: string;
@@ -70,6 +72,8 @@ export type MovieDetail = {
   writers: Person[];
   cast: Person[];
   community_rating: number | null;
+  imdb_rating?: number | null;
+  imdb_votes?: number | null;
   rating_count: number;
   rating_hist: number[];
   watch?: import("../components/movie/WhereToWatch").Watch | null;

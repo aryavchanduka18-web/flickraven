@@ -1,3 +1,4 @@
+import ImdbScore from "../components/movie/ImdbScore";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -102,7 +103,7 @@ function FilmTile({ f, wide = false }: { f: Credit; wide?: boolean }) {
       </div>
       <div className="mt-0.5 flex gap-2 text-xs">
         {f.match_pct != null && <span className="text-base font-extrabold text-accent">{f.match_pct}% match</span>}
-        {m.community_rating != null && <span className="text-white/70">★ {m.community_rating.toFixed(1)}</span>}
+        <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} className="text-white/70" />
       </div>
     </Link>
   );

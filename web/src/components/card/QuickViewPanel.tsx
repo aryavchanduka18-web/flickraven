@@ -1,3 +1,4 @@
+import ImdbScore from "../../components/movie/ImdbScore";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -45,7 +46,7 @@ export default function QuickViewPanel() {
               <h2 className="font-display text-2xl font-bold">{item.movie.title}</h2>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted">
                 {item.match_pct != null && <span className="text-lg font-extrabold text-accent">{item.match_pct}% match</span>}
-                {item.movie.community_rating != null && <span>★ {item.movie.community_rating.toFixed(1)}</span>}
+                <ImdbScore rating={item.movie.imdb_rating} votes={item.movie.imdb_votes} />
                 {item.movie.year && <span>{item.movie.year}</span>}
                 {item.movie.runtime && <span>{runtime(item.movie.runtime)}</span>}
                 <span>{languageName(item.movie.language)}</span>

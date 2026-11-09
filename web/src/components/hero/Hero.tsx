@@ -1,3 +1,4 @@
+import ImdbScore from "../../components/movie/ImdbScore";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -53,7 +54,7 @@ export default function Hero({ items }: { items: RecItem[] }) {
               {item.match_pct != null && agreementLabel(item.agreement) && (
                 <span className="text-[11px] text-white/60">{agreementLabel(item.agreement)!.toLowerCase()} model agreement</span>
               )}
-              {m.community_rating != null && <span>★ {m.community_rating.toFixed(1)}</span>}
+              <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
               {m.year && <span>{m.year}</span>}
               {m.runtime && <span>{runtime(m.runtime)}</span>}
               <span>{languageName(m.language)}</span>
