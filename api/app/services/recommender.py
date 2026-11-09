@@ -45,18 +45,23 @@ def _settings(name: str) -> dict:
     return json.loads((MODELS / f"{name}.json").read_text())["settings"]
 
 
+LEARNED_FILES = ("drama_neighbors.json", "anime_neighbors.json")
+
+
 def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
-    """Learned series-to-series similarities (artifacts/models/drama_neighbors.json, made by pipeline/drama_cf.py
-    from real MyDramaList lists; only the similarities are kept) as an n x n matrix over the catalog rows, or None."""
-    path = MODELS / "drama_neighbors.json"
-    if not path.exists():
+    """Learned series and anime similarities (artifacts/models/drama_neighbors.json from MyDramaList and
+    anime_neighbors.json from the Kaggle anime lists, made by pipeline/drama_cf.py and pipeline/anime_cf.py; only
+    the similarities are kept) as one n x n matrix over the catalog rows, or None when no file exists."""
+    files = [MODELS / f for f in LEARNED_FILES if (MODELS / f).exists()]
+    if not files:
         return None
     row_of = {t: i for i, t in enumerate(tmdb_ids)}
     rows, cols, vals = [], [], []
-    for a, nbs in json.loads(path.read_text())["neighbors"].items():
-        for b, v in nbs:
-            if int(a) in row_of and b in row_of:
-                rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
+    for path in files:
+        for a, nbs in json.loads(path.read_text())["neighbors"].items():
+            for b, v in nbs:
+                if int(a) in row_of and b in row_of:
+                    rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
     n = len(tmdb_ids)
     sim = sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32)
     return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
