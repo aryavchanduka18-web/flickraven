@@ -67,6 +67,33 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
     return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
 
 
+def _similar_table(tmdb_ids: list[int]) -> dict | None:
+    """More Like This neighbours (artifacts/models/similar_titles.npz, made by pipeline/similar_titles.py), re-indexed
+    to the catalog rows. Titles the file does not know (added later) have rows -1 and use the fallback formula.
+    About 15 MB in memory for 33,000 titles x 40 neighbours."""
+    path = MODELS / "similar_titles.npz"
+    if not path.exists():
+        return None
+    f = np.load(path)
+    row_of = {int(t): i for i, t in enumerate(tmdb_ids)}
+    src = np.array([row_of.get(int(t), -1) for t in f["tmdb_ids"]], dtype=np.int64)    # file row -> catalog row
+    n, k = len(tmdb_ids), f["rows"].shape[1]
+    rows = np.full((n, k), -1, dtype=np.int32)
+    scores = np.zeros((n, k), dtype=np.float16)
+    comps = np.zeros((f["comps"].shape[0], n, k), dtype=np.uint8)
+    have = src >= 0
+    nb = f["rows"][have]
+    mapped = np.where(nb >= 0, src[np.maximum(nb, 0)], -1)
+    # a neighbour that left the catalog is dropped and the rest move up, keeping their order
+    order = np.argsort(mapped < 0, axis=1, kind="stable")
+    take = lambda a: np.take_along_axis(a, order, axis=1)
+    rows[src[have]] = take(mapped)
+    scores[src[have]] = take(f["scores"][have])
+    for i in range(comps.shape[0]):
+        comps[i, src[have]] = take(f["comps"][i][have])
+    return {"rows": rows, "scores": scores, "comps": comps, "stored": [str(s) for s in f["stored"]]}
+
+
 def load_engine(db: Session) -> OnlineEngine:
     global _engine
     with _lock:
@@ -113,7 +140,9 @@ def load_engine(db: Session) -> OnlineEngine:
             als={"Y": f["als_Y"], "alpha": al["alpha"], "reg": al["regularization"]})
         weights = json.loads((MODELS / "hybrid_weights.json").read_text())
         calibrator = joblib.load(MODELS / "calibration.joblib")
-        _engine = OnlineEngine(catalog, sources, weights, calibrator, (f["item_nb_idx"], f["item_nb_vals"]), train)
+        engine = OnlineEngine(catalog, sources, weights, calibrator, (f["item_nb_idx"], f["item_nb_vals"]), train)
+        engine.similar_table = _similar_table(movies["tmdb_id"].tolist())
+        _engine = engine
         return _engine
 
 

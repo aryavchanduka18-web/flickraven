@@ -9,8 +9,11 @@ export const useHome = (mode?: Mode) =>
 
 export const useMovie = (id: number) => useQuery({ queryKey: ["movie", id], queryFn: () => api<MovieDetail>(`/movies/${id}`) });
 
-export const useSimilar = (id: number) =>
-  useQuery({ queryKey: ["similar", id], queryFn: () => api<{ items: RecItem[] }>(`/movies/${id}/similar`) });
+export type SimilarPage = { items: RecItem[]; total: number; offset: number };
+
+/** More Like This, first `limit` titles (same type as the title, with reasons). */
+export const useSimilar = (id: number, limit = 8) =>
+  useQuery({ queryKey: ["similar", id, limit], queryFn: () => api<SimilarPage>(`/movies/${id}/similar?limit=${limit}`) });
 
 export const useFranchise = (id: number) =>
   useQuery({ queryKey: ["franchise", id], queryFn: () => api<{ sections: FranchiseSection[] }>(`/movies/${id}/franchise`) });

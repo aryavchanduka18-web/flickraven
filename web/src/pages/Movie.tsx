@@ -12,6 +12,7 @@ import RatingDistribution from "../components/feedback/RatingDistribution";
 import RatingStars from "../components/feedback/RatingStars";
 import { PageMessage } from "../components/Loading";
 import Rail from "../components/rail/Rail";
+import { PosterGrid } from "../components/card/PosterCard";
 import { languageName, runtime } from "../lib/format";
 import { tmdbImage } from "../lib/tmdb";
 
@@ -137,7 +138,22 @@ export default function Movie() {
         </aside>
       </div>
       <FranchiseRails id={m.id} />
-      {similar.data && <div className="mt-12"><Rail title="More Like This" subtitle="Films most similar to this one" items={similar.data.items} source="more_like_this" personal={false} /></div>}
+      {similar.data && similar.data.items.length > 0 && (
+        <section className="mx-auto mt-12 max-w-[1800px] px-4 md:px-10">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="font-display text-xl font-bold md:text-2xl">More Like This</h2>
+              <p className="text-sm text-muted">{m.title_type && m.title_type !== "movie" ? "Series" : "Films"} with a similar story, themes or people</p>
+            </div>
+            {similar.data.total > similar.data.items.length && (
+              <Link to={`/movie/${id}/similar`} className="text-sm text-white/80 underline underline-offset-4 hover:text-white">
+                View all {similar.data.total} similar titles
+              </Link>
+            )}
+          </div>
+          <PosterGrid items={similar.data.items} source="more_like_this" />
+        </section>
+      )}
     </div>
   );
 }

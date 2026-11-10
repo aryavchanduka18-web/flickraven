@@ -26,6 +26,7 @@ try {
     Step "3b. Where to watch (TMDB / JustWatch, India first)" @("-m", "pipeline.watch_providers")
     Step "3c. IMDb ratings (IMDb's dataset, display only)" @("-m", "pipeline.imdb_ratings")
     Step "4. Give new films content features" @("-m", "pipeline.extend_serving")
+    Step "4b. More Like This neighbours for the new titles" @("-m", "pipeline.similar_titles")
     Step "5. Export catalog and models" @("scripts\deploy_data.py", "export")
     $env:TARGET_DATABASE_URL = $url
     try { Step "6. Upload to the live site" @("scripts\deploy_data.py", "upload", "--refresh-catalog") }
