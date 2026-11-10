@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # AI assistant (Google Gemini). The key lives only in this environment variable, never in the repository.
     # ASSISTANT_ENABLED=false switches the assistant off at the next restart. Caps are messages per person per day.
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
     assistant_enabled: bool = True
     assistant_daily_cap: int = 30
     assistant_guest_cap: int = 8

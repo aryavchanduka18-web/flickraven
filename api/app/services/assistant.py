@@ -19,6 +19,7 @@ from app.config import get_settings
 MAX_CHARS = 1000            # one message
 MAX_TURNS = 12              # messages of history sent to the model
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+RETRYABLE_STATUS_CODES = {500, 502, 503, 504}
 TITLE_RE = re.compile(r"\[\[(.+?)\]\]")
 
 SYSTEM = """You are FlickRaven's assistant: a friendly, knowledgeable guide to films, TV series and anime. You may chat about \
@@ -100,19 +101,55 @@ def named_titles(db: Session, message: str) -> str:
     return ("Catalog facts about titles mentioned (use these for story questions, say if they are not enough):\n" + "\n".join(lines)) if lines else ""
 
 
+def _gemini_error_details(response) -> tuple[str, str]:
+    """Return short provider diagnostics without logging request content or credentials."""
+    try:
+        error = response.json().get("error", {})
+    except (ValueError, AttributeError):
+        return "", ""
+    if not isinstance(error, dict):
+        return "", ""
+    status = str(error.get("status") or error.get("code") or "")
+    message = " ".join(str(error.get("message") or "").split())[:240]
+    api_key = get_settings().gemini_api_key
+    if api_key:
+        message = message.replace(api_key, "[redacted]")
+    return status, message
+
+
 def ask_gemini(history: list[dict], system: str) -> str:
     s = get_settings()
     body = {"system_instruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["text"]}]} for m in history],
-            "generationConfig": {"maxOutputTokens": 700, "temperature": 0.7}}
-    try:
-        r = httpx.post(URL.format(model=s.gemini_model), json=body, headers={"x-goog-api-key": s.gemini_api_key}, timeout=httpx.Timeout(25.0, connect=5.0))
-    except httpx.HTTPError as e:
-        log.warning("gemini request failed: %s", type(e).__name__)
-        raise HTTPException(502, "The assistant could not be reached. Try again in a moment.")
+            "generationConfig": {"maxOutputTokens": 700}}
+    for attempt in range(2):
+        try:
+            r = httpx.post(URL.format(model=s.gemini_model), json=body,
+                           headers={"x-goog-api-key": s.gemini_api_key},
+                           timeout=httpx.Timeout(25.0, connect=5.0))
+        except httpx.HTTPError as e:
+            if attempt == 0:
+                log.info("gemini request failed (%s); retrying once", type(e).__name__)
+                time.sleep(0.25)
+                continue
+            log.warning("gemini request failed after retry: %s", type(e).__name__)
+            raise HTTPException(502, "The assistant could not be reached. Try again in a moment.")
+        if r.status_code in RETRYABLE_STATUS_CODES and attempt == 0:
+            log.warning("gemini returned transient HTTP %s; retrying once", r.status_code)
+            time.sleep(0.25)
+            continue
+        break
     if r.status_code != 200:
-        log.warning("gemini returned HTTP %s", r.status_code)
-        raise HTTPException(502, "The assistant is busy right now. Try again in a moment.")
+        provider_status, provider_message = _gemini_error_details(r)
+        log.warning("gemini returned HTTP %s (provider_status=%s, message=%s)",
+                    r.status_code, provider_status or "unknown", provider_message or "none")
+        if r.status_code in (400, 401, 403, 404):
+            detail = "The assistant service needs a configuration update. Please try again later."
+        elif r.status_code == 429:
+            detail = "The AI service has reached its current request limit. Please try again later."
+        else:
+            detail = "The assistant is temporarily busy. Try again in a moment."
+        raise HTTPException(502, detail)
     try:
         parts = r.json()["candidates"][0]["content"]["parts"]
         return "".join(p.get("text", "") for p in parts).strip() or "I could not think of an answer to that. Try asking another way."
