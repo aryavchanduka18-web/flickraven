@@ -2,12 +2,13 @@ import { motion, useReducedMotion } from "framer-motion";
 import { NavLink } from "react-router-dom";
 import { AvatarMenu, Logo, TABS } from "./NavBar";
 import SearchBox from "./SearchBox";
-import { ActivityIcon, DiscoverIcon, GenresIcon, HomeIcon, ListIcon, SearchIcon, SidebarIcon } from "./icons";
+import { ActivityIcon, DiscoverIcon, GenresIcon, HomeIcon, ListIcon, SearchIcon, SidebarIcon, SparkIcon } from "./icons";
 import { useUI } from "./ui";
 
 const ICONS: Record<string, (p: { className?: string }) => React.JSX.Element> = {
   "/": HomeIcon,
   "/discover": DiscoverIcon,
+  "/pick": SparkIcon,
   "/genres": GenresIcon,
   "/my-list": ListIcon,
   "/activity": ActivityIcon,

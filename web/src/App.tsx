@@ -12,6 +12,7 @@ import Movie from "./pages/Movie";
 import SimilarAll from "./pages/SimilarAll";
 import MyList from "./pages/MyList";
 import Onboarding from "./pages/Onboarding";
+import PerfectPick from "./pages/PerfectPick";
 import Person from "./pages/Person";
 import SeriesFit from "./pages/SeriesFit";
 import TasteDna from "./pages/TasteDna";
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/missions" element={<Navigate to="/" replace />} />
         <Route path="/taste-dna" element={<TasteDna />} />
         <Route path="/performance" element={<Performance />} />
+        <Route path="/pick" element={<PerfectPick />} />
         <Route path="/search" element={<Search />} />
         <Route path="/series-fit" element={<SeriesFit />} />
         <Route path="/onboarding" element={<Onboarding />} />
