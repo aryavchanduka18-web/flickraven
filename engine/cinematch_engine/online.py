@@ -17,7 +17,7 @@ from cinematch_engine.blend import candidate_pool, contributions
 from cinematch_engine.config import event_weights
 from cinematch_engine.explain import explain
 from cinematch_engine.profile import stage_of
-from cinematch_engine.rerank import MODES, TOP_N, mmr
+from cinematch_engine.rerank import MODES, TAIL_PCT, TOP_N, mmr, spread, tail_slots
 from cinematch_engine.sources import SOURCES, Profiles, SourceModels
 from cinematch_engine.surprise import REASON as SURPRISE_REASON
 from cinematch_engine.tonight import Request, recommend as tonight_recommend
@@ -243,22 +243,37 @@ class OnlineEngine:
         final = np.tensordot(np.array([w.get(s, 0) for s in SOURCES], dtype=np.float32), norm, axes=1)
         if self.availability is not None:
             pool, norm, final = self._add_unavailable_candidates(st, scores, excl, pool, norm, final, w)
+        cfg = MODES[mode]
+        t = tail_slots(k, cfg.get("tail_share", 0.0))
+        if t:
+            pool, norm, final = self._add_unavailable_candidates(st, scores, excl, pool, norm, final, w,
+                                                                 rows=self.tail_rows())
         order = np.argsort(-final)
         pool, norm, final = pool[order], norm[:, order], final[order]
-        top = slice(0, TOP_N)
-        items, rel = pool[top], final[top]
+        is_tail_all = self.cat.fame_pct[pool] < TAIL_PCT
+        # The top 100 by blend score, plus (when a tail channel is on) the best 40 long-tail films, which may rank lower.
+        keep = np.union1d(np.arange(min(TOP_N, len(pool))), np.nonzero(is_tail_all)[0][:40]) if t else np.arange(min(TOP_N, len(pool)))
+        pool, norm, final = pool[keep], norm[:, keep], final[keep]
+        items, rel = pool, final
+        is_tail = is_tail_all[keep]
         x = self.cat.content[items]
         sim = (x @ x.T).toarray().astype(np.float32)
         boost = self._explore_boost(st, items) if mode == "discover" else None
-        cfg = MODES[mode]
         lam, beta = cfg["lambda"], cfg["beta"]
         if tuning is not None and not tuning.neutral:
             lam = float(np.clip(lam - 0.2 * tuning.shift("adventurous"), 0.3, 0.98))
             beta = max(0.0, beta + 0.15 * tuning.shift("hidden"))
             boost = (boost if boost is not None else 0) + self._tuning_boost(items, tuning)
-        local = mmr(np.arange(len(items)), rel, sim, self.cat.novelty[items], k, lam, beta, boost)
+        everything = np.arange(len(items))
+        if t:
+            tail_local = mmr(everything, rel, sim, self.cat.novelty[items], t, lam, beta, boost, allowed=is_tail)
+            head_local = mmr(everything, rel, sim, self.cat.novelty[items], k - len(tail_local), lam, beta, boost,
+                             allowed=~is_tail, already=tail_local)
+            local = spread(head_local, tail_local)
+        else:
+            local = mmr(everything, rel, sim, self.cat.novelty[items], k, lam, beta, boost)
         picked = items[local]
-        shares = contributions(norm[:, :TOP_N][:, local], w)
+        shares = contributions(norm[:, local], w)
         blend_rank = {int(i): j for j, i in enumerate(items)}
         # Match % comes from the catalog-wide hybrid score, as on the film page, Why, lists and genre pages,
         # so a film shows the same number everywhere (the pool score above only decides what is picked).
@@ -270,7 +285,16 @@ class OnlineEngine:
                         "shares": share, "reranked": blend_rank[int(row)] > pos + 3})
         return out
 
-    def _add_unavailable_candidates(self, st, scores, excl, pool, norm, final, w, per_source: int = 50):
+    def tail_rows(self) -> np.ndarray:
+        """Films outside the 20% most-voted films of the catalog (the long-tail channel's candidates)."""
+        rows = getattr(self, "_tail_rows", None)
+        if rows is None:
+            cat = self.cat
+            rows = np.nonzero((cat.fame_pct < TAIL_PCT) & (np.asarray(cat.kind) == "movie"))[0]
+            self._tail_rows = rows
+        return rows
+
+    def _add_unavailable_candidates(self, st, scores, excl, pool, norm, final, w, per_source: int = 50, rows=None):
         """Films without collaborative factors can be proposed by no model but content and popularity, which the
         candidate pool then scored 0 for the rest. Add the best of them by their availability-aware score
         (rail_scores), on the pool's scale: the map from catalog-wide score to pool score is fitted (isotonic)
@@ -278,7 +302,7 @@ class OnlineEngine:
         from sklearn.isotonic import IsotonicRegression
         lifted = self.language_lift(st, scores)
         rail = self.rail_scores(st, lifted)
-        rows = self.unavailable_rows()
+        rows = self.unavailable_rows() if rows is None else rows
         rows = rows[np.isfinite(rail[rows]) & ~np.isin(rows, excl) & ~np.isin(rows, pool)]
         if not len(rows):
             return pool, norm, final
