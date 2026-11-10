@@ -33,6 +33,10 @@ THEMES = {
     "weekend": Theme("weekend", "Perfect binge-watches", "Short, finished series you can get through in a weekend."),
     "binge": Theme("binge", "Can't stop at just one episode", "Much-loved series with plenty of seasons to get lost in."),
     "quick_comedy": Theme("quick_comedy", "Quick comedy", "Live-action comedy series with short episodes, easy to fit in."),
+    "one_season": Theme("one_season", "One Season. One Great Story.", "Finished in a single season: a complete story without a long commitment."),
+    "completed": Theme("completed", "Completed Series Worth Bingeing", "Finished series that viewers rate very highly, so there is no wait for the next season."),
+    "hidden_gems": Theme("hidden_gems", "Hidden Gems You Might Have Missed", "Well-rated series that fewer people have seen."),
+    "returning": Theme("returning", "New Episodes & Returning Shows", "Series that are still airing and well rated. TMDB's status, not an episode calendar."),
     "rewatch": Theme("rewatch", "Great to rewatch", "Finished series with several seasons that hold up a second time."),
 }
 
@@ -64,6 +68,15 @@ def in_theme(key: str, s: dict) -> bool:
         return seasons >= 3 and episodes >= 30 and pop >= 7.5
     if key == "quick_comedy":
         return live_action and "Comedy" in (s.get("genres") or []) and 0 < (s.get("runtime") or 0) <= 30 and episodes >= 20 and pop >= 6.5
+    votes = s.get("votes") or 0
+    if key == "one_season":
+        return s.get("status") in ("Ended", "Canceled") and seasons == 1 and 4 <= episodes <= 16 and pop >= 7.6 and votes >= 300
+    if key == "completed":
+        return s.get("status") == "Ended" and episodes >= 8 and pop >= 8.0 and votes >= 1000
+    if key == "hidden_gems":
+        return live_action and pop >= 7.8 and 100 <= votes < 1500
+    if key == "returning":
+        return s.get("status") == "Returning Series" and pop >= 7.2 and votes >= 300
     if key == "rewatch":
         return s.get("status") == "Ended" and seasons >= 4 and pop >= 7.5
     return False

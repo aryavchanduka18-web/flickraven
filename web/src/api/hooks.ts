@@ -31,7 +31,7 @@ export type SeriesRail = { key: string; title: string; subtitle: string; items: 
 
 /** Themed series rows (Korean, Japanese, Indian, Anglo and international dramas for you, quick comedy, because you liked ..., a films-and-series mix). */
 export const useSeriesRails = () =>
-  useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[] }>("/recs/series-rails"), staleTime: 60_000 });
+  useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[]; engaged_series?: number }>("/recs/series-rails"), staleTime: 60_000 });
 
 type FeedbackAction =
   | { kind: "rate"; rating: number | null }

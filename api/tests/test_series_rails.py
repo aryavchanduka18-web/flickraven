@@ -68,3 +68,16 @@ def test_interest_orders_rows_but_never_hides_one():
     interest = sr.affinity(["hi", "hi", "hi", "en"], [])                            # a user who likes Hindi
     assert [r["key"] for r in sr.build(series, ids, interest)] == ["indian", "anglo", "kdrama"]
     assert sr.affinity([], ["ko"])["kdrama"] == 3 and sr.affinity([], [])["kdrama"] == 0
+
+
+def test_new_tv_rows_follow_their_written_rules():
+    base = {"lang": "en", "countries": ["US"], "genres": ["Drama"], "runtime": 50, "popularity": 8.2, "votes": 2000}
+    assert sr.in_theme("one_season", {**base, "status": "Ended", "seasons": 1, "episodes": 8})
+    assert not sr.in_theme("one_season", {**base, "status": "Ended", "seasons": 2, "episodes": 8})
+    assert not sr.in_theme("one_season", {**base, "status": "Returning Series", "seasons": 1, "episodes": 8})
+    assert sr.in_theme("completed", {**base, "status": "Ended", "seasons": 4, "episodes": 40})
+    assert not sr.in_theme("completed", {**base, "status": "Returning Series", "seasons": 4, "episodes": 40})
+    assert sr.in_theme("hidden_gems", {**base, "votes": 400, "status": "Ended", "seasons": 1, "episodes": 8})
+    assert not sr.in_theme("hidden_gems", {**base, "votes": 5000})                     # well known is not hidden
+    assert sr.in_theme("returning", {**base, "status": "Returning Series", "seasons": 3, "episodes": 30})
+    assert not sr.in_theme("returning", {**base, "status": "Ended", "seasons": 3, "episodes": 30})
