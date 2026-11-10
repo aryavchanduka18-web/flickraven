@@ -82,3 +82,13 @@ def test_long_messages_are_cut_and_empty_ones_refused(client):
     ask(client, "x" * 5000)
     assert len(client.sent[0]["body"]["contents"][-1]["parts"][0]["text"]) == ai.MAX_CHARS
     assert client.post("/api/assistant/chat", json={"messages": []}).status_code == 422
+
+
+def test_a_failed_gemini_call_does_not_use_up_a_message(client, monkeypatch):
+    def boom(url, json=None, headers=None, timeout=None):
+        raise ai.httpx.ConnectError("down")
+    monkeypatch.setattr(ai.httpx, "post", boom)
+    before = client.get("/api/assistant/status").json()["remaining"]
+    r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "hi"}]})
+    assert r.status_code == 502
+    assert client.get("/api/assistant/status").json()["remaining"] == before

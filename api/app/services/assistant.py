@@ -4,6 +4,7 @@ Privacy: the model gets the conversation, a short taste summary (genres and a fe
 user names, the catalog's own synopsis. It never gets a name, an email or an id. Free-tier prompts may be used by
 Google to improve its products; the privacy page says so.
 """
+import logging
 import re
 import threading
 import time
@@ -33,6 +34,7 @@ section on the title's page.
 - Use the taste summary only to personalise suggestions; do not recite it back."""
 
 _used: dict[tuple[str, str], int] = {}
+log = logging.getLogger(__name__)
 _lock = threading.Lock()
 
 
@@ -59,6 +61,14 @@ def spend(user_id: int, is_guest: bool) -> None:
         if _used.get(key, 0) >= cap_for(is_guest):
             raise HTTPException(429, "You have used today's assistant messages. They reset tomorrow.")
         _used[key] = _used.get(key, 0) + 1
+
+
+def refund(user_id: int, is_guest: bool) -> None:
+    """Give a message back when the answer could not be produced (the user should not pay for our failure)."""
+    key = (str(user_id), today())
+    with _lock:
+        if _used.get(key, 0) > 0:
+            _used[key] -= 1
 
 
 def taste_summary(db: Session, user_id: int) -> str:
@@ -96,10 +106,12 @@ def ask_gemini(history: list[dict], system: str) -> str:
             "contents": [{"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["text"]}]} for m in history],
             "generationConfig": {"maxOutputTokens": 700, "temperature": 0.7}}
     try:
-        r = httpx.post(URL.format(model=s.gemini_model), json=body, headers={"x-goog-api-key": s.gemini_api_key}, timeout=30)
-    except httpx.HTTPError:
+        r = httpx.post(URL.format(model=s.gemini_model), json=body, headers={"x-goog-api-key": s.gemini_api_key}, timeout=httpx.Timeout(25.0, connect=5.0))
+    except httpx.HTTPError as e:
+        log.warning("gemini request failed: %s", type(e).__name__)
         raise HTTPException(502, "The assistant could not be reached. Try again in a moment.")
     if r.status_code != 200:
+        log.warning("gemini returned HTTP %s", r.status_code)
         raise HTTPException(502, "The assistant is busy right now. Try again in a moment.")
     try:
         parts = r.json()["candidates"][0]["content"]["parts"]

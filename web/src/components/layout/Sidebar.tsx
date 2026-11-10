@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { NavLink } from "react-router-dom";
 import { AvatarMenu, Logo, TABS } from "./NavBar";
 import SearchBox from "./SearchBox";
-import { ActivityIcon, DiscoverIcon, GenresIcon, HomeIcon, ListIcon, SearchIcon, SidebarIcon, SparkIcon } from "./icons";
+import { ActivityIcon, DiscoverIcon, GenresIcon, HomeIcon, ListIcon, SidebarIcon, SparkIcon } from "./icons";
 import { useUI } from "./ui";
 
 const ICONS: Record<string, (p: { className?: string }) => React.JSX.Element> = {
@@ -80,9 +80,6 @@ export default function Sidebar({ moving }: { moving: boolean }) {
         <button className="glass-btn h-[50px] w-[42px] rounded-2xl" aria-label="Show sidebar" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}>
           <SidebarIcon />
         </button>
-        <NavLink to="/search" className="glass-btn h-[50px] w-[42px] rounded-2xl" aria-label="Search">
-          <SearchIcon className="h-[22px] w-[22px]" />
-        </NavLink>
       </div>
     </>
   );
