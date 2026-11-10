@@ -1,15 +1,20 @@
 # FlickRaven
 
-An explainable hybrid movie recommendation website (college Recommender Systems project).
-It recommends movies; it does not stream them.
+An explainable hybrid recommendation website for films, TV series and anime.
+It recommends titles and shows where to watch them; it does not stream them.
 
-**Live:** https://cinematch-16hy.onrender.com (Render free plan: the first visit after 15 quiet minutes takes about a
-minute). How it is hosted and how to update it: `docs/deploy.md`.
+**Live:** https://flickraven.onrender.com (Render free plan: the first visit after a restart can take up to half a
+minute while the recommender loads). How it is hosted and how to update it: `docs/deploy.md`.
 
 What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), save to My
 List, tune the recommendations, open "Why?" on any recommendation (what each model contributed, how much the
 models agree), browse franchises ("More from John Wick", "More from Marvel"), cast and crew pages, themed rows
-(Rom-Com, Crime Thriller, ...), genre and Discover pages with every film, For Tonight, and the Research Lab.
+(Rom-Com, Crime Thriller, ...), genre and Discover pages with every title (Movies / Series / Anime tabs),
+For Tonight, and the Research Lab. Search understands genre, language, year and series/anime words ("hindi comedy",
+"90s action", "korean series") and suggests films, people and genres as you type. Film pages show the IMDb score,
+where to watch (India first, via TMDB / JustWatch) and, for series, seasons and episodes. Home has Netflix-style
+series rows (East Asian dramas, Popular K-dramas, binge-worthy, quick comedy, because you liked ..., a films-and-series
+mix). The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
 Not available (no email service): email verification and password reset.
 
 | Part | Folder | Tech |
