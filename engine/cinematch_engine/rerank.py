@@ -8,22 +8,46 @@ that are rare in the user's history.
 """
 import numpy as np
 
-MODES = {"familiar": {"lambda": 0.95, "beta": 0.0, "explore_boost": 0.0},
-         "balanced": {"lambda": 0.75, "beta": 0.05, "explore_boost": 0.0},
-         "discover": {"lambda": 0.55, "beta": 0.20, "explore_boost": 0.05}}
+# tail_share: the share of a list reserved for less-known films (the long-tail channel, see tail_slots below).
+# Chosen from pipeline/tail_eval.py (artifacts/metrics/long_tail.json): 10% costs about 5% of NDCG@10 in Balanced, 20%
+# about 10% in Discover (an upper bound: a film nobody in MovieLens rated cannot score). Familiar stays at 0.
+MODES = {"familiar": {"lambda": 0.95, "beta": 0.0, "explore_boost": 0.0, "tail_share": 0.0},
+         "balanced": {"lambda": 0.75, "beta": 0.05, "explore_boost": 0.0, "tail_share": 0.1},
+         "discover": {"lambda": 0.55, "beta": 0.20, "explore_boost": 0.05, "tail_share": 0.2}}
 TOP_N = 100
+TAIL_PCT = 80          # a film is "long tail" when it is outside the 20% most-voted films of the catalog
+
+
+def tail_slots(k: int, share: float) -> int:
+    """How many of k positions are reserved for long-tail films (never more than half the list)."""
+    return min(int(round(k * share)), k // 2)
+
+
+def spread(head: np.ndarray, tail: np.ndarray) -> np.ndarray:
+    """Put the tail picks at evenly spaced positions of the final list instead of piling them at the end."""
+    k = len(head) + len(tail)
+    out = list(head)
+    for j, x in enumerate(tail):
+        out.insert(min(round((j + 1) * k / (len(tail) + 1)) - 1, len(out)), x)
+    return np.array(out, dtype=head.dtype if len(head) else tail.dtype)
 
 
 def mmr(items: np.ndarray, relevance: np.ndarray, sim: np.ndarray, novelty: np.ndarray, k: int,
-        lam: float, beta: float, boost: np.ndarray | None = None) -> np.ndarray:
-    """items: candidate indices (sorted by relevance, at most TOP_N); sim: item x item similarity."""
+        lam: float, beta: float, boost: np.ndarray | None = None, allowed: np.ndarray | None = None,
+        already: np.ndarray | None = None) -> np.ndarray:
+    """items: candidate indices (sorted by relevance, at most TOP_N); sim: item x item similarity.
+    allowed: optional mask over items (only these may be picked). already: positions in `items` that are already
+    on the list, so they count for similarity and cannot be picked again."""
     rel = relevance - relevance.min()
     rel = rel / rel.max() if rel.max() > 0 else rel
     extra = beta * novelty[items] + (boost if boost is not None else 0)
     picked: list[int] = []
     max_sim = np.zeros(len(items), dtype=np.float32)
-    available = np.ones(len(items), dtype=bool)
-    for _ in range(min(k, len(items))):
+    available = np.ones(len(items), dtype=bool) if allowed is None else allowed.copy()
+    for j in (already if already is not None else []):
+        available[j] = False
+        max_sim = np.maximum(max_sim, sim[items, items[j]])
+    for _ in range(min(k, int(available.sum()))):
         score = lam * rel - (1 - lam) * max_sim + extra
         score[~available] = -np.inf
         j = int(np.argmax(score))
