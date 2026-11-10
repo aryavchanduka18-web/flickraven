@@ -70,6 +70,16 @@ def test_interest_orders_rows_but_never_hides_one():
     assert sr.affinity([], ["ko"])["kdrama"] == 3 and sr.affinity([], [])["kdrama"] == 0
 
 
+def test_series_are_deduplicated_across_rows_by_user_interest():
+    series = [s(i, lang="en", countries=["US"], popularity=8.5, votes=1500) for i in range(1, 9)]
+    series += [s(i, lang="en", countries=["US"], popularity=7.0, votes=300) for i in range(9, 17)]
+    ids = list(range(1, 17))
+    rows = sr.build(series, ids, {"acclaimed": 1})
+    assert [row["key"] for row in rows] == ["acclaimed", "anglo"]
+    assert rows[0]["ids"] == list(range(1, 9))
+    assert rows[1]["ids"] == list(range(9, 17))
+
+
 def test_new_tv_rows_follow_their_written_rules():
     base = {"lang": "en", "countries": ["US"], "genres": ["Drama"], "runtime": 50, "popularity": 8.2, "votes": 2000}
     assert sr.in_theme("one_season", {**base, "status": "Ended", "seasons": 1, "episodes": 8})

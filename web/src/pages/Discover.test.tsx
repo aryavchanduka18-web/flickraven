@@ -19,10 +19,10 @@ beforeEach(() => {
   });
 });
 
-function setup() {
+function setup(initialType?: "movie" | "series" | "anime" | "all") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}><UIProvider><MemoryRouter><Discover /></MemoryRouter></UIProvider></QueryClientProvider>,
+    <QueryClientProvider client={client}><UIProvider><MemoryRouter><Discover initialType={initialType} /></MemoryRouter></UIProvider></QueryClientProvider>,
   );
 }
 const lastMovies = () => [...urls].reverse().find((u) => u.includes("/movies?")) ?? "";
@@ -61,5 +61,11 @@ describe("Discover filters", () => {
     setup();
     fireEvent.click(await screen.findByRole("button", { name: "Anime" }));
     await waitFor(() => expect(lastMovies()).toContain("genre=anime"));
+  });
+
+  it("opens the dedicated Shows view filtered to series", async () => {
+    setup("series");
+    expect(screen.getByRole("tab", { name: "Series" }).getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => expect(lastMovies()).toContain("type=series"));
   });
 });
