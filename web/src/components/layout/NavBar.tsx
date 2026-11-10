@@ -8,6 +8,7 @@ import SearchBox from "./SearchBox";
 export const TABS = [
   { to: "/", label: "Home" },
   { to: "/discover", label: "Discover" },
+  { to: "/pick", label: "Perfect Pick" },
   { to: "/genres", label: "Genres" },
   { to: "/my-list", label: "My List" },
   { to: "/activity", label: "Activity" },

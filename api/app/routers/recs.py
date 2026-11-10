@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
+from app.services import perfect_pick as pp
 from app.services import series_fit as fit
 from app.services import series_rails as series_rails_service
 from app.services.confidence import agreement_all, confidence
@@ -232,6 +233,93 @@ def tonight(body: TonightBody, user=Depends(current_user), db: Session = Depends
     log_shown(db, user["id"], str(uuid.uuid4()), None, "tonight", None, items)
     db.commit()
     return {"items": items, "relaxed": relaxed, "message": note}
+
+
+class PerfectPickBody(BaseModel):
+    mood: str
+    time: str = "medium"                 # short | medium | long | series
+    adventure: str = "balanced"          # familiar | balanced | adventurous
+    other_languages: bool = False        # include languages outside the profile's
+    exclude: list[int] = []              # titles already shown (Not this one)
+
+
+@router.post("/perfect-pick")
+def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Three picks from mood, time and familiar-vs-adventurous. Films come from For Tonight's mood and runtime rules
+    ranked by the user's hybrid score; series (time = "series") are ones that take 25 hours or less in total, ranked by the
+    user's series ranking and shown without a Match % (series have no ratings). By default only the profile's
+    languages are used; when too few fit, other languages are included and the reply says so."""
+    from cinematch_engine.tonight import BAND_TEXT, matches_mood, moods
+    kb = moods()
+    if body.mood not in kb or body.time not in pp.TIMES or body.adventure not in pp.ADVENTURES:
+        raise HTTPException(422, "Unknown mood, time or adventure value")
+    engine = engine_or_503(db)
+    cat, st = engine.cat, rec.user_state(db, user["id"], engine)
+    skip = set(body.exclude)
+    langs = set(st.languages) if st.languages and not body.other_languages else set()
+    notes: list[str] = []
+    mood_exact, time_text = True, {}
+    extra, cands = {}, []
+    if body.time == "series":
+        rows, scores = engine.kind_rank(st, "series")
+        ids = [int(cat.movie_ids[r]) for r in rows]
+        info = {r["id"]: dict(r) for r in db.execute(text("SELECT m.id, m.episodes, m.runtime_min AS runtime FROM movies m "
+                                                           "WHERE m.id = ANY(:i) AND m.title_type = 'series' AND m.backdrop_path IS NOT NULL"), {"i": ids}).mappings()}
+        pool = []
+        for r, sc, i in zip(rows, scores, ids):
+            h = fit.hours(info.get(i, {}).get("episodes"), info.get(i, {}).get("runtime"))
+            if h is not None and h <= pp.SERIES_MAX_HOURS and i not in skip:
+                pool.append((int(r), float(sc), i, h))
+        tiers = [(True, bool(langs)), (True, False), (False, False)]          # (mood must match, language limited)
+        chosen = []
+        for must_mood, limit_lang in tiers:
+            chosen = [p for p in pool if (not must_mood or matches_mood({"genres": cat.genres[p[0]], "keywords": cat.keywords[p[0]]}, kb[body.mood]))
+                      and (not limit_lang or cat.language[p[0]] in langs)]
+            if len(chosen) >= 3:
+                mood_exact = must_mood
+                if not must_mood:
+                    notes.append("Fewer than three series fit that mood, so these are the closest.")
+                if langs and not limit_lang:
+                    notes.append("Fewer than three series in your languages fit, so other languages are included.")
+                break
+        pcts = pp.pct_of([p[1] for p in chosen])
+        cands = [pp.Cand(p[2], pc, float(cat.novelty[p[0]])) for p, pc in zip(chosen, pcts)]
+        for p in chosen:
+            time_text[p[2]] = f"About {p[3]:g} hours in total ({info[p[2]]['episodes']} episodes), so it can be finished"
+    else:
+        req = TonightRequest(body.mood, body.time, None, [])
+        rows, relaxed, note = engine.tonight(st, req, k=300)
+        if note:
+            notes.append(note)
+        mood_exact = "mood" not in relaxed
+        rail = engine.rail_scores(st)
+        rows = [r for r in rows if int(cat.movie_ids[r]) not in skip]
+        if langs:
+            mine = [r for r in rows if cat.language[r] in langs]
+            if len(mine) >= 3:
+                rows = mine
+            else:
+                notes.append("Fewer than three films in your languages fit, so other languages are included.")
+        pcts = pp.pct_of([float(rail[r]) for r in rows])
+        cands = [pp.Cand(int(cat.movie_ids[r]), pc, float(cat.novelty[r])) for r, pc in zip(rows, pcts)]
+        for r in rows:
+            i = int(cat.movie_ids[r])
+            mins = cat.runtime[r]
+            time_text[i] = (f"{int(mins) // 60}h {int(mins) % 60}m, {BAND_TEXT[body.time]}" if body.time in BAND_TEXT and mins == mins else "Length fits your time")
+            s = float(rail[r])
+            extra[i] = {"score": s, "match_pct": engine.match(st.stage, s)}
+    picks = pp.choose(cands, body.adventure)
+    for c in picks:
+        e = extra.setdefault(c.id, {})
+        e["reasons"] = pp.reasons(c.role, body.mood, mood_exact, time_text[c.id], e.get("match_pct"))
+    items = cards(db, [c.id for c in picks], user["id"], extra)
+    if items:
+        log_shown(db, user["id"], str(uuid.uuid4()), None, "perfect_pick", None, items)
+        db.commit()
+    message = " ".join(dict.fromkeys(notes)) or None
+    if not items:
+        message = message or "Nothing fits those answers yet. Try another mood or more time."
+    return {"items": items, "message": message}
 
 
 @router.get("/surprise")

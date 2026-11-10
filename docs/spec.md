@@ -310,7 +310,7 @@ Desktop (v5, 2026-11-11, Apple TV look): a floating dark-glass sidebar on the le
 ```
 [FlickRaven logo] [hide]
 [Search]
-Home  Discover  Genres  My List  Activity
+Home  Discover  Perfect Pick  Genres  My List  Activity
 ...
 [avatar + name]  (menu: Taste DNA, Taste Profile, Recommendation report, Preferences, Account, Sign in / out)
 ```
@@ -332,6 +332,7 @@ Home  Discover  Genres  My List  Activity
 | Movie page | (v5) Full-bleed header like the Home hero (the title's own backdrop on the right, black fade on the left, back button), then title, year, certification, runtime, genres, Match % chip, IMDb score, synopsis, buttons Where to watch / Add to list / Why this?, Like, Dislike, Watched and the rating stars, and a tab row (Overview, More like this, Cast & crew) that scrolls to each part. Where to watch: each service is a button that opens that service's own search for the title (a search link, not a confirmed page; unknown services fall back to a web search), plus a JustWatch link. More Like This is 3 portrait tiles per row (2 on phones), 9 titles, with the Match % badge on the poster (only where it exists), then title, IMDb score and year, and one real reason. Older text follows: backdrop, poster, title, Match %, community rating, year, runtime, genres, language, country, certification, release date, synopsis, the user's rating (5 stars, half steps), rating distribution (1–10 bars), "Why you're seeing this", director, writers, cast, studios, keywords, awards (when Wikidata has them), More Like This (poster grid, 8 titles, "View all" page at `/movie/:id/similar` with Load more; same type only, with reasons). Actions: Add to / Remove from List, Like, Dislike, Rate, Mark Watched. |
 | Quick View | Opened by the card's chevron: backdrop, title, Match %, rating, year, runtime, genres, language, short synopsis, Why This, actions, "View full details". |
 | Discover | Type tabs (Movies, Series, Anime, All), a scrolling genre pill row (Anime is its own genre), a Filters panel (language, country, released from / until, length, IMDb score, Match % for films with a personal sort, streaming service, with a count of filters on and Clear), sort, Surprise Me, For Tonight panel. Country and streaming-service choices come from `GET /api/discover/options` (what the catalog really holds); the streaming filter means a subscription or free service as TMDB lists it for India. |
+| Perfect Pick | `/pick`: three one-tap questions (mood, time: under 90 min / about 2 h / plenty / a series of 25 h or less, familiar / a bit of both / adventurous), then three picks with real reasons. `POST /api/recs/perfect-pick`. Films: For Tonight's mood and runtime rules ranked by the hybrid score; familiar = best scores, adventurous = score and novelty together (never below a score floor), balanced = best two plus one surprise. Profile languages by default; if fewer than three fit, other languages are included and the page says so (switch to include them anyway). Series: 25 hours or less in total, ranked by the series ranking, no Match %. "Not these" asks again excluding what was shown. |
 | Genres | Genre grid; a genre page ranks its films **for this user** with the hybrid score. |
 | Search | Title, cast, director, genre, language (Postgres full-text search). |
 | My List | Saved films; sort by recently added, rating, year, genre. |
@@ -887,3 +888,12 @@ Needed from Aryav:
 5. **College rule:** whether AI-written code is allowed for the mini project and whether it must be disclosed.
 
 Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 are installed. PostgreSQL runs in Docker.
+
+
+### 14.2d AI assistant (Gemini Flash, 2026-11-11)
+
+- Floating "Ask FlickRaven" chat (bottom right). `POST /api/assistant/chat`, `GET /api/assistant/status`. Model: Google Gemini Flash (`GEMINI_MODEL`, default `gemini-2.5-flash`; check the current model name and the free-tier terms before relying on it). Key only in the Render environment variable `GEMINI_API_KEY`. Hidden entirely when the key is missing or `ASSISTANT_ENABLED=false`.
+- Open topics are allowed (recommendations, a title's story, general film chat). Limits: 30 messages per signed-in person per day, 8 for guests (in process memory: a restart resets them), 1,000 characters per message, 12 messages of history, 700 output tokens.
+- Grounding: titles the person names are looked up in our catalog and their synopsis is sent with the question; the model is told to say when it is unsure. Titles it recommends are written [[Title (Year)]] and are linked only if they exist in the catalog; others show as plain text. Plot spoilers are written between || || and shown blurred until tapped.
+- Privacy: the model gets the chat, a taste summary (top genres, up to 6 liked titles) and the synopses; never name, email or ids. The privacy page says free-tier prompts may be used by Google. Chats are not stored.
+- Not built: taste-aware ranking inside the assistant, saving chats, AI-written Taste DNA text.
