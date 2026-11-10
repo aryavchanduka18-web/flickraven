@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 MIN_FILMS = 6
+INDIAN_REGIONAL = ["ta", "te", "ml", "bn", "kn", "mr", "pa"]      # Tamil, Telugu, Malayalam, Bengali, Kannada, Marathi, Punjabi
 
 COLLECTIONS = [
     {"key": "rom-com", "title": "Rom-Com", "all_genres": ["Romance", "Comedy"],
@@ -30,7 +31,13 @@ COLLECTIONS = [
     {"key": "coming-of-age", "title": "Coming of Age", "keywords": ["coming of age"]},
     {"key": "martial-arts", "title": "Martial Arts", "keywords": ["martial arts"]},
     {"key": "horror-comedy", "title": "Horror Comedy", "all_genres": ["Horror", "Comedy"]},
-    {"key": "retro-hindi", "title": "Retro Hindi Classics", "language": "hi", "max_year": 1999},
+    {"key": "hindi-picked", "title": "Hindi Movies Picked for You", "language": "hi", "interest": ["hi"]},
+    {"key": "modern-bollywood", "title": "Modern Bollywood", "language": "hi", "min_year": 2010, "interest": ["hi"]},
+    {"key": "hindi-thriller-crime", "title": "Hindi Thrillers and Crime", "language": "hi", "any_genres": ["Thriller", "Crime"], "interest": ["hi"]},
+    {"key": "hindi-comedy", "title": "Hindi Comedy", "language": "hi", "all_genres": ["Comedy"], "interest": ["hi"]},
+    {"key": "bollywood-rom-com", "title": "Bollywood Rom-Coms", "language": "hi", "all_genres": ["Romance", "Comedy"], "interest": ["hi"]},
+    {"key": "indian-beyond", "title": "Indian Cinema Beyond Bollywood", "languages": INDIAN_REGIONAL, "interest": INDIAN_REGIONAL},
+    {"key": "retro-hindi", "title": "Bollywood Classics", "language": "hi", "max_year": 1999},
     {"key": "anime", "title": "Anime Films", "all_genres": ["Animation"], "language": "ja"},
     {"key": "korean-thrillers", "title": "Korean Thrillers", "all_genres": ["Thriller"], "language": "ko"},
 ]
@@ -48,9 +55,19 @@ def member_ids(db: Session, c: dict) -> list[int]:
         where.append("EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
                      "WHERE mk.movie_id = m.id AND k.name = ANY(:kw))")
         p["kw"] = c["keywords"]
+    if c.get("any_genres"):
+        where.append("EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
+                     "WHERE mg.movie_id = m.id AND g.name = ANY(:anyg))")
+        p["anyg"] = c["any_genres"]
     if c.get("language"):
         where.append("m.original_language = :lang")
         p["lang"] = c["language"]
+    if c.get("languages"):
+        where.append("m.original_language = ANY(:langs)")
+        p["langs"] = c["languages"]
+    if c.get("min_year"):
+        where.append("m.year >= :miny")
+        p["miny"] = c["min_year"]
     if c.get("max_year"):
         where.append("m.year <= :maxy")
         p["maxy"] = c["max_year"]
@@ -78,3 +95,24 @@ def ordered(db: Session, c: dict, match: dict[int, dict], members: list[int] | N
     rest = [i for i in members if i not in set(pins)]
     scored = sorted((i for i in rest if i in match), key=lambda i: -match[i]["score"])
     return pins + scored + [i for i in rest if i not in match]
+
+
+def interest_languages(db: Session, uid: int | None) -> set[str]:
+    """Languages this person has shown interest in: the ones chosen in their profile, plus the language of any film or
+    series they rated 7 or more, liked, saved, marked watched or picked in onboarding. Nobody gets a language row
+    just because the catalog has it: an English-only viewer is not given a Hindi quota."""
+    if uid is None:
+        return set()
+    pref = db.execute(text("SELECT languages FROM user_preferences WHERE user_id = :u"), {"u": uid}).scalar()
+    langs = set(pref or [])
+    langs |= set(db.execute(text("""SELECT DISTINCT m.original_language FROM movies m WHERE m.original_language IS NOT NULL AND m.id IN (
+        SELECT movie_id FROM ratings WHERE user_id = :u AND rating >= 7
+        UNION SELECT movie_id FROM reactions WHERE user_id = :u AND value > 0
+        UNION SELECT movie_id FROM watched WHERE user_id = :u
+        UNION SELECT movie_id FROM onboarding_picks WHERE user_id = :u)"""), {"u": uid}).scalars())
+    return langs
+
+
+def offered(c: dict, interest: set[str]) -> bool:
+    """A collection with an `interest` list is offered only to people interested in one of those languages."""
+    return not c.get("interest") or bool(set(c["interest"]) & interest)

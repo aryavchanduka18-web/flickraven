@@ -30,7 +30,8 @@ def collections(request: Request, db: Session = Depends(get_db)) -> dict:
     """Every collection with at least MIN_FILMS films, each with its first RAIL films for this user."""
     uid = user_id_from(request, db)
     skip = hidden(db, uid)
-    members = {c["key"]: [i for i in col.member_ids(db, c) if i not in skip] for c in col.COLLECTIONS}
+    interest = col.interest_languages(db, uid)
+    members = {c["key"]: [i for i in col.member_ids(db, c) if i not in skip] for c in col.COLLECTIONS if col.offered(c, interest)}
     members = {k: v for k, v in members.items() if len(v) >= col.MIN_FILMS}
     match = rec.match_for(db, uid, sorted({i for ids in members.values() for i in ids}))
     out = []
