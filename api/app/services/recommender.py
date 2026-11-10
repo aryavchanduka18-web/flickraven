@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from cinematch_engine.availability import AvailabilityMap
 from cinematch_engine.online import Catalog, OnlineEngine, Tuning, UserState
 from cinematch_engine.profile import BEHAVIORAL_EVENTS
 from cinematch_engine.sources import SourceModels
@@ -142,6 +143,7 @@ def load_engine(db: Session) -> OnlineEngine:
         calibrator = joblib.load(MODELS / "calibration.joblib")
         engine = OnlineEngine(catalog, sources, weights, calibrator, (f["item_nb_idx"], f["item_nb_vals"]), train)
         engine.similar_table = _similar_table(movies["tmdb_id"].tolist())
+        engine.availability = AvailabilityMap.load(MODELS / "availability_calibration.json")   # None = old zero rule
         _engine = engine
         return _engine
 
