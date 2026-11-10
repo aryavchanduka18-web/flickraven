@@ -166,7 +166,7 @@ function FranchiseRails({ id }: { id: number }) {
         const items = s.kind === "collection" ? s.items.filter((i) => i.movie.id !== id) : s.items;
         const at = s.items.findIndex((i) => i.movie.id === id);
         const subtitle = s.kind === "collection" ? `Part ${at + 1} of ${s.items.length} · in release order`
-          : s.kind === "universe" ? "In release order" : s.kind === "director" ? "Newest first" : "Other franchise films with a similar feel";
+          : s.kind === "universe" ? "In release order" : "Newest first";
         return <Rail key={s.key} title={s.title} subtitle={subtitle} items={items} source={`franchise_${s.kind}`} personal={false} />;
       })}
     </div>

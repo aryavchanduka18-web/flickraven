@@ -90,4 +90,4 @@ export type MovieDetail = {
   confidence?: import("../components/explain/ConfidenceCard").Confidence;
 };
 
-export type FranchiseSection = { key: string; kind: "collection" | "universe" | "director" | "franchise_like"; title: string; current?: number; items: RecItem[] };
+export type FranchiseSection = { key: string; kind: "collection" | "universe" | "director"; title: string; current?: number; items: RecItem[] };

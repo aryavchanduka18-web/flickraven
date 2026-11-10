@@ -66,3 +66,19 @@ def test_unknown_film_is_404():
 def test_collection_title():
     assert collection_title("The Avengers Collection") == "The Avengers"
     assert collection_title("X-Men Collection") == "X-Men"
+
+
+def test_no_franchise_rows_for_a_film_that_is_not_part_of_one(ids):
+    secs = sections(ids["Lone Film"])
+    assert "franchise_like" not in secs and set(secs) <= {"director"}
+
+
+def test_series_get_no_franchise_rows(ids, test_engine):
+    with test_engine.begin() as conn:
+        sid = conn.execute(text("""INSERT INTO movies (tmdb_id, title, title_type, year) VALUES (930500, 'A Series', 'series', 2020)
+                                   RETURNING id""")).scalar()
+    try:
+        assert TestClient(app).get(f"/api/movies/{sid}/franchise").json() == {"sections": []}
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(text("DELETE FROM movies WHERE id = :i"), {"i": sid})
