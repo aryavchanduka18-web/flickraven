@@ -24,6 +24,12 @@ export const useCollections = () =>
 export const useKindRail = (kind: "series" | "anime") =>
   useQuery({ queryKey: ["kind", kind], queryFn: () => api<{ items: RecItem[]; total: number }>(`/recs/kind/${kind}?limit=24`), staleTime: 60_000 });
 
+export type SeriesRail = { key: string; title: string; subtitle: string; items: RecItem[] };
+
+/** Themed series rows (East Asian dramas, quick comedy, because you liked ..., a films-and-series mix). */
+export const useSeriesRails = () =>
+  useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[] }>("/recs/series-rails"), staleTime: 60_000 });
+
 type FeedbackAction =
   | { kind: "rate"; rating: number | null }
   | { kind: "react"; value: 1 | -1 | 0 }

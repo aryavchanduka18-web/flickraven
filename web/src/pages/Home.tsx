@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
+import type { RecItem } from "../api/types";
 import { Link, Navigate } from "react-router-dom";
-import { useCollections, useHome, useKindRail, useMe, useSetMode } from "../api/hooks";
+import { useCollections, useHome, useKindRail, useMe, useSeriesRails, useSetMode } from "../api/hooks";
 import type { Mode } from "../api/types";
 import DiscoveryModeControl from "../components/discovery/DiscoveryModeControl";
 import TonightPanel from "../components/discovery/TonightPanel";
@@ -20,14 +23,31 @@ export default function Home() {
   const [tune, setTune] = useState(false);
   const collections = useCollections();
   const series = useKindRail("series");
+  // The personal picks need the recommender, which can take a while right after the server wakes up. Popular films
+  // come straight from the database, so they show at once while the picks are being prepared.
+  const quick = useQuery({
+    queryKey: ["home-quick"],
+    queryFn: () => api<{ items: RecItem[] }>("/movies?sort=popular&page=1"),
+    enabled: !home.data,
+    staleTime: 5 * 60_000,
+  });
   const anime = useKindRail("anime");
+  const showAnimeRow = !!anime.data && anime.data.items.length > 0;
+  const themed = useSeriesRails();
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
   const active: Mode = mode ?? home.data?.mode ?? me.data?.discovery_mode ?? "balanced";
   return (
     <div>
-      {home.data ? <Hero items={home.data.hero} /> : <div className="h-[78vh] animate-pulse bg-surface" />}
+      {home.data ? <Hero items={home.data.hero} /> : (
+        <div className="flex h-[42vh] min-h-[280px] items-end bg-gradient-to-b from-surface to-bg px-4 pb-10 md:px-10">
+          <div>
+            <p className="font-display text-3xl font-extrabold">Getting your picks ready…</p>
+            <p className="mt-2 max-w-xl text-sm text-muted">The site was asleep and is waking up. This can take up to half a minute the first time; popular films are below while you wait.</p>
+          </div>
+        </div>
+      )}
       <div className="relative z-10 -mt-8 space-y-2">
         <div className="flex flex-wrap items-center gap-4 px-4 pb-4 md:px-10">
           <DiscoveryModeControl
@@ -61,20 +81,32 @@ export default function Home() {
             </button>
           )}
         </div>
-        {home.isLoading && [0, 1, 2].map((i) => <RailSkeleton key={i} />)}
+        {home.isLoading && quick.data && quick.data.items.length > 0 && (
+          <Rail title="Popular right now" subtitle="Your personal picks are loading." items={quick.data.items.slice(0, 20)} source="rail:quick" personal={false} />
+        )}
+        {home.isLoading && !quick.data && [0, 1, 2].map((i) => <RailSkeleton key={i} />)}
         <div className="space-y-6">
-          {home.data?.rails.map((r) => (
-            <Rail key={r.key} title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
-              personal={PERSONAL.has(r.key) || r.items.some((i) => i.match_pct != null)} />
+          {home.data?.rails.map((r, i) => (
+            <Fragment key={r.key}>
+              <Rail title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
+                personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} />
+              {/* Series and anime come right after the first two film rails, so they are seen without long scrolling. */}
+              {i === 1 && series.data && series.data.items.length > 0 && (
+                <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
+                  items={series.data.items} source="rail:series" personal={false} />
+              )}
+              {i === 1 && themed.data?.rails.filter((x) => x.key !== "mix").map((x) => (
+                <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source={`rail:series_${x.key}`} personal={false} />
+              ))}
+              {i === 3 && themed.data?.rails.filter((x) => x.key === "mix").map((x) => (
+                <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source="rail:series_mix" personal={false} />
+              ))}
+              {i === 1 && showAnimeRow && (
+                <Rail title="Anime for you" subtitle="From what you like and what is popular."
+                  items={anime.data!.items} source="rail:anime" personal={false} />
+              )}
+            </Fragment>
           ))}
-          {home.data && series.data && series.data.items.length > 0 && (
-            <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
-              items={series.data.items} source="rail:series" personal={false} />
-          )}
-          {home.data && anime.data && anime.data.items.length > 0 && (
-            <Rail title="Anime for you" subtitle="From what you like and what is popular."
-              items={anime.data.items} source="rail:anime" personal={false} />
-          )}
           {home.data && collections.data?.collections.map((c) => (
             <Rail key={c.key} title={c.title} subtitle={`${c.count.toLocaleString()} films`} items={c.items}
               source={`collection:${c.key}`} personal={c.items.some((i) => i.match_pct != null)} />
