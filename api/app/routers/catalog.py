@@ -97,8 +97,12 @@ def franchise(movie_id: int, request: Request, db: Session = Depends(get_db)) ->
 def discover(request: Request, genre: str | None = None, lang: str | None = None, decade: int | None = None,
              runtime: str | None = None, country: str | None = None, min_rating: float | None = None,
              sort: str = "popular", page: int = 1, type: str | None = None,
+             year_min: int | None = None, year_max: int | None = None, min_imdb: float | None = None,
+             provider: int | None = None, min_match: int | None = None,
              db: Session = Depends(get_db)) -> dict:
-    """Browse the catalog. `type` is movie (the default), series, anime or all."""
+    """Browse the catalog. `type` is movie (the default), series, anime or all. Extra filters: `year_min`/`year_max`
+    (release period), `min_imdb` (IMDb score), `provider` (a TMDB provider id that streams it for free or on subscription
+    in the stored region) and `min_match` (Match %, needs a personal sort and a signed-in user)."""
     where, p = ["true"], {}
     if genre == ANIME_SLUG and type in (None, "movie", "all"):
         where.append("m.title_type IN ('movie', 'anime')")          # Japanese animation: TV anime and animated films
@@ -122,6 +126,16 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
         where.append(":country = ANY(m.countries)"); p["country"] = country
     if min_rating:
         where.append("m.popularity_score >= :mr"); p["mr"] = min_rating
+    if year_min:
+        where.append("m.year >= :ymin"); p["ymin"] = year_min
+    if year_max:
+        where.append("m.year <= :ymax"); p["ymax"] = year_max
+    if min_imdb:
+        where.append("m.imdb_rating >= :mi"); p["mi"] = min_imdb
+    if provider:
+        where.append("m.id IN (SELECT w.movie_id FROM movie_watch_providers w WHERE w.provider_id = :prov "
+                     "AND w.kind IN ('flatrate', 'free', 'ads'))")
+        p["prov"] = provider
     order = {"popular": "m.tmdb_vote_count DESC NULLS LAST", "rating": "m.popularity_score DESC NULLS LAST",
              "newest": "m.release_date DESC NULLS LAST", "title": "m.title"}.get(sort, "m.tmdb_vote_count DESC NULLS LAST")
     uid = user_id_from(request, db)
@@ -139,10 +153,15 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     if sort in PERSONAL_SORTS and uid is not None and rec.artifacts_ready():
         all_ids = [r[0] for r in db.execute(text(f"SELECT m.id FROM movies m WHERE {' AND '.join(where)} ORDER BY {order}"), p)]
         ranked, scores, engine, stage = personal_order(db, uid, all_ids, sort)
+        total = len(all_ids)
+        if min_match:
+            # Only films that have a Match % (the engine can score them) and reach the chosen level.
+            ranked = [i for i in ranked if i in scores and engine.match(stage, scores[i]) >= min_match]
+            total = len(ranked)
         start = (max(page, 1) - 1) * 40
         shown = ranked[start:start + 40]
         extra = {i: {"score": scores[i], "match_pct": engine.match(stage, scores[i])} for i in shown if i in scores}
-        return {"items": cards(db, shown, uid, extra), "total": len(all_ids), "page": page, "sort": sort}
+        return {"items": cards(db, shown, uid, extra), "total": total, "page": page, "sort": sort}
     p.update(limit=40, offset=(max(page, 1) - 1) * 40)
     ids = [r[0] for r in db.execute(text(f"SELECT m.id FROM movies m WHERE {' AND '.join(where)} ORDER BY {order} LIMIT :limit OFFSET :offset"), p)]
     total = db.execute(text(f"SELECT count(*) FROM movies m WHERE {' AND '.join(where)}"), p).scalar()
@@ -150,6 +169,19 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
 
 
 PERSONAL_SORTS = {"recommended", "match", "hidden", "novel"}
+
+
+@router.get("/discover/options")
+def discover_options(db: Session = Depends(get_db)) -> dict:
+    """Choices for the Discover filters, from what the catalog really holds: countries (ISO codes, most titles
+    first) and streaming services (TMDB provider id, name, logo, how many titles), for the stored region."""
+    countries = [{"code": r[0], "titles": r[1]} for r in db.execute(text(
+        "SELECT c, count(*) FROM movies m, unnest(m.countries) c GROUP BY c ORDER BY 2 DESC, 1 LIMIT 40"))]
+    providers = [{"id": r[0], "name": r[1], "logo": r[2], "titles": r[3]} for r in db.execute(text(
+        """SELECT w.provider_id, min(w.provider_name), min(w.logo_path), count(DISTINCT w.movie_id) AS n
+           FROM movie_watch_providers w WHERE w.kind IN ('flatrate', 'free', 'ads')
+           GROUP BY w.provider_id HAVING count(DISTINCT w.movie_id) >= 30 ORDER BY n DESC LIMIT 30"""))]
+    return {"countries": countries, "providers": providers}
 
 
 def personal_order(db: Session, uid: int, ids: list[int], sort: str):

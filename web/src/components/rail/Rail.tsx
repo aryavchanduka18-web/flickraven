@@ -33,7 +33,7 @@ export default function Rail({ title, subtitle, items, source, personal = true }
         className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-28 pt-3 -mb-24 md:scroll-px-10 md:gap-4 md:px-10"
       >
         {items.map((it, i) => (
-          <div key={it.movie.id} className="w-[78vw] shrink-0 snap-start sm:w-[46vw] lg:w-[38vw] xl:w-[34vw] 2xl:w-[30vw]">
+          <div key={it.movie.id} className="w-[78vw] shrink-0 snap-start sm:w-[calc((100vw-var(--sb))*0.46)] lg:w-[calc((100vw-var(--sb))*0.38)] xl:w-[calc((100vw-var(--sb))*0.34)] 2xl:w-[calc((100vw-var(--sb))*0.30)]">
             <MovieCard item={it} source={source} position={i} personal={personal} />
           </div>
         ))}
@@ -50,8 +50,8 @@ function RailArrow({ side, hidden, onClick }: { side: "left" | "right"; hidden: 
       onClick={onClick}
       aria-label={side === "left" ? "Scroll left" : "Scroll right"}
       tabIndex={hidden ? -1 : 0}
-      className={`absolute top-[calc(50%-3rem)] z-30 hidden h-12 w-12 place-items-center rounded-full border border-white/25 bg-black/35 text-white opacity-0 backdrop-blur-md transition-opacity duration-200 hover:bg-black/55 md:grid ${
-        hidden ? "pointer-events-none" : "group-hover/rail:opacity-100 focus:opacity-100"
+      className={`glass-btn absolute top-[calc(50%-3rem)] z-30 hidden h-[46px] w-[46px] rounded-full transition-opacity duration-300 md:inline-flex ${
+        hidden ? "pointer-events-none opacity-0" : "opacity-90 hover:opacity-100"
       } ${side === "left" ? "left-3" : "right-3"}`}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">

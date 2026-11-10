@@ -4,7 +4,7 @@ export function RailSkeleton() {
       <div className="mb-3 h-5 w-48 animate-pulse rounded bg-surface-2" />
       <div className="flex gap-4 overflow-hidden">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="aspect-video w-[78vw] shrink-0 animate-pulse rounded-md bg-surface sm:w-[46vw] lg:w-[38vw]" />
+          <div key={i} className="aspect-video w-[78vw] shrink-0 animate-pulse rounded-md bg-surface sm:w-[calc((100vw-var(--sb))*0.46)] lg:w-[calc((100vw-var(--sb))*0.38)]" />
         ))}
       </div>
     </div>
