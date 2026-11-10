@@ -113,6 +113,46 @@ Match % is a logistic calibration of the blend score per stage, fitted on valida
 expected calibration error is 0.013 (cold), 0.015 (warming) and 0.028 (established), all under the
 0.05 pass threshold, with Match % values mostly between 70% and 93%.
 
+**Limit found on 2026-11-10 (read this before quoting those numbers).** That check scores only films that were in the
+candidate pool. The app shows the Match % for every film from the catalog-wide hybrid score, a different scale. Measured
+on 600 test users with each user's own later ratings (`pipeline/segment_eval.py`, `artifacts/metrics/segments.json`):
+the Match % shown averages 88% (cold), 85% (warming) and 83% (established), while 61% of the films these users went on
+to rate were rated 7 or more. So the displayed Match % runs about 22 to 27 points high on films a user actually rates.
+A one-feature refit on the catalog-wide score, fitted on half the users and judged on the other half, brings the gap
+to about 2 points for every stage. It is not applied yet (it changes every number on the site).
+
+### 5.6 Evaluation by segment
+Per segment: share of later ratings that were 7+ ("positive"), mean Match % shown, gap = match/100 - positive, and the
+within-user chance that a positive film outranked a non-positive one (AUC; 0.5 is chance). Segments under 100 ratings
+are left out. Film vs series cannot be measured this way: series have no ratings in MovieLens, and are checked by their
+own hit@10 tests (MyDramaList 31.6% vs popularity 17.2%; anime 31.8% vs 19.6%).
+
+| Segment | Group | Ratings | Positive | Mean Match % | Gap | AUC |
+|---|---|---|---|---|---|---|
+| Film source | MovieLens factors | 57,510 | 60% | 87.1 | +0.27 | 0.60 |
+| Film source | No MovieLens factors | 17,799 | 65% | 80.4 | +0.16 | 0.53 |
+| User stage | Cold | 25,103 | 61% | 88.0 | +0.27 | 0.53 |
+| User stage | Warming | 25,103 | 61% | 85.3 | +0.24 | 0.56 |
+| User stage | Established | 25,103 | 61% | 83.3 | +0.22 | 0.59 |
+| Language | English | 71,439 | 60% | 85.5 | +0.25 | 0.55 |
+| Language | French | 897 | 70% | 86.7 | +0.17 | 0.47 |
+| Language | Japanese | 888 | 80% | 87.3 | +0.07 | 0.49 |
+| Language | Korean | 156 | 79% | 87.3 | +0.08 | 0.57 |
+| Language | Spanish | 360 | 82% | 87.2 | +0.05 | 0.51 |
+| Country | United States | 57,378 | 58% | 85.6 | +0.27 | 0.56 |
+| Country | United Kingdom | 11,295 | 69% | 84.9 | +0.16 | 0.51 |
+| Country | India | 222 | 76% | 82.9 | +0.07 | 0.61 |
+| Country | Japan | 1,116 | 75% | 87.0 | +0.12 | 0.60 |
+| Country | South Korea | 168 | 79% | 87.3 | +0.09 | 0.57 |
+
+What it says: ranking is only mildly better than chance everywhere (AUC 0.47 to 0.61), best for films with MovieLens
+factors and for established users, and weakest for films without MovieLens factors, cold users and French and
+Japanese films. The Match % is too high in every segment, most for US films and cold users. After the refit above the
+segment gaps are within about 0.1 for the large segments; the small ones (Korean, Indian, 100 to 170 ratings) move
+the other way (the Match % becomes too low by up to 0.2), so one global curve is not enough for them yet. The ratings are
+those users chose to make, so these are not recommendations the users were shown; the live report (`/performance`)
+measures that.
+
 ## 6. The website
 React + TypeScript front end and a FastAPI back end over PostgreSQL. Every visitor is a user (guest
 accounts upgrade on registration). The home page is planned in one call: hero (top 5 picks), up to 13
