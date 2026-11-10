@@ -24,3 +24,18 @@ Mind-bending:
     - genre: Thriller
       keywords: [time travel, dream, parallel world, memory, plot twist, alternate reality, simulation]
   nearest: Intense
+Emotional:
+  genres: [Drama, Romance]
+  genre_with_keywords:
+    - genre: War
+      keywords: [loss, grief, family, sacrifice]
+  nearest: Feel-good
+Suspenseful:
+  genres: [Thriller, Mystery, Crime]
+  nearest: Intense
+Mysterious:
+  genres: [Mystery]
+  genre_with_keywords:
+    - genre: Thriller
+      keywords: [detective, murder, conspiracy, secret, investigation, whodunit]
+  nearest: Suspenseful

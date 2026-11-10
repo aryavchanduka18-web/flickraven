@@ -906,6 +906,13 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - API: `type` on `/movies` = movie (default), show (series + anime TV), series, anime, all. Genre pages (`/genres/{slug}/movies?type=all|movie|show`) work for every genre; films are ranked by the hybrid, shows by `kind_rank`, and the two lists are woven by relative position because their scores are not on one scale. Match % is shown for films only.
 - Anime genre = Japanese-language animation with title_type movie (films) or anime (TV anime); plain `series` titles are not Anime.
 
+### 14.2g Perfect Pick v2 (2026-11-11)
+
+- Six questions (shown only when relevant): movie, series or either; mood (the six For Tonight moods plus Emotional, Suspenseful, Mysterious, or none); genres (many, optional); languages (English, Hindi, Korean, Japanese, Tamil, Telugu, Malayalam, other, or any); time (films: under 90 / 90-120 / 2-3 h / any; series: one season / under 10 h / 10-20 h / 20-30 h / any; either: under 2 h / 3 h / 10 h / any) plus finished or airing for series; familiar, balanced or unexpected. Back works at every step.
+- Order of work: hard limits (kind, time, finished/airing) -> candidates from the film hybrid or the series ranking -> score `0.55 relevance percentile + 0.25 picked-genre fit + 0.20 mood fit` -> novelty by the last answer (floors as before) -> a genre-diversity pass (each next pick loses 0.25 x its genre overlap with those already picked) -> a reason per checked condition. Series time is episodes x episode length (a series with unknown length never counts as "under 10 hours"; "one season" uses the season count). The weights are a design starting point, not tuned on data.
+- Fewer than three fit: mood is relaxed first, then genres, then language; the reply names what was relaxed. "Include other languages" drops the language limit.
+- Match % is shown for films only. `POST /api/recs/perfect-pick` body: kind, mood, genres, languages, time, status, adventure, other_languages, exclude.
+
 ### 14.2e Taste Evolution (2026-11-11)
 
 - On `/taste-dna`, "How your taste changed": per month (last 6 with activity) the top 3 genres of titles liked or rated 7+, and, with 5+ titles in the latest two months and 5+ before, the genre that rose and the one that fell (change of 10 points or more). Counts only; `GET /api/me/taste-evolution`.
