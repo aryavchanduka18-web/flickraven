@@ -52,7 +52,10 @@ def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_
     rows, scores = engine.kind_rank(st, kind)
     page = slice(max(offset, 0), max(offset, 0) + min(limit, 60))
     extra = {int(engine.cat.movie_ids[r]): {"score": float(s)} for r, s in zip(rows[page], scores[page])}
-    return {"items": cards(db, list(extra), user["id"], extra), "total": int(len(rows))}
+    items = cards(db, list(extra), user["id"], extra)
+    log_shown(db, user["id"], str(uuid.uuid4()), None, f"kind_{kind}", None, items)   # so the report counts series too
+    db.commit()
+    return {"items": items, "total": int(len(rows))}
 
 
 @router.get("/series-rails")
@@ -98,10 +101,13 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
         rails.append({"key": "mix", "title": "Films and series picked for you", "subtitle": "A mix of both.", "ids": mixed})
 
     out = []
+    request_id = str(uuid.uuid4())
     for r in rails:
         items = cards(db, r["ids"], uid)
         if len(items) >= series_rails_service.MIN_ROW:
             out.append({"key": r["key"], "title": r["title"], "subtitle": r["subtitle"], "items": items})
+            log_shown(db, uid, request_id, None, f"series_{r['key']}", None, items)   # the report counts series too
+    db.commit()
     return {"rails": out}
 
 
