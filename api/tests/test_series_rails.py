@@ -18,6 +18,13 @@ def test_theme_rules():
     assert sr.in_theme("rewatch", s(1, seasons=9, status="Ended", popularity=8.3)) and not sr.in_theme("rewatch", s(1, seasons=9, status="Returning Series", popularity=8.3))
 
 
+def test_acclaimed_and_weekend_rules():
+    assert sr.in_theme("acclaimed", s(1, popularity=8.7, votes=5000)) and not sr.in_theme("acclaimed", s(1, popularity=8.7, votes=300))
+    assert not sr.in_theme("acclaimed", s(1, popularity=8.7, votes=5000, genres=["Animation", "Drama"]))
+    assert sr.in_theme("weekend", s(1, seasons=1, episodes=8, popularity=8.0)) and not sr.in_theme("weekend", s(1, seasons=6, episodes=100, popularity=8.0))
+    assert not sr.in_theme("weekend", s(1, seasons=1, episodes=8, status="Returning Series", popularity=8.0))
+
+
 def test_rows_follow_the_users_ranking_and_need_enough_titles():
     series = [s(i, lang="ko", countries=["KR"]) for i in range(1, 13)] + [s(99)]
     rows = sr.build(series, [5, 3, 99, 1, 2, 4, 6, 7, 8, 9, 10, 11, 12])

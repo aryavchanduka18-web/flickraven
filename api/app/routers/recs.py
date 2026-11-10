@@ -67,11 +67,11 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     ranked = [int(cat.movie_ids[r]) for r in rows]
     series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
                "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
-               "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0),
+               "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
                "has_art": r["backdrop_path"] is not None}
               for r in db.execute(text("""
                 SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
-                       m.popularity_score, m.backdrop_path,
+                       m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
                        ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres
                 FROM movies m WHERE m.title_type = 'series'""")).mappings()]
     rails = [{"key": t["key"], "title": t["title"], "subtitle": t["subtitle"], "ids": t["ids"]}

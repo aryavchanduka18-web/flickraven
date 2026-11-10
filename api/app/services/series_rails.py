@@ -22,6 +22,8 @@ class Theme:
 THEMES = {
     "east_asian": Theme("east_asian", "East Asian TV dramas", "Korean, Japanese, Chinese and Taiwanese dramas."),
     "kdrama": Theme("kdrama", "Popular K-dramas", "The most-watched Korean dramas."),
+    "acclaimed": Theme("acclaimed", "Critically acclaimed TV dramas", "The highest-rated drama series, by viewer ratings on TMDB."),
+    "weekend": Theme("weekend", "Perfect binge-watches", "Short, finished series you can get through in a weekend."),
     "binge": Theme("binge", "Can't stop at just one episode", "Much-loved series with plenty of seasons to get lost in."),
     "quick_comedy": Theme("quick_comedy", "Quick comedy", "Live-action comedy series with short episodes, easy to fit in."),
     "rewatch": Theme("rewatch", "Great to rewatch", "Finished series with several seasons that hold up a second time."),
@@ -37,6 +39,10 @@ def in_theme(key: str, s: dict) -> bool:
         return live_action and bool(EAST_ASIA & set(s.get("countries") or []))
     if key == "kdrama":
         return live_action and s.get("lang") == "ko"
+    if key == "acclaimed":
+        return live_action and "Drama" in (s.get("genres") or []) and pop >= 8.3 and (s.get("votes") or 0) >= 1000
+    if key == "weekend":
+        return s.get("status") == "Ended" and 1 <= seasons <= 3 and 6 <= episodes <= 36 and pop >= 7.8
     if key == "binge":
         return seasons >= 3 and episodes >= 30 and pop >= 7.5
     if key == "quick_comedy":
