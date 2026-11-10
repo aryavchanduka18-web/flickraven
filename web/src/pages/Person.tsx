@@ -35,7 +35,7 @@ export default function Person() {
   const roles = (Object.keys(p.departments) as Department[]).sort((a, b) => (p.departments[b] ?? 0) - (p.departments[a] ?? 0));
 
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pb-24 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pb-24 pt-20 md:px-10">
       <header className="flex flex-col items-center gap-6 text-center md:flex-row md:items-end md:text-left">
         <div className="h-48 w-48 shrink-0 overflow-hidden rounded-full bg-surface-2 ring-1 ring-white/10 md:h-56 md:w-56">
           {p.profile_path && <img src={tmdbImage(p.profile_path, "w342")} alt={p.name} className="h-full w-full object-cover" />}

@@ -67,7 +67,7 @@ export default function Account() {
   const mismatch = confirm.length > 0 && confirm !== next;
 
   return (
-    <div className="mx-auto max-w-xl space-y-6 px-4 pb-24 pt-24">
+    <div className="mx-auto max-w-xl space-y-6 px-4 pb-24 pt-20">
       <h1 className="font-display text-3xl font-extrabold">Account</h1>
 
       {me.is_guest && (

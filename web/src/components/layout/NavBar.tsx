@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "../../api/hooks";
 import { send } from "../../api/client";
@@ -10,7 +10,6 @@ export const TABS = [
   { to: "/discover", label: "Discover" },
   { to: "/genres", label: "Genres" },
   { to: "/my-list", label: "My List" },
-  { to: "/missions", label: "Missions" },
   { to: "/activity", label: "Activity" },
 ];
 
@@ -26,10 +25,10 @@ function useScrolled(threshold = 80) {
   return scrolled;
 }
 
-export function Logo() {
+export function Logo({ className = "h-9" }: { className?: string }) {
   return (
-    <Link to="/" className="font-display text-xl font-extrabold tracking-tight text-white" aria-label="FlickRaven home">
-      Flick<span className="text-accent">Raven</span>
+    <Link to="/" aria-label="FlickRaven home" className="inline-flex">
+      <img src="/flickraven-logo.png" alt="FlickRaven" width={719} height={179} className={`${className} w-auto select-none`} draggable={false} />
     </Link>
   );
 }
@@ -38,28 +37,12 @@ export default function NavBar() {
   const scrolled = useScrolled();
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-40 transition-colors duration-200 ${
+      className={`fixed inset-x-0 top-0 z-40 transition-colors duration-200 md:hidden ${
         scrolled ? "bg-bg/95 shadow-[0_1px_0_#ffffff10]" : "bg-gradient-to-b from-black/70 to-transparent"
       }`}
     >
-      <div className="mx-auto flex h-16 max-w-[1800px] items-center gap-6 px-4 md:px-10">
-        <Logo />
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
-          {TABS.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.to === "/"}
-              className={({ isActive }) =>
-                `rounded-full px-3.5 py-1.5 text-sm transition-colors duration-150 ${
-                  isActive ? "bg-white font-medium text-black" : "text-white/85 hover:bg-white/10"
-                }`
-              }
-            >
-              {t.label}
-            </NavLink>
-          ))}
-        </nav>
+      <div className="mx-auto flex h-16 items-center gap-3 px-4">
+        <Logo className="h-8" />
         <SearchBox />
         <AvatarMenu />
       </div>
@@ -67,7 +50,7 @@ export default function NavBar() {
   );
 }
 
-function AvatarMenu() {
+export function AvatarMenu({ up = false, withName = false }: { up?: boolean; withName?: boolean }) {
   const { data: me } = useMe();
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
@@ -77,17 +60,22 @@ function AvatarMenu() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 text-sm font-semibold ring-1 ring-white/10 hover:ring-white/30"
+        className={withName ? "flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left hover:bg-white/10" : "grid h-9 w-9 place-items-center rounded-full bg-surface-2 text-sm font-semibold ring-1 ring-white/10 hover:ring-white/30"}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
       >
-        {initial}
+        {withName ? (
+          <>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold">{initial}</span>
+            <span className="min-w-0 truncate text-[15px] font-semibold">{me?.display_name ?? "Guest"}</span>
+          </>
+        ) : initial}
       </button>
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-white/10 bg-surface py-1 text-sm shadow-2xl"
+          className={`absolute z-50 w-52 overflow-hidden rounded-2xl border border-white/10 bg-surface/95 py-1 text-sm shadow-2xl backdrop-blur-xl ${up ? "bottom-full left-0 mb-2" : "right-0 mt-2"}`}
           onMouseLeave={() => setOpen(false)}
         >
           <MenuLink to="/taste-dna" onClick={() => setOpen(false)}>My Taste DNA</MenuLink>

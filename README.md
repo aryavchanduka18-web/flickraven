@@ -6,6 +6,8 @@ It recommends titles and shows where to watch them; it does not stream them.
 **Live:** https://flickraven.onrender.com (Render free plan: the first visit after a restart can take up to half a
 minute while the recommender loads). How it is hosted and how to update it: `docs/deploy.md`.
 
+The site has an Apple TV style: a floating dark-glass sidebar (hide it with the tall button at its top) and a full-bleed Home header with View details, Add to list and Why this.
+
 What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), save to My
 List, tune the recommendations, open "Why?" on any recommendation (what each model contributed, how much the
 models agree), browse franchises ("More from John Wick", "More from Marvel"), cast and crew pages, themed rows
@@ -16,9 +18,7 @@ where to watch (India first, via TMDB / JustWatch) and, for series, seasons and 
 series rows (Korean, Japanese, Indian, American and British and international dramas "for you", binge-worthy, quick comedy, because you liked ..., a films-and-series
 mix). Taste DNA (`/taste-dna`, avatar menu) shows which storytelling traits (pacing, plot complexity, dark
 atmosphere, ...) you lean towards, from what you rate, like and tag after rating; it has its own recommendation row and a
-shareable card you download yourself. Your Discovery Journey (`/missions`) has personal challenges (other countries, languages,
-decades, classics, a new genre, a mini-series) in Recommended / Active / Completed / Explore tabs, each with a reason from your own
-history, progress counted only from titles you mark watched, rate or like, and a completion card you download yourself. The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
+shareable card you download yourself. The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
 Not available (no email service): email verification and password reset.
 
 | Part | Folder | Tech |

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { tmdbImage } from "../../lib/tmdb";
+import { SearchIcon } from "./icons";
 
 type Suggest = {
   films: { id: number; title: string; year: number | null; poster: string | null }[];
@@ -11,7 +12,7 @@ type Suggest = {
 };
 
 /** Search-as-you-type: films, people and genres under the box after 2 letters; Enter opens all results. */
-export default function SearchBox() {
+export default function SearchBox({ variant = "bar" }: { variant?: "bar" | "sidebar" }) {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -47,13 +48,14 @@ export default function SearchBox() {
   return (
     <form
       ref={box}
-      className="relative ml-auto"
+      className={variant === "sidebar" ? "relative w-full" : "relative ml-auto"}
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
         if (q.trim()) go(`/search?q=${encodeURIComponent(q.trim())}`);
       }}
     >
+      {variant === "sidebar" && <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-white/80" />}
       <input
         value={q}
         onChange={(e) => {
@@ -64,13 +66,15 @@ export default function SearchBox() {
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Search titles, people, genres"
+        placeholder={variant === "sidebar" ? "Search" : "Search titles, people, genres"}
         aria-label="Search"
         autoComplete="off"
-        className="w-36 rounded-full border border-white/15 bg-black/40 px-4 py-1.5 text-sm text-white placeholder:text-white/45 focus:w-56 focus:outline-none md:w-56 md:focus:w-72 transition-[width] duration-200"
+        className={variant === "sidebar"
+          ? "w-full rounded-2xl border border-transparent bg-white/[0.07] py-2.5 pl-11 pr-3 text-[15px] font-semibold text-white placeholder:font-semibold placeholder:text-white/70 transition-colors focus:border-white/25 focus:bg-white/[0.12] focus:outline-none"
+          : "w-36 rounded-full border border-white/15 bg-black/40 px-4 py-1.5 text-sm text-white placeholder:text-white/45 focus:w-56 focus:outline-none md:w-56 md:focus:w-72 transition-[width] duration-200"}
       />
       {open && debounced.length >= 2 && (
-        <div className="absolute right-0 top-11 z-50 max-h-[70vh] w-[min(92vw,22rem)] overflow-y-auto rounded-lg border border-white/10 bg-bg p-2 shadow-2xl">
+        <div className={`absolute top-12 z-50 max-h-[70vh] w-[min(92vw,22rem)] overflow-y-auto rounded-2xl border border-white/10 bg-bg/95 p-2 shadow-2xl backdrop-blur-xl ${variant === "sidebar" ? "left-0" : "right-0"}`}>
           {any ? (
             <>
               {d!.genres.length > 0 && (

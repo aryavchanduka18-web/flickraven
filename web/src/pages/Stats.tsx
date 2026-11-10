@@ -57,7 +57,7 @@ export default function StatsPage() {
   const s = q.data!;
   const used = s.database_bytes / s.database_limit_bytes;
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 pb-24 pt-24 md:px-10">
+    <div className="mx-auto max-w-5xl space-y-6 px-4 pb-24 pt-20 md:px-10">
       <div>
         <h1 className="font-display text-3xl font-extrabold">Usage</h1>
         <p className="mt-1 text-sm text-muted">Only you can see this page. Totals only, never what one person watched. Updates every minute.</p>

@@ -31,7 +31,7 @@ export default function Discover() {
   const pickType = (type: string) => setF({ ...f, type, sort: ["hidden", "novel"].includes(f.sort) && type !== "movie" && type !== "all" ? "recommended" : f.sort });
   const sel = "rounded-md border border-white/15 bg-surface-2 px-3 py-2 text-sm";
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-display text-3xl font-extrabold">Discover</h1>
         <div className="flex items-center gap-3">

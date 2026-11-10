@@ -29,7 +29,7 @@ export default function Search() {
   const d = res.data;
   const what = d ? describe(d.understood) : null;
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Results for "{q}"</h1>
       {what && <p className="mt-1 text-sm text-muted">Showing {what}</p>}
       {d && (d.genres.length > 0 || d.people.length > 0) && (
