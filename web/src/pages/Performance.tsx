@@ -26,7 +26,7 @@ export default function Performance() {
       <h1 className="font-display text-3xl font-extrabold">How Well Does Flickeraven Know You?</h1>
       <p className="mt-1 text-sm text-muted">A look at how our recommendations performed for you, from the last {d.log_days} days.</p>
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {stat(String(d.shown), "recommendations shown")}{stat(String(d.opened), "you opened")}{stat(String(d.watched), "you marked watched")}{stat(String(d.rated), "you rated")}
+        {stat(String(d.shown), "titles recommended to you (distinct, last " + d.log_days + " days)")}{stat(`${d.opened} of ${d.shown}`, "you opened")}{stat(`${d.watched} of ${d.shown}`, "you marked watched")}{stat(`${d.rated} of ${d.shown}`, "you rated after we showed them (evaluated)")}
       </div>
       {!d.ready ? (
         <div className="mt-8 rounded-xl border border-white/10 bg-surface p-6">
@@ -40,9 +40,9 @@ export default function Performance() {
       ) : (
         <>
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3">
-            {stat(`${d.positive_pct}%`, `rated ${d.positive_threshold} or more (of ${d.rated}; plausibly ${d.low}-${d.high}%)`)}
-            {stat(`${d.avg_rating}`, "your average rating of our picks")}
-            {stat(d.avg_predicted_match != null ? `${d.avg_predicted_match}%` : "n/a", "average Match % when shown")}
+            {stat(`${d.positive_pct}%`, `positive outcome rate: rated ${d.positive_threshold} or more, out of ${d.rated} evaluated (plausibly ${d.low}-${d.high}%)`)}
+            {stat(`${d.avg_rating}`, `average actual rating you gave (${d.rated} ratings)`)}
+            {stat(d.avg_predicted_match != null ? `${d.avg_predicted_match}%` : "n/a", `average predicted Match % when shown${d.rated_without_match ? ` (${d.rated! - d.rated_without_match} with a Match %)` : ""}`)}
           </div>
           <section className="mt-8 rounded-xl border border-white/10 bg-surface p-5" aria-label="Match percentage versus outcome">
             <h2 className="font-display text-lg font-bold">Match % versus what you rated</h2>

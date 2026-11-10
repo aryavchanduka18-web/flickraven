@@ -11,28 +11,25 @@ export type Confidence = {
 };
 
 const TONE: Record<string, string> = { High: "bg-emerald-400", Moderate: "bg-amber-300", Low: "bg-white/60" };
-const TECH_NAME: Record<string, string> = {
-  svd: "SVD", item_cf: "Item CF", user_cf: "User CF", content: "TF-IDF content", als: "ALS", popularity: "Popularity",
+export const SOURCE_NAME: Record<string, string> = {
+  svd: "SVD rating prediction", item_cf: "Item-Based Collaborative Filtering", user_cf: "User-Based Collaborative Filtering",
+  content: "Content-Based Filtering", als: "Implicit ALS (Behavioural)", popularity: "Popularity",
 };
+const TECH_NAME = SOURCE_NAME;
 const GROUP_OF: Record<string, string> = {
   svd: "Collaborative", item_cf: "Collaborative", user_cf: "Collaborative", content: "Content", als: "Behavioral",
   popularity: "Popularity",
 };
 
-/** Recommendation confidence: how much the models agree on this film for you, from the live engine's scores. */
+/** Model Agreement: how much the methods agree on this title for you. The Match % is shown once, outside this card. */
 export default function ConfidenceCard({ c }: { c?: Confidence }) {
   const [open, setOpen] = useState(false);
   if (!c) return null;
   const filled = c.agreement == null ? 0 : Math.round(c.agreement / 10);
-  const match = c.groups.find((g) => g.key === "hybrid")?.score ?? null;
   return (
-    <section className="rounded-xl border border-white/10 bg-surface p-5" aria-label="Recommendation confidence">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Recommendation confidence</h3>
+    <section className="rounded-xl border border-white/10 bg-surface p-5" aria-label="Model agreement">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Model Agreement</h3>
 
-      {/* Match % is the headline; model agreement is a small secondary reading under it. */}
-      {match != null && (
-        <div className="mt-3 font-display text-4xl font-extrabold leading-none text-accent">{match}% match</div>
-      )}
       <div className="mt-3 flex items-center gap-3 text-xs text-muted">
         <span>
           {c.agreement == null ? "Model agreement not available yet" : `${c.agreement}% model agreement`}
@@ -48,21 +45,21 @@ export default function ConfidenceCard({ c }: { c?: Confidence }) {
 
       <p className="mt-4 text-sm leading-relaxed text-white/85">{c.sentence}</p>
       <p className="mt-1 text-xs text-muted">
-        Agreement shows how many different methods point to the same film. It is separate from your match %.
+        Model agreement shows whether the different methods rank this title alike. It is not the chance that the match is right, and it has not been checked against real outcomes. It is separate from your Match %.
       </p>
 
       <dl className="mt-4 space-y-2.5">
-        {c.groups.map((g) => (
-          <div key={g.key} className="grid grid-cols-[6.5rem_1fr_3rem] items-center gap-3 text-sm">
+        {c.groups.filter((g) => g.key !== "hybrid").map((g) => (
+          <div key={g.key} className="grid grid-cols-[7.5rem_1fr_3rem] items-center gap-3 text-sm">
             <dt className={g.key === "hybrid" ? "font-semibold" : "text-white/80"}>{g.label}</dt>
             <dd className="h-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
               {g.score != null && <div className={`h-full rounded-full ${g.key === "hybrid" ? "bg-accent" : "bg-white/70"}`} style={{ width: `${g.score}%` }} />}
             </dd>
-            <dd className="text-right tabular-nums text-white/85">{g.score == null ? <span className="text-xs text-muted">no data</span> : g.key === "hybrid" ? `${g.score}%` : g.score}</dd>
+            <dd className="text-right tabular-nums text-white/85">{g.score == null ? <span className="text-xs text-muted">no data</span> : g.score}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-2 text-xs text-muted">Model scores: where this film ranks for you among everything that model can judge (100 = its top pick). Hybrid is your Match %.</p>
+      <p className="mt-2 text-xs text-muted">Model scores: where this film ranks for you among everything that model can judge (100 = its top pick). "No data" means that method cannot judge this title, which is not the same as a low rank.</p>
 
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open}
         className="mt-4 text-xs font-medium text-white/70 underline decoration-white/30 underline-offset-4 hover:text-white">

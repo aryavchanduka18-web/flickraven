@@ -5,18 +5,14 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Reason } from "../../api/types";
 import { useUI } from "../layout/ui";
-import ConfidenceCard, { type Confidence } from "./ConfidenceCard";
+import ConfidenceCard, { SOURCE_NAME, type Confidence } from "./ConfidenceCard";
 
 type Explain = {
-  movie_id: number; stage: string; behavioral_count: number; onboarding_count: number; match_pct: number | null;
+  movie_id: number; stage: string; behavioral_count: number; onboarding_count: number; logged_interactions: number; match_pct: number | null;
   shares: Record<string, number>; reasons: Reason[]; weights: Record<string, number>; confidence: Confidence;
 };
 
-const SOURCE: Record<string, string> = {
-  content: "Similar to films you like (content)", item_cf: "Films liked together (item CF)",
-  user_cf: "People with your taste (user CF)", svd: "Rating prediction (SVD)", als: "What you watch and save (ALS)",
-  popularity: "Popular overall",
-};
+const SOURCE = SOURCE_NAME;
 
 /** "Why?": everything the engine can say about one recommendation, from /recs/explain. */
 export default function WhyPanel() {
@@ -44,8 +40,12 @@ export default function WhyPanel() {
               <div className="space-y-6 text-sm">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                   {q.data.match_pct != null && <span className="font-display text-3xl font-extrabold text-accent">{q.data.match_pct}% match</span>}
-                  <span className="text-muted">Profile stage: <span className="capitalize text-white/85">{q.data.stage}</span>
-                    {" "}({q.data.behavioral_count} actions{q.data.onboarding_count ? `, ${q.data.onboarding_count} onboarding picks` : ""})</span>
+                  <div className="text-muted">
+                    <div>Profile stage: <span className="capitalize text-white/85">{q.data.stage}</span></div>
+                    <div>Qualifying distinct titles: {q.data.behavioral_count} (ratings, likes, dislikes, list adds, watched)</div>
+                    <div>Logged interactions: {q.data.logged_interactions} (repeat views do not add titles)</div>
+                    <div>Onboarding picks: {q.data.onboarding_count} (not counted toward the stage)</div>
+                  </div>
                 </div>
                 {q.data.reasons.length > 0 && (
                   <ul className="space-y-1.5">
@@ -57,7 +57,7 @@ export default function WhyPanel() {
                   </ul>
                 )}
                 <section>
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">What contributed</h3>
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Share of the blend</h3>
                   <div className="space-y-2">
                     {shares.map(([s, v]) => (
                       <div key={s} className="grid grid-cols-[minmax(0,13rem)_1fr_3rem] items-center gap-3">
@@ -67,7 +67,7 @@ export default function WhyPanel() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-muted">Shares follow the hybrid weights tuned for your stage. Sources with zero weight at this stage are left out.</p>
+                  <p className="mt-2 text-xs text-muted">Each share is how much that method counts in the final blend at your stage, not how highly it ranks this title. Methods with zero weight at your stage are left out.</p>
                 </section>
                 <ConfidenceCard c={q.data.confidence} />
                 <Link to={`/movie/${q.data.movie_id}`} onClick={() => openWhy(null)} className="inline-block text-sm font-medium underline underline-offset-4">Open the film page</Link>
