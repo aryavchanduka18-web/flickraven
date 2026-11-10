@@ -6,7 +6,9 @@ import { api } from "../api/client";
 import { languageName } from "../lib/format";
 import { tmdbImage } from "../lib/tmdb";
 
-type Item = { id: number; event_type: string; value: number | null; created_at: string; movie_id: number | null; title: string | null; backdrop_path: string | null };
+type Item = { id: number; event_type: string; value: number | null; created_at: string; movie_id: number | null; title: string | null; backdrop_path: string | null; title_type?: string | null };
+type Grouped = { movie_id: number; title: string; title_type: string; backdrop_path: string | null; year: number | null; last_at: string; last_event: string; rating: number | null; counts: Record<string, number> };
+const KIND: Record<string, string> = { movie: "Film", series: "Series", anime: "Anime" };
 type Taste = {
   top_genres: { genre: string; count: number }[]; top_languages: { language: string; count: number }[];
   eras: { decade: number; count: number }[]; average_rating: number | null; like_dislike_ratio: number | null;
@@ -21,8 +23,10 @@ const TABS = [["", "All"], ["ratings", "Ratings"], ["likes", "Likes"], ["list", 
 
 export default function Activity() {
   const [type, setType] = useState("");
+  const [full, setFull] = useState(false);
+  const grouped = useQuery({ queryKey: ["activity-titles", type], queryFn: () => api<{ items: Grouped[] }>(`/activity/titles${type ? `?type=${type}` : ""}`), enabled: !full });
   const taste = useQuery({ queryKey: ["taste"], queryFn: () => api<Taste>("/me/taste-profile") });
-  const q = useQuery({ queryKey: ["activity", type], queryFn: () => api<{ items: Item[] }>(`/activity${type ? `?type=${type}` : ""}`) });
+  const q = useQuery({ queryKey: ["activity", type], queryFn: () => api<{ items: Item[] }>(`/activity${type ? `?type=${type}` : ""}`), enabled: full });
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-24 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Activity</h1>
@@ -34,14 +38,39 @@ export default function Activity() {
             className={`rounded-full px-4 py-1.5 text-sm ${type === k ? "bg-white text-black" : "text-white/80 hover:bg-white/10"}`}>{l}</button>
         ))}
       </div>
-      <ol className="mt-6 divide-y divide-white/5">
+      <div className="mt-4 flex items-center gap-2 text-sm" role="group" aria-label="Activity view">
+        <button aria-pressed={!full} onClick={() => setFull(false)} className={`rounded-md px-3 py-1 ${!full ? "bg-white/15" : "text-white/70 hover:bg-white/10"}`}>Recent Activity</button>
+        <button aria-pressed={full} onClick={() => setFull(true)} className={`rounded-md px-3 py-1 ${full ? "bg-white/15" : "text-white/70 hover:bg-white/10"}`}>Full Interaction History</button>
+      </div>
+      <p className="mt-2 text-xs text-muted">{full ? "Every logged event, newest first." : "One row per title, with its latest action. Repeat views of a title are one row."}</p>
+      {!full && (
+        <ol className="mt-4 divide-y divide-white/5">
+          {grouped.data?.items.map((g) => (
+            <li key={g.movie_id} className="flex items-center gap-4 py-3">
+              <div className="aspect-video w-28 shrink-0 overflow-hidden rounded bg-surface-2">
+                {g.backdrop_path && <img src={tmdbImage(g.backdrop_path, "w300")} alt="" loading="lazy" className="h-full w-full object-cover" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm"><Link to={`/movie/${g.movie_id}`} className="font-medium hover:underline">{g.title}</Link>
+                  <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/70">{KIND[g.title_type] ?? g.title_type}</span>
+                  {g.rating != null && <span className="ml-2 text-accent">{g.rating}/10</span>}
+                </div>
+                <div className="text-xs text-muted">Latest: {LABEL[g.last_event] ?? g.last_event} · {new Date(g.last_at).toLocaleString()}</div>
+                <div className="text-xs text-muted">{Object.entries(g.counts).map(([k, n]) => `${LABEL[k] ?? k}${n > 1 ? ` ×${n}` : ""}`).join(" · ")}</div>
+              </div>
+            </li>
+          ))}
+          {grouped.data && !grouped.data.items.length && <li className="py-6 text-sm text-muted">Nothing here yet.</li>}
+        </ol>
+      )}
+      <ol className={`mt-6 divide-y divide-white/5 ${full ? "" : "hidden"}`}>
         {q.data?.items.map((it) => (
           <li key={it.id} className="flex items-center gap-4 py-3">
             <div className="aspect-video w-28 shrink-0 overflow-hidden rounded bg-surface-2">
               {it.backdrop_path && <img src={tmdbImage(it.backdrop_path, "w300")} alt="" loading="lazy" className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm"><span className="text-muted">{LABEL[it.event_type] ?? it.event_type}</span>{" "}
+              <div className="text-sm"><span className="text-muted">{LABEL[it.event_type] ?? it.event_type}{it.title_type && it.title_type !== "movie" ? ` ${KIND[it.title_type]?.toLowerCase()}` : ""}</span>{" "}
                 {it.movie_id && <Link to={`/movie/${it.movie_id}`} className="font-medium hover:underline">{it.title}</Link>}
                 {it.event_type === "rate" && it.value != null && <span className="ml-2 text-accent">{it.value}/10</span>}
               </div>
@@ -49,7 +78,7 @@ export default function Activity() {
             </div>
           </li>
         ))}
-        {q.data && !q.data.items.length && <li className="py-6 text-sm text-muted">Nothing here yet.</li>}
+        {full && q.data && !q.data.items.length && <li className="py-6 text-sm text-muted">Nothing here yet.</li>}
       </ol>
     </div>
   );
@@ -76,7 +105,7 @@ function TasteProfile({ t }: { t: Taste }) {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {stat("Films rated", t.films_rated)}{stat("Films saved", t.films_saved)}
+        {stat("Titles rated", t.films_rated)}{stat("Titles saved", t.films_saved)}
         {stat("Average rating", t.average_rating)}{stat("Likes per dislike", t.like_dislike_ratio)}
         {stat("Discovery", t.discovery_mode)}{stat("Stage", `${t.stage} (${t.behavioral_count})`)}
       </div>

@@ -76,7 +76,7 @@ export default function Discover() {
       </p>
       <div className="mt-6">
         <PagedGrid queryKey={["discover", qs.toString()]} path={(p) => `/movies?${qs}${qs.toString() ? "&" : ""}page=${p}`}
-          source="discover" personal={PERSONAL.includes(f.sort)} onTotal={setTotal} />
+          source="discover" poster personal={PERSONAL.includes(f.sort)} onTotal={setTotal} />
       </div>
     </div>
   );

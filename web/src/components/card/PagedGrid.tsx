@@ -3,13 +3,16 @@ import { useEffect, useRef } from "react";
 import { api } from "../../api/client";
 import type { RecItem } from "../../api/types";
 import MovieGrid from "./MovieGrid";
+import { PosterGrid } from "./PosterCard";
 
 type Page = { items: RecItem[]; total: number; page: number };
 
 /** A grid that keeps loading the next server page (40 films) as you scroll, with a Load more button
  *  as a fallback, so every film in a genre or filter can be reached. */
-export default function PagedGrid({ queryKey, path, source, personal = true, onTotal }: {
+export default function PagedGrid({ queryKey, path, source, personal = true, onTotal, poster = false }: {
   queryKey: unknown[]; path: (page: number) => string; source: string; personal?: boolean; onTotal?: (n: number) => void;
+  /** Vertical poster cards (2:3, four per row on wide screens) instead of the wide 16:9 cards. */
+  poster?: boolean;
 }) {
   const q = useInfiniteQuery({
     queryKey,
@@ -33,12 +36,12 @@ export default function PagedGrid({ queryKey, path, source, personal = true, onT
   }, [q.hasNextPage, q.isFetchingNextPage, q.fetchNextPage]);
 
   if (q.isLoading) return <div className="h-64 animate-pulse rounded-md bg-surface" />;
-  if (q.isError) return <p className="text-sm text-red-300">Could not load these films. Try again in a moment.</p>;
+  if (q.isError) return <p className="text-sm text-red-300">Could not load these titles. Try again in a moment.</p>;
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
-  if (!items.length) return <p className="text-sm text-muted">No films match.</p>;
+  if (!items.length) return <p className="text-sm text-muted">No match found.</p>;
   return (
     <div>
-      <MovieGrid items={items} source={source} personal={personal} />
+      {poster ? <PosterGrid items={items} source={source} /> : <MovieGrid items={items} source={source} personal={personal} />}
       <div ref={sentinel} className="flex flex-col items-center gap-2 pb-16">
         <p className="text-xs text-muted">Showing {items.length.toLocaleString()} of {(total ?? 0).toLocaleString()}</p>
         {q.hasNextPage && (

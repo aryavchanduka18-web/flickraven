@@ -258,8 +258,9 @@ def explain(movie_id: int, user=Depends(current_user), db: Session = Depends(get
     from app.routers.catalog import _shares
     shares = _shares(engine, st, row)
     s = float(engine.rail_scores(st)[row])
+    logged = db.execute(text("SELECT count(*) FROM interactions WHERE user_id = :u"), {"u": user["id"]}).scalar() or 0
     return {"movie_id": movie_id, "stage": st.stage, "behavioral_count": st.behavioral_count,
-            "onboarding_count": len(st.picks), "shares": shares,
+            "logged_interactions": int(logged), "onboarding_count": len(st.picks), "shares": shares,
             "match_pct": engine.match(st.stage, s) if np.isfinite(s) else None,
             "reasons": engine.reasons(st, row, shares), "weights": engine.weights[st.stage],
             "confidence": confidence(engine, st, row, engine.match(st.stage, s) if np.isfinite(s) else None)}
