@@ -27,6 +27,10 @@ POPCORN_GENRES = {"Action", "Adventure", "Comedy", "Animation", "Science Fiction
 LOCAL_LANGUAGES = {"en", "hi", "ta", "te", "ml", "kn", "bn", "mr"}
 # Popularity points (1-10 scale) added to films in the user's onboarding languages, by stage (language_lift).
 LANGUAGE_LIFT = {"cold": 1.2, "warming": 0.6, "established": 0.0}
+# Explicit language preferences persist after onboarding. The candidate lift only helps retrieval;
+# this small score term is the measured reranking signal for established users.
+PERSISTENT_LANGUAGE_CANDIDATE_LIFT = 2.4
+PERSISTENT_LANGUAGE_RERANK_BOOST = 0.24
 
 
 @dataclass
@@ -235,8 +239,10 @@ class OnlineEngine:
         scores = scores or self.scores(st)
         excl = np.union1d(self.excluded(st), np.asarray(list(extra_exclude), dtype=np.int64))
         excl = np.union1d(excl, self.onboarding_constraint(st))
-        # Picking uses language-lifted scores; Match % below still comes from the unlifted scores.
-        pool, norm = candidate_pool({s: v[None, :] for s, v in self.language_lift(st, scores).items()}, [excl])
+        # Onboarding language lift is temporary. A saved preference also keeps matching titles in
+        # candidate retrieval after a user becomes established; the final rerank signal is separate.
+        candidate_scores = self.persistent_language_candidate_scores(st, self.language_lift(st, scores))
+        pool, norm = candidate_pool({s: v[None, :] for s, v in candidate_scores.items()}, [excl])
         valid = pool[0] >= 0
         pool, norm = pool[0][valid], norm[:, 0, valid]
         w = self.weights[st.stage]
@@ -248,12 +254,14 @@ class OnlineEngine:
         if t:
             pool, norm, final = self._add_unavailable_candidates(st, scores, excl, pool, norm, final, w,
                                                                  rows=self.tail_rows())
+        language_bonus = self.persistent_language_bonus(st, pool)
+        final = final + language_bonus
         order = np.argsort(-final)
-        pool, norm, final = pool[order], norm[:, order], final[order]
+        pool, norm, final, language_bonus = pool[order], norm[:, order], final[order], language_bonus[order]
         is_tail_all = self.cat.fame_pct[pool] < TAIL_PCT
         # The top 100 by blend score, plus (when a tail channel is on) the best 40 long-tail films, which may rank lower.
         keep = np.union1d(np.arange(min(TOP_N, len(pool))), np.nonzero(is_tail_all)[0][:40]) if t else np.arange(min(TOP_N, len(pool)))
-        pool, norm, final = pool[keep], norm[:, keep], final[keep]
+        pool, norm, final, language_bonus = pool[keep], norm[:, keep], final[keep], language_bonus[keep]
         items, rel = pool, final
         is_tail = is_tail_all[keep]
         x = self.cat.content[items]
@@ -274,6 +282,9 @@ class OnlineEngine:
             local = mmr(everything, rel, sim, self.cat.novelty[items], k, lam, beta, boost)
         picked = items[local]
         shares = contributions(norm[:, local], w)
+        preference_share = np.divide(language_bonus[local], final[local], out=np.zeros(len(local), dtype=np.float32),
+                                     where=final[local] > 0)
+        shares *= (1.0 - preference_share)[None, :]
         blend_rank = {int(i): j for j, i in enumerate(items)}
         # Match % comes from the catalog-wide hybrid score, as on the film page, Why, lists and genre pages,
         # so a film shows the same number everywhere (the pool score above only decides what is picked).
@@ -281,6 +292,8 @@ class OnlineEngine:
         out = []
         for pos, (row, sc) in enumerate(zip(picked, rel[local])):
             share = {s: float(shares[si, pos]) for si, s in enumerate(SOURCES)}
+            if preference_share[pos] > 0:
+                share["language_preference"] = float(preference_share[pos])
             out.append({"row": int(row), "score": float(sc), "match_pct": int(self.match(st.stage, float(catalog[row]))),
                         "shares": share, "reranked": blend_rank[int(row)] > pos + 3})
         return out
@@ -336,6 +349,29 @@ class OnlineEngine:
         out = dict(scores)
         out["popularity"] = scores["popularity"] + bonus
         return out
+
+    def persistent_language_candidate_scores(self, st: UserState, scores: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+        """Use saved languages to retrieve candidates for established users without changing source weights.
+
+        The one-time onboarding lift remains governed by `language_lift`; this separate candidate-only lift
+        addresses the established-stage popularity weight being zero. Final relevance is still ranked by the
+        hybrid score plus the small, separately reported language-preference term.
+        """
+        if st.stage != "established" or not st.languages:
+            return scores
+        langs = set(st.languages)
+        per_lang = {l: PERSISTENT_LANGUAGE_CANDIDATE_LIFT * (0.5 if l == "en" and len(langs) > 1 else 1.0)
+                    for l in langs}
+        bonus = np.array([per_lang.get(l, 0.0) for l in self.cat.language], dtype=np.float32)
+        out = dict(scores)
+        out["popularity"] = scores["popularity"] + bonus
+        return out
+
+    def persistent_language_bonus(self, st: UserState, rows: np.ndarray) -> np.ndarray:
+        """Small final-ranking bonus for explicit saved languages; never infer a preference for users without one."""
+        if st.stage != "established" or not st.languages:
+            return np.zeros(len(rows), dtype=np.float32)
+        return (PERSISTENT_LANGUAGE_RERANK_BOOST * np.isin(np.asarray(self.cat.language)[rows], st.languages)).astype(np.float32)
 
     def match(self, stage: str, score: float) -> int:
         return int(self.cal.match_pct(stage, np.array([score]))[0])
