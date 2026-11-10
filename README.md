@@ -14,7 +14,9 @@ For Tonight, and the Research Lab. Search understands genre, language, year and 
 "90s action", "korean series") and suggests films, people and genres as you type. Film pages show the IMDb score,
 where to watch (India first, via TMDB / JustWatch) and, for series, seasons and episodes. Your recommendation report (`/performance`) compares the Match % we showed with what you then rated, with counts and honest limits. Home has Netflix-style
 series rows (East Asian dramas, Popular K-dramas, binge-worthy, quick comedy, because you liked ..., a films-and-series
-mix). The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
+mix). Taste DNA (`/taste-dna`, avatar menu) shows which storytelling traits (pacing, plot complexity, dark
+atmosphere, ...) you lean towards, from what you rate, like and tag after rating; it has its own recommendation row and a
+shareable card you download yourself. The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
 Not available (no email service): email verification and password reset.
 
 | Part | Folder | Tech |
@@ -96,6 +98,7 @@ database running:
 .\.venv\Scripts\python.exe -m pipeline.14_taste_map
 .\.venv\Scripts\python.exe -m pipeline.15_ncf
 .\.venv\Scripts\python.exe -m pipeline.report_validation   # refresh docs/phase-*-results.md
+.\.venv\Scripts\python.exe -m pipeline.similar_titles   # More Like This table (also after every catalog change; --evaluate prints the comparison)
 .\.venv\Scripts\python.exe -m pipeline.demo_accounts       # the prepared demo account
 ```
 

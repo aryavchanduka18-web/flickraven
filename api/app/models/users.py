@@ -56,6 +56,8 @@ class UserPreferences(Base):
     disliked_genre_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     # Tune sliders {adventurous, hidden, international, length}, 0-100, 50 = neutral (engine Tuning).
     tuning: Mapped[dict | None] = mapped_column(JSONB)
+    # Refine My Taste: {trait: "more" | "less"} (app/services/taste_dna.py); a missing trait = learned from activity.
+    taste_overrides: Mapped[dict | None] = mapped_column(JSONB)
     discovery_mode: Mapped[str] = mapped_column(Text, server_default="balanced", nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -106,3 +108,13 @@ class Watched(Base):
     user_id: Mapped[int] = user_fk(primary_key=True)
     movie_id: Mapped[int] = movie_fk(primary_key=True, index=True)
     marked_at: Mapped[datetime] = created_now()
+
+class TitleFeedbackTag(Base):
+    """Optional "what did you enjoy / what didn't work" tags a user attached to a title (Taste DNA)."""
+
+    __tablename__ = "title_feedback_tags"
+
+    user_id: Mapped[int] = user_fk(primary_key=True)
+    movie_id: Mapped[int] = movie_fk(primary_key=True, index=True)
+    tag: Mapped[str] = mapped_column(Text, primary_key=True)
+    created_at: Mapped[datetime] = created_now()

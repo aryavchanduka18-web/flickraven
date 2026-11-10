@@ -90,6 +90,7 @@ function AvatarMenu() {
           className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-white/10 bg-surface py-1 text-sm shadow-2xl"
           onMouseLeave={() => setOpen(false)}
         >
+          <MenuLink to="/taste-dna" onClick={() => setOpen(false)}>My Taste DNA</MenuLink>
           <MenuLink to="/activity" onClick={() => setOpen(false)}>Taste Profile</MenuLink>
           <MenuLink to="/performance" onClick={() => setOpen(false)}>Recommendation report</MenuLink>
           <MenuLink to="/onboarding" onClick={() => setOpen(false)}>Preferences</MenuLink>

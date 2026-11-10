@@ -8,6 +8,7 @@ from app.auth import user_id_from
 from app.db import get_db
 from app.services import franchise as fr
 from app.services import search as sq
+from app.services import similar as similar_svc
 from app.services.confidence import confidence
 from app.services import recommender as rec
 from app.services.movies import cards, detail
@@ -58,15 +59,26 @@ def _shares(engine, st, row, scores=None) -> dict:
 
 
 @router.get("/movies/{movie_id}/similar")
-def similar(movie_id: int, request: Request, db: Session = Depends(get_db)) -> dict:
+def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, db: Session = Depends(get_db)) -> dict:
+    """More Like This: titles of the same type most similar to this one, with the reasons (services/similar.py).
+    Paged with offset/limit (at most 40 neighbours are stored per title)."""
     if not rec.artifacts_ready():
-        return {"items": []}
+        return {"items": [], "total": 0}
     engine = rec.load_engine(db)
-    row = engine.cat.row_of.get(movie_id)
-    if row is None:
+    if engine.cat.row_of.get(movie_id) is None:
         raise HTTPException(404, "Unknown movie")
-    ids = [int(engine.cat.movie_ids[r]) for r in engine.similar(row)]
-    return {"items": cards(db, ids, user_id_from(request, db))}
+    offset, limit = max(offset, 0), min(max(limit, 1), 40)
+    page, extra, total = similar_svc.similar_page(db, engine, movie_id, offset, limit)
+    uid = user_id_from(request, db)
+    ids = list(extra)
+    # Match % only where the models that the calibrator was fitted on can score the title (MovieLens films);
+    # a number for the others would not mean what it says.
+    known = [i for i in ids if engine.cat.universe_of_row[engine.cat.row_of[i]] >= 0]
+    match = rec.match_for(db, uid, known)
+    for i in ids:
+        if i in match:
+            extra[i]["match_pct"] = match[i]["match_pct"]
+    return {"items": cards(db, ids, uid, extra), "total": total, "offset": offset}
 
 
 @router.get("/movies/{movie_id}/franchise")

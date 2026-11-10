@@ -9,11 +9,13 @@ import Home from "./pages/Home";
 import Lab from "./pages/Lab";
 import { Privacy, Terms } from "./pages/Legal";
 import Movie from "./pages/Movie";
+import SimilarAll from "./pages/SimilarAll";
 import MyList from "./pages/MyList";
 import Onboarding from "./pages/Onboarding";
 import Person from "./pages/Person";
 import SeriesFit from "./pages/SeriesFit";
 import Missions from "./pages/Missions";
+import TasteDna from "./pages/TasteDna";
 import Performance from "./pages/Performance";
 import Search from "./pages/Search";
 import StatsPage from "./pages/Stats";
@@ -28,10 +30,12 @@ export default function App() {
         <Route path="/genres" element={<Genres />} />
         <Route path="/genres/:slug" element={<Genre />} />
         <Route path="/movie/:id" element={<Movie />} />
+        <Route path="/movie/:id/similar" element={<SimilarAll />} />
         <Route path="/person/:id" element={<Person />} />
         <Route path="/my-list" element={<MyList />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/missions" element={<Missions />} />
+        <Route path="/taste-dna" element={<TasteDna />} />
         <Route path="/performance" element={<Performance />} />
         <Route path="/search" element={<Search />} />
         <Route path="/series-fit" element={<SeriesFit />} />

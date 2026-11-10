@@ -1,0 +1,32 @@
+# Hand-written More Like This test set (written 2026-11-10 BEFORE looking at the new model's output).
+# For each anchor: titles a viewer would reasonably call "similar" (story, tone, setting, audience), not just
+# the same genre. Written by Claude from general film knowledge; Aryav should review and correct it.
+# split: tune = used to choose weights; test = only for the final before/after report (never tuned on).
+# type: movie/series/anime when the title is ambiguous. Titles missing from the catalog are skipped by the evaluation (and reported).
+- {anchor: "Set It Up", year: 2018, split: test, expected: ["The Proposal", "Two Weeks Notice", "The Devil Wears Prada", "Hitch", "Working Girl", "Crazy, Stupid, Love.", "The Intern", "Isn't It Romantic", "Emma.", "Always Be My Maybe"]}
+- {anchor: "The Devil Wears Prada", split: tune, expected: ["The Intern", "Set It Up", "The Proposal", "Confessions of a Shopaholic", "Working Girl", "13 Going on 30", "How to Lose a Guy in 10 Days"]}
+- {anchor: "Inception", split: tune, expected: ["Interstellar", "The Matrix", "Shutter Island", "Tenet", "Memento", "The Prestige", "Source Code", "Paprika"]}
+- {anchor: "Zindagi Na Milegi Dobara", split: test, expected: ["Dil Chahta Hai", "Yeh Jawaani Hai Deewani", "Dil Dhadakne Do", "Wake Up Sid", "Queen", "Rock On!!", "Jab We Met"]}
+- {anchor: "3 Idiots", split: tune, expected: ["Chhichhore", "Munna Bhai M.B.B.S.", "PK", "Rang De Basanti", "Dil Chahta Hai", "Lage Raho Munna Bhai"]}
+- {anchor: "Drishyam", year: 2015, split: test, expected: ["Drishyam 2", "Andhadhun", "Talaash", "Kahaani", "Badla", "Ittefaq"]}
+- {anchor: "Parasite", year: 2019, split: tune, expected: ["Burning", "Snowpiercer", "Shoplifters", "Memories of Murder", "The Handmaiden", "Mother", "Us"]}
+- {anchor: "Train to Busan", split: test, expected: ["Peninsula", "#Alive", "The Wailing", "World War Z", "Seoul Station", "Dawn of the Dead"]}
+- {anchor: "Spirited Away", split: tune, expected: ["My Neighbor Totoro", "Howl's Moving Castle", "Princess Mononoke", "Kiki's Delivery Service", "Ponyo", "The Boy and the Heron", "Castle in the Sky"]}
+- {anchor: "Your Name.", split: test, expected: ["Weathering with You", "A Silent Voice: The Movie", "Suzume", "The Girl Who Leapt Through Time", "5 Centimeters per Second", "I Want to Eat Your Pancreas"]}
+- {anchor: "Vikram", year: 2022, split: tune, expected: ["Kaithi", "Master", "Leo", "Jailer", "Vikram Vedha", "Beast"]}
+- {anchor: "Bāhubali: The Beginning", split: test, expected: ["Bāhubali 2: The Conclusion", "RRR", "Magadheera", "K.G.F: Chapter 1", "Ponniyin Selvan: Part I", "Pushpa: The Rise"]}
+- {anchor: "The Invisible Guest", split: tune, expected: ["The Body", "Mirage", "The Hidden Face", "Gone Girl", "Prisoners", "Shutter Island"]}
+- {anchor: "The Notebook", split: test, expected: ["A Walk to Remember", "Dear John", "The Vow", "The Lucky One", "Me Before You", "Safe Haven", "Titanic"]}
+- {anchor: "John Wick", year: 2014, split: tune, expected: ["Nobody", "The Equalizer", "Atomic Blonde", "Extraction", "Taken", "The Raid"]}
+- {anchor: "Dangal", split: test, expected: ["Chak De! India", "Sultan", "Bhaag Milkha Bhaag", "M.S. Dhoni: The Untold Story", "Mary Kom", "Lagaan: Once Upon a Time in India", "83"]}
+- {anchor: "Breaking Bad", split: tune, expected: ["Better Call Saul", "Ozark", "Narcos", "The Sopranos", "Fargo", "Dexter", "Peaky Blinders"]}
+- {anchor: "The Office", year: 2005, split: test, expected: ["Parks and Recreation", "Brooklyn Nine-Nine", "Superstore", "Abbott Elementary", "Community", "30 Rock"]}
+- {anchor: "Friends", type: series, split: tune, expected: ["How I Met Your Mother", "The Big Bang Theory", "Seinfeld", "New Girl", "Modern Family", "Two and a Half Men"]}
+- {anchor: "Sherlock", split: test, expected: ["Luther", "Broadchurch", "Elementary", "Line of Duty", "Bodyguard"]}
+- {anchor: "Crash Landing on You", split: tune, expected: ["Descendants of the Sun", "Guardian: The Lonely and Great God", "Hometown Cha-Cha-Cha", "Queen of Tears", "Business Proposal", "What's Wrong with Secretary Kim", "Itaewon Class"]}
+- {anchor: "Squid Game", split: test, expected: ["Alice in Borderland", "All of Us Are Dead", "Sweet Home", "Kingdom", "Hellbound", "Money Heist: Korea - Joint Economic Area"]}
+- {anchor: "Panchayat", split: tune, expected: ["Gullak", "TVF Pitchers", "Kota Factory", "Aspirants", "Yeh Meri Family", "Hostel Daze"]}
+- {anchor: "Sacred Games", split: test, expected: ["Mirzapur", "Paatal Lok", "Delhi Crime", "Breathe", "The Family Man", "Scam 1992: The Harshad Mehta Story", "Asur"]}
+- {anchor: "Stranger Things", split: tune, expected: ["Dark", "The Umbrella Academy", "Wednesday", "Locke & Key", "Twin Peaks", "The OA"]}
+- {anchor: "Attack on Titan", type: anime, split: test, expected: ["Demon Slayer: Kimetsu no Yaiba", "Tokyo Ghoul", "Fullmetal Alchemist: Brotherhood", "Vinland Saga", "Chainsaw Man"]}
+- {anchor: "Death Note", type: anime, split: tune, expected: ["Code Geass: Lelouch of the Rebellion", "Monster", "Psycho-Pass", "Steins;Gate", "Erased", "The Promised Neverland"]}
