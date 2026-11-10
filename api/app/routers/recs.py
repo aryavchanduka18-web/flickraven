@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
+from app.services import series_fit as fit
 from app.services import series_rails as series_rails_service
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
@@ -102,6 +103,29 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
         if len(items) >= series_rails_service.MIN_ROW:
             out.append({"key": r["key"], "title": r["title"], "subtitle": r["subtitle"], "items": items})
     return {"rails": out}
+
+
+@router.get("/series-fit")
+def series_fit(budget: str = "", status: str = "", episode_length: str = "", per_day: int = 2,
+               user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Series that fit the time the user has (see app/services/series_fit.py), best first for this user, each with
+    total hours and days to finish at `per_day` episodes a day."""
+    if budget not in ("", *fit.BUDGETS) or status not in ("", *fit.STATUS) or episode_length not in ("", *fit.EPISODE_LENGTHS):
+        raise HTTPException(422, "Unknown filter value")
+    per_day = max(1, min(per_day, 10))
+    engine = engine_or_503(db)
+    st = rec.user_state(db, user["id"], engine)
+    rows, _ = engine.kind_rank(st, "series")
+    ranked = [int(engine.cat.movie_ids[r]) for r in rows]
+    info = {r["id"]: dict(r) for r in db.execute(text("""SELECT id, episodes, runtime_min AS runtime, series_status AS status
+        FROM movies WHERE title_type = 'series'""")).mappings()}
+    matching = [i for i in ranked if i in info and fit.fits(info[i], budget, status, episode_length)]
+    ids = matching[:40]
+    items = cards(db, ids, user["id"])
+    for it in items:
+        s = info[it["movie"]["id"]]
+        it["plan"] = fit.plan(s["episodes"], s["runtime"], per_day)
+    return {"items": items, "total": len(matching)}
 
 
 @router.get("/home")
