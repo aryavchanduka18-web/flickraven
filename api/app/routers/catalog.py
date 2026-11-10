@@ -100,11 +100,17 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
              db: Session = Depends(get_db)) -> dict:
     """Browse the catalog. `type` is movie (the default), series, anime or all."""
     where, p = ["true"], {}
-    if type in ("movie", "series", "anime") or type is None:
+    if genre == ANIME_SLUG and type in (None, "movie", "all"):
+        where.append("m.title_type IN ('movie', 'anime')")          # Japanese animation: TV anime and animated films
+    elif type in ("movie", "series", "anime") or type is None:
         where.append("m.title_type = :type"); p["type"] = type or "movie"
-    if genre:
+    if genre == ANIME_SLUG:
+        where.append(f"m.original_language = 'ja' AND {ANIMATION_IDS}")
+    elif genre:
         where.append("m.id IN (SELECT mg.movie_id FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE g.slug = :genre)")
         p["genre"] = genre
+        if genre == ANIMATION_SLUG:
+            where.append("m.original_language IS DISTINCT FROM 'ja'")  # Japanese animation is Anime, not Animation
     if lang:
         where.append("m.original_language = :lang"); p["lang"] = lang
     if decade:
@@ -210,18 +216,38 @@ def suggest(q: str, db: Session = Depends(get_db)) -> dict:
             "genres": sq.find_genres(db, q) if plain else [], "understood": parsed.understood()}
 
 
+ANIME_SLUG = "anime"
+ANIMATION_SLUG = "animation"
+ANIMATION_IDS = ("m.id IN (SELECT mg.movie_id FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
+                 f"WHERE g.slug = '{ANIMATION_SLUG}')")
+
+
 @router.get("/genres")
 def genres(db: Session = Depends(get_db)) -> dict:
-    rows = db.execute(text("""SELECT g.id, g.name, g.slug, count(mg.movie_id) AS films,
-        (SELECT m.backdrop_path FROM movies m JOIN movie_genres x ON x.movie_id = m.id WHERE x.genre_id = g.id
-         AND m.backdrop_path IS NOT NULL ORDER BY m.tmdb_vote_count DESC NULLS LAST LIMIT 1) AS backdrop
-        FROM genres g LEFT JOIN movie_genres mg ON mg.genre_id = g.id GROUP BY g.id ORDER BY g.name""")).mappings()
-    return {"genres": [dict(r) for r in rows]}
+    """Genre tiles. Counts are films only. "Anime" is its own entry next to Animation and means Japanese animation
+    (TV anime and animated films); Animation is the rest (cartoons and animated films from everywhere else)."""
+    rows = [dict(r) for r in db.execute(text(f"""SELECT g.id, g.name, g.slug,
+        count(m.id) FILTER (WHERE m.title_type = 'movie' AND NOT (g.slug = '{ANIMATION_SLUG}' AND m.original_language = 'ja')) AS films,
+        (SELECT m2.backdrop_path FROM movies m2 JOIN movie_genres x ON x.movie_id = m2.id WHERE x.genre_id = g.id
+         AND m2.title_type = 'movie' AND NOT (g.slug = '{ANIMATION_SLUG}' AND m2.original_language = 'ja')
+         AND m2.backdrop_path IS NOT NULL ORDER BY m2.tmdb_vote_count DESC NULLS LAST LIMIT 1) AS backdrop
+        FROM genres g LEFT JOIN movie_genres mg ON mg.genre_id = g.id LEFT JOIN movies m ON m.id = mg.movie_id
+        GROUP BY g.id""")).mappings()]
+    anime = db.execute(text(f"""SELECT count(*) AS n, (SELECT m2.backdrop_path FROM movies m2 WHERE m2.title_type IN ('movie', 'anime')
+        AND m2.original_language = 'ja' AND {ANIMATION_IDS.replace('m.id', 'm2.id')} AND m2.backdrop_path IS NOT NULL
+        ORDER BY m2.tmdb_vote_count DESC NULLS LAST LIMIT 1) AS backdrop
+        FROM movies m WHERE m.title_type IN ('movie', 'anime') AND m.original_language = 'ja' AND {ANIMATION_IDS}""")).mappings().first()
+    if anime and anime["n"]:
+        rows.append({"id": 0, "name": "Anime", "slug": ANIME_SLUG, "films": anime["n"], "backdrop": anime["backdrop"]})
+    return {"genres": sorted(rows, key=lambda r: r["name"])}
 
 
 @router.get("/genres/{slug}/movies")
 def genre_movies(slug: str, request: Request, page: int = 1, db: Session = Depends(get_db)) -> dict:
-    """A genre page ranks its films FOR THIS USER with the hybrid score (spec 8.3)."""
+    """A genre page ranks its films FOR THIS USER with the hybrid score (spec 8.3). "anime" (Japanese animation, TV and
+    films) is listed most popular first: TV anime and films have no common score to rank them together."""
+    if slug == ANIME_SLUG:
+        return discover(request, genre=ANIME_SLUG, sort="popular", page=page, type="all", db=db) | {"genre": "Anime"}
     g = db.execute(text("SELECT id, name FROM genres WHERE slug = :s"), {"s": slug}).first()
     if g is None:
         raise HTTPException(404, "Unknown genre")
@@ -231,7 +257,8 @@ def genre_movies(slug: str, request: Request, page: int = 1, db: Session = Depen
     engine = rec.load_engine(db)
     st = rec.user_state(db, uid, engine)
     scores = engine.rail_scores(st)
-    rows = [r for r in np.argsort(-scores) if g[1] in engine.cat.genres[r] and np.isfinite(scores[r])]
+    rows = [r for r in np.argsort(-scores) if g[1] in engine.cat.genres[r] and np.isfinite(scores[r])
+            and not (slug == ANIMATION_SLUG and engine.cat.language[r] == "ja")]
     start = (max(page, 1) - 1) * 40
     pick = rows[start:start + 40]
     extra = {int(engine.cat.movie_ids[r]): {"score": float(scores[r]), "match_pct": engine.match(st.stage, float(scores[r]))}
