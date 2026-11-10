@@ -70,6 +70,7 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     cat = engine.cat
     rows, scores = engine.kind_rank(st, "series")
     ranked = [int(cat.movie_ids[r]) for r in rows]
+    ranked_series_rows = set(rows.tolist())
     series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
                "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
                "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
@@ -81,8 +82,8 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
                 FROM movies m WHERE m.title_type = 'series'""")).mappings()]
     engaged = {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
     interest = series_rails_service.affinity([cat.language[r] for r in engaged], list(st.languages))
-    rails = [{"key": t["key"], "title": t["title"], "subtitle": t["subtitle"], "ids": t["ids"]}
-             for t in series_rails_service.build(series, ranked, interest)]
+    shown_series = set(ranked[:24])       # Home's main Series row requests 24 titles.
+    rails = []
 
     # "Because you liked X": the series most like the one the user liked or rated highest.
     liked = {r: 1.0 for r in st.likes | st.picks}
@@ -90,16 +91,22 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     liked = {r: w for r, w in liked.items() if cat.kind[r] == "series"}
     if liked:
         base = min(liked, key=lambda r: (-liked[r], r))
-        seen = set(rows.tolist())
-        similar = [int(cat.movie_ids[r]) for r in engine.similar(base, k=120) if cat.kind[r] == "series" and r in seen][:20]
+        similar = [int(cat.movie_ids[r]) for r in engine.similar(base, k=120)
+                   if cat.kind[r] == "series" and r in ranked_series_rows and int(cat.movie_ids[r]) not in shown_series][:20]
         if len(similar) >= series_rails_service.MIN_ROW:
-            rails.insert(0, {"key": "because", "title": f"Because you liked {cat.titles[base]}",
-                             "subtitle": "Series with a similar feel.", "ids": similar})
+            rails.append({"key": "because", "title": f"Because you liked {cat.titles[base]}",
+                          "subtitle": "Series with a similar feel.", "ids": similar})
+            shown_series.update(similar)
+
+    for theme in series_rails_service.build(series, ranked, interest, exclude_ids=shown_series):
+        rails.append({"key": theme["key"], "title": theme["title"], "subtitle": theme["subtitle"], "ids": theme["ids"]})
+        shown_series.update(theme["ids"])
 
     # Films and series, alternating.
     film_scores = engine.rail_scores(st)
     films = [int(cat.movie_ids[r]) for r in np.argsort(-film_scores)[:30] if np.isfinite(film_scores[r])][:12]
-    mixed = series_rails_service.interleave(films, ranked[:12])
+    remaining_series = [mid for mid in ranked if mid not in shown_series]
+    mixed = series_rails_service.interleave(films, remaining_series[:12])
     if len(mixed) >= series_rails_service.MIN_ROW:
         rails.append({"key": "mix", "title": "Films and series picked for you", "subtitle": "A mix of both.", "ids": mixed})
 
