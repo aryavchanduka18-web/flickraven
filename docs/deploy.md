@@ -88,14 +88,20 @@ already there, and finishes a bundle upload that stopped half way.
   It updates every film by its TMDB id and adds the new ones. Nothing is deleted, so accounts, ratings and
   lists made on the site stay as they are. It also uploads the new model bundle. Then **Restart service**.
 
-## Every month (about 30 minutes)
+## Every month (about 30 minutes; the first full run after the series and wider-catalog update takes 1 to 2 hours)
 
-1. Start Docker Desktop, then `scripts\db.ps1`.
-2. Run `scripts\monthly_refresh.ps1`. It backs up the live database, finds films released in the last six
+1. Start Docker Desktop (wait until it says it is running; if it will not start, rename
+   `%LOCALAPPDATA%\Docker\run` and `%LOCALAPPDATA%\docker-secrets-engine` and start it again), then run
+   `powershell -ExecutionPolicy Bypass -File .\scripts\db.ps1` in the `cinematch` folder.
+2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\monthly_refresh.ps1` (the `-ExecutionPolicy Bypass` part is
+   needed on a laptop where running scripts is disabled; keep the laptop awake). It backs up the live database, finds films released in the last six
    months on TMDB (English and every catalog language), adds the ones that pass the metadata gate as
    "new & notable" films, rebuilds the catalog and the model bundle, and uploads them. Accounts and ratings
    on the site are not touched. The new films have no MovieLens ratings, so the models and the evaluation
-   results stay the same; new films are recommended through "similar to" (content) scores.
+   results stay the same; new films are recommended through "similar to" (content) scores. Steps: 1 new releases,
+   1b wider catalog, 1c series and anime, 2 rebuild, 3 load, 3b where to watch, 3c IMDb ratings, 4 content features,
+   5 export, 6 upload. TMDB answers are cached on the laptop, so a stopped run resumes where it left off, and a
+   title TMDB refuses is skipped and asked for again next month.
 3. In Render: **flickraven** service, **Manual Deploy**, **Restart service**.
 
 If you skip a month nothing breaks; the catalog just stops getting newer.
