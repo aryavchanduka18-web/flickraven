@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { RecItem } from "../api/types";
@@ -32,6 +32,7 @@ export default function Home() {
     staleTime: 5 * 60_000,
   });
   const anime = useKindRail("anime");
+  const showAnimeRow = !!anime.data && anime.data.items.length > 0;
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
@@ -84,18 +85,21 @@ export default function Home() {
         )}
         {home.isLoading && !quick.data && [0, 1, 2].map((i) => <RailSkeleton key={i} />)}
         <div className="space-y-6">
-          {home.data?.rails.map((r) => (
-            <Rail key={r.key} title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
-              personal={PERSONAL.has(r.key) || r.items.some((i) => i.match_pct != null)} />
+          {home.data?.rails.map((r, i) => (
+            <Fragment key={r.key}>
+              <Rail title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
+                personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} />
+              {/* Series and anime come right after the first two film rails, so they are seen without long scrolling. */}
+              {i === 1 && series.data && series.data.items.length > 0 && (
+                <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
+                  items={series.data.items} source="rail:series" personal={false} />
+              )}
+              {i === 1 && showAnimeRow && (
+                <Rail title="Anime for you" subtitle="From what you like and what is popular."
+                  items={anime.data!.items} source="rail:anime" personal={false} />
+              )}
+            </Fragment>
           ))}
-          {home.data && series.data && series.data.items.length > 0 && (
-            <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
-              items={series.data.items} source="rail:series" personal={false} />
-          )}
-          {home.data && anime.data && anime.data.items.length > 0 && (
-            <Rail title="Anime for you" subtitle="From what you like and what is popular."
-              items={anime.data.items} source="rail:anime" personal={false} />
-          )}
           {home.data && collections.data?.collections.map((c) => (
             <Rail key={c.key} title={c.title} subtitle={`${c.count.toLocaleString()} films`} items={c.items}
               source={`collection:${c.key}`} personal={c.items.some((i) => i.match_pct != null)} />
