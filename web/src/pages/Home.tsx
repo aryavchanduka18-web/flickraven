@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { RecItem } from "../api/types";
 import { Link, Navigate } from "react-router-dom";
-import { useCollections, useHome, useKindRail, useMe, useSetMode } from "../api/hooks";
+import { useCollections, useHome, useKindRail, useMe, useSeriesRails, useSetMode } from "../api/hooks";
 import type { Mode } from "../api/types";
 import DiscoveryModeControl from "../components/discovery/DiscoveryModeControl";
 import TonightPanel from "../components/discovery/TonightPanel";
@@ -33,6 +33,7 @@ export default function Home() {
   });
   const anime = useKindRail("anime");
   const showAnimeRow = !!anime.data && anime.data.items.length > 0;
+  const themed = useSeriesRails();
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
@@ -94,6 +95,12 @@ export default function Home() {
                 <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
                   items={series.data.items} source="rail:series" personal={false} />
               )}
+              {i === 1 && themed.data?.rails.filter((x) => x.key !== "mix").map((x) => (
+                <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source={`rail:series_${x.key}`} personal={false} />
+              ))}
+              {i === 3 && themed.data?.rails.filter((x) => x.key === "mix").map((x) => (
+                <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source="rail:series_mix" personal={false} />
+              ))}
               {i === 1 && showAnimeRow && (
                 <Rail title="Anime for you" subtitle="From what you like and what is popular."
                   items={anime.data!.items} source="rail:anime" personal={false} />
