@@ -94,17 +94,19 @@ def affinity(liked_languages: list[str], chosen_languages: list[str]) -> dict[st
     return out
 
 
-def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | None = None) -> list[dict]:
+def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | None = None,
+          exclude_ids: set[int] | None = None) -> list[dict]:
     """[{key, title, subtitle, ids}] for every theme with at least MIN_ROW series, each ordered like `ranked_ids`
     (the user's series ranking, best first); series missing from the ranking (already seen) are left out.
-    With `interest` (see affinity), rows the user has shown interest in come first; the rest keep their order and
-    are still shown, so nobody is shut out of a language."""
+    `exclude_ids` are titles already shown in Home's main Series row or an earlier series shelf. With `interest`
+    (see affinity), rows the user has shown interest in come first; the rest keep their order and are still shown,
+    so nobody is shut out of a language."""
     by_id = {s["id"]: s for s in series}
     themes = list(THEMES.values())
     if interest:
         themes.sort(key=lambda t: -interest.get(t.key, 0))
     out = []
-    used = set()
+    used = set(exclude_ids or ())
     for theme in themes:
         ids = [i for i in ranked_ids if i not in used and i in by_id and by_id[i].get("has_art") and in_theme(theme.key, by_id[i])][:ROW_SIZE]
         if len(ids) >= MIN_ROW:

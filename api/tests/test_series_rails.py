@@ -80,6 +80,14 @@ def test_series_are_deduplicated_across_rows_by_user_interest():
     assert rows[1]["ids"] == list(range(9, 17))
 
 
+def test_series_shelves_skip_titles_already_shown_in_the_main_series_row():
+    series = [s(i, lang="en", countries=["US"], popularity=8.5, votes=1500) for i in range(1, 9)]
+    series += [s(i, lang="en", countries=["US"], popularity=7.0, votes=300) for i in range(9, 25)]
+    rows = sr.build(series, list(range(1, 25)), {"acclaimed": 1}, exclude_ids=set(range(1, 9)))
+    assert [row["key"] for row in rows] == ["anglo"]
+    assert rows[0]["ids"] == list(range(9, 25))
+
+
 def test_new_tv_rows_follow_their_written_rules():
     base = {"lang": "en", "countries": ["US"], "genres": ["Drama"], "runtime": 50, "popularity": 8.2, "votes": 2000}
     assert sr.in_theme("one_season", {**base, "status": "Ended", "seasons": 1, "episodes": 8})
