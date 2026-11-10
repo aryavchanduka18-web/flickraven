@@ -140,3 +140,43 @@ def put_tuning(body: TuningBody, user=Depends(current_user), db: Session = Depen
                {"u": user["id"], "t": json.dumps(body.model_dump())})
     db.commit()
     return body.model_dump()
+
+
+MISSION_SUGGESTIONS = {
+    "world": "m.title_type = 'movie' AND NOT (m.countries && ARRAY['US','IN']::text[])",
+    "languages": "m.original_language <> :main_lang",
+    "classics": "m.title_type = 'movie' AND m.year < 1980",
+    "mini_series": "m.title_type = 'series' AND m.episodes BETWEEN 1 AND 8 AND m.series_status IN ('Ended', 'Canceled')",
+    "genre": "m.title_type = 'movie' AND EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
+             "WHERE mg.movie_id = m.id AND g.name = :genre)",
+}
+
+
+@router.get("/me/missions")
+def missions(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Discovery missions with live progress from what you watched, rated or liked (app/services/missions.py), and
+    a few well-known titles you have not seen yet for each open one."""
+    from app.services import missions as ms
+    from app.services.movies import cards
+    p = {"u": user["id"]}
+    seen_sql = """SELECT movie_id FROM watched WHERE user_id = :u UNION SELECT movie_id FROM ratings WHERE user_id = :u
+                  UNION SELECT movie_id FROM reactions WHERE user_id = :u AND value > 0"""
+    titles = [dict(r) for r in db.execute(text(f"""
+        SELECT m.countries, m.original_language AS lang, m.year, m.title_type, m.episodes,
+               ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres
+        FROM movies m WHERE m.id IN ({seen_sql})"""), p).mappings()]
+    by_size = [r[0] for r in db.execute(text("""SELECT g.name FROM genres g JOIN movie_genres mg ON mg.genre_id = g.id
+        GROUP BY g.name ORDER BY count(*) DESC"""))]
+    genre = ms.pick_new_genre(titles, by_size)
+    langs = [t["lang"] for t in titles if t["lang"]]
+    main_lang = max(set(langs), key=langs.count) if langs else "en"
+    out = []
+    for m in ms.progress(titles, genre):
+        kind = "genre" if m.key.startswith("genre:") else m.key
+        ids = [] if m.done else [r[0] for r in db.execute(text(f"""
+            SELECT m.id FROM movies m WHERE {MISSION_SUGGESTIONS[kind]} AND m.backdrop_path IS NOT NULL
+              AND m.id NOT IN ({seen_sql}) AND coalesce(m.popularity_score, 0) >= 6.5
+            ORDER BY m.tmdb_vote_count DESC NULLS LAST LIMIT 8"""), {**p, "main_lang": main_lang, "genre": genre})]
+        out.append({"key": m.key, "title": m.title, "description": m.description, "goal": m.goal,
+                    "progress": m.progress, "done": m.done, "suggestions": cards(db, ids, user["id"])})
+    return {"missions": out}

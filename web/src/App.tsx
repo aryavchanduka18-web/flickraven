@@ -12,6 +12,7 @@ import Movie from "./pages/Movie";
 import MyList from "./pages/MyList";
 import Onboarding from "./pages/Onboarding";
 import Person from "./pages/Person";
+import Missions from "./pages/Missions";
 import Search from "./pages/Search";
 import StatsPage from "./pages/Stats";
 import { PageMessage } from "./components/Loading";
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/person/:id" element={<Person />} />
         <Route path="/my-list" element={<MyList />} />
         <Route path="/activity" element={<Activity />} />
+        <Route path="/missions" element={<Missions />} />
         <Route path="/search" element={<Search />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
