@@ -111,7 +111,8 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
             out.append({"key": r["key"], "title": r["title"], "subtitle": r["subtitle"], "items": items})
             log_shown(db, uid, request_id, None, f"series_{r['key']}", None, items)   # the report counts series too
     db.commit()
-    return {"rails": out}
+    # How many series the user has shown interest in: Home adds TV-focused rows as this grows (see Home.tsx).
+    return {"rails": out, "engaged_series": sum(1 for r in engaged if cat.kind[r] == "series")}
 
 
 NEXT_BUDGET = {"3": "5", "5": "10", "10": "20", "20": "long"}

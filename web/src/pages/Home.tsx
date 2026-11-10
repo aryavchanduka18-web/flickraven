@@ -11,6 +11,7 @@ import TunePanel from "../components/discovery/TunePanel";
 import Hero from "../components/hero/Hero";
 import { PageMessage, RailSkeleton } from "../components/Loading";
 import Rail from "../components/rail/Rail";
+import { themedRowLimit } from "../lib/seriesRows";
 
 const PERSONAL = new Set(["top_picks", "based_on_ratings", "people_like_you", "different"]);
 
@@ -95,7 +96,10 @@ export default function Home() {
                 <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
                   items={series.data.items} source="rail:series" personal={false} />
               )}
-              {i === 1 && themed.data?.rails.filter((x) => x.key !== "mix").map((x) => (
+              {i === 1 && themed.data?.rails.filter((x) => x.key === "because").map((x) => (
+                <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source="rail:series_because" personal={false} />
+              ))}
+              {i === 1 && themed.data?.rails.filter((x) => x.key !== "mix" && x.key !== "because").slice(0, themedRowLimit(themed.data.engaged_series ?? 0)).map((x) => (
                 <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source={`rail:series_${x.key}`} personal={false} />
               ))}
               {i === 3 && themed.data?.rails.filter((x) => x.key === "mix").map((x) => (
