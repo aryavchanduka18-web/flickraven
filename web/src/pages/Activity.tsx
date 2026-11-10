@@ -1,3 +1,4 @@
+import RecReport from "../components/explain/RecReport";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -25,6 +26,7 @@ export default function Activity() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 pt-24 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Activity</h1>
+      <RecReport />
       {taste.data && <TasteProfile t={taste.data} />}
       <div className="mt-10 flex flex-wrap gap-2" role="tablist">
         {TABS.map(([k, l]) => (
