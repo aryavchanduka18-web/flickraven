@@ -913,6 +913,12 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - Fewer than three fit: mood is relaxed first, then genres, then language; the reply names what was relaxed. "Include other languages" drops the language limit.
 - Match % is shown for films only. `POST /api/recs/perfect-pick` body: kind, mood, genres, languages, time, status, adventure, other_languages, exclude.
 
+### 14.2h Hindi and Indian rows (2026-11-11)
+
+- New Home collections, offered only to people with a language interest: Hindi Movies Picked for You, Modern Bollywood (2010 onwards), Hindi Thrillers and Crime, Hindi Comedy, Bollywood Rom-Coms (Hindi interest), and Indian Cinema Beyond Bollywood (Tamil, Telugu, Malayalam, Bengali, Kannada, Marathi, Punjabi; interest in any of them). "Retro Hindi Classics" is now "Bollywood Classics" and stays for everyone.
+- Interest = languages chosen in the profile, plus the language of anything rated 7+, liked, watched or picked in onboarding. English-only people get no Hindi quota; guests get none of the gated rows. Rows are ordered by the user's own hybrid score (popularity where the engine cannot score a film), and need at least 6 films.
+- A persistent explicit-language lift for ranking itself came in #78.
+
 ### 14.2e Taste Evolution (2026-11-11)
 
 - On `/taste-dna`, "How your taste changed": per month (last 6 with activity) the top 3 genres of titles liked or rated 7+, and, with 5+ titles in the latest two months and 5+ before, the genre that rose and the one that fell (change of 10 points or more). Counts only; `GET /api/me/taste-evolution`.
