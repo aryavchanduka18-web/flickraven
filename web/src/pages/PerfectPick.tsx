@@ -28,8 +28,8 @@ export default function PerfectPick() {
   const [other, setOther] = useState(false);
   const [shown, setShown] = useState<number[]>([]);
   const run = useMutation({
-    mutationFn: (v: { exclude: number[]; other: boolean }) =>
-      send<Result>("POST", "/recs/perfect-pick", { mood: a.mood, time: a.time, adventure: a.adventure, other_languages: v.other, exclude: v.exclude }),
+    mutationFn: (v: { answers: typeof a; exclude: number[]; other: boolean }) =>
+      send<Result>("POST", "/recs/perfect-pick", { mood: v.answers.mood, time: v.answers.time, adventure: v.answers.adventure, other_languages: v.other, exclude: v.exclude }),
     onSuccess: (r) => setShown((s) => [...s, ...r.items.map((i) => i.movie.id)]),
   });
   const ask = (key: keyof typeof a, v: string) => {
@@ -38,7 +38,7 @@ export default function PerfectPick() {
     if (step < 2) return setStep(step + 1);
     setStep(3);
     setShown([]);
-    run.mutate({ exclude: [], other });
+    run.mutate({ answers: next, exclude: [], other });
   };
   const questions = [
     ["What are you in the mood for?", "mood", MOODS], ["How much time do you have?", "time", TIMES], ["Familiar or adventurous?", "adventure", ADVENTURE],
@@ -88,7 +88,7 @@ export default function PerfectPick() {
                     <ul className="mt-3 space-y-1 text-sm text-white/80">{it.reasons.map((r) => <li key={r.code}>{r.text}</li>)}</ul>
                     <div className="mt-auto flex gap-2 pt-4">
                       <Link to={`/movie/${it.movie.id}`} className="glass-btn solid rounded-xl px-4 py-2 text-sm font-semibold">Details</Link>
-                      <button onClick={() => run.mutate({ exclude: shown, other })} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Get three new picks">Not these</button>
+                      <button onClick={() => run.mutate({ answers: a, exclude: shown, other })} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Get three new picks">Not these</button>
                     </div>
                   </div>
                 </article>
@@ -97,7 +97,7 @@ export default function PerfectPick() {
           )}
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={other} onChange={(e) => { setOther(e.target.checked); setShown([]); run.mutate({ exclude: [], other: e.target.checked }); }} />
+              <input type="checkbox" checked={other} onChange={(e) => { setOther(e.target.checked); setShown([]); run.mutate({ answers: a, exclude: [], other: e.target.checked }); }} />
               Include languages outside my profile
             </label>
             <button onClick={() => { setStep(0); setA({ mood: "", time: "", adventure: "" }); }} className="glass-btn ml-auto rounded-2xl px-5 py-2.5 text-sm font-semibold">Start over</button>
