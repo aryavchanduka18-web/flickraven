@@ -36,7 +36,7 @@ export default function SeriesFit() {
   );
   const d = res.data;
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pb-24 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pb-24 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Find a Series That Fits Your Time</h1>
       <p className="mt-1 text-sm text-muted">Tell us how much time you have and we will shortlist series you can actually finish.</p>
       <div className="mt-6 grid gap-8 lg:grid-cols-[320px_1fr]">

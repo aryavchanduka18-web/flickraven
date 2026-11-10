@@ -28,7 +28,7 @@ export default function Activity() {
   const taste = useQuery({ queryKey: ["taste"], queryFn: () => api<Taste>("/me/taste-profile") });
   const q = useQuery({ queryKey: ["activity", type], queryFn: () => api<{ items: Item[] }>(`/activity${type ? `?type=${type}` : ""}`), enabled: full });
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1400px] px-4 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Activity</h1>
       <RecReport />
       {taste.data && <TasteProfile t={taste.data} />}

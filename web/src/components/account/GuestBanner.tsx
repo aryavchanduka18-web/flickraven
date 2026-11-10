@@ -29,7 +29,7 @@ export default function GuestBanner() {
     }
   };
   return (
-    <div className="fixed inset-x-0 top-16 z-30 flex justify-center px-4" role="region" aria-label="Guest notice">
+    <div className="shell-main fixed inset-x-0 top-16 z-30 flex justify-center px-4 md:top-4" role="region" aria-label="Guest notice">
       <div className="flex items-center gap-3 rounded-full border border-white/10 bg-surface/95 py-1.5 pl-4 pr-1.5 text-sm shadow-xl backdrop-blur">
         <span>Create an account to keep your taste</span>
         <Link to="/register" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black">Create account</Link>

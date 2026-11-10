@@ -8,7 +8,7 @@ import { tmdbImage } from "../lib/tmdb";
 export function Genres() {
   const q = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { id: number; name: string; slug: string; films: number; backdrop: string | null }[] }>("/genres") });
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Genres</h1>
       <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
         {q.data?.genres.map((g) => (
@@ -32,7 +32,7 @@ export function Genre() {
   const name = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { name: string; slug: string }[] }>("/genres") })
     .data?.genres.find((x) => x.slug === slug)?.name;
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">{name ?? ""}</h1>
       <p className="mt-1 text-sm text-muted">{total != null ? `${total.toLocaleString()} ${slug === "anime" ? "titles" : "films"}, ` : ""}{slug === "anime" ? "most popular first (Japanese animation: TV anime and films)." : "ranked for you by the recommender."}</p>
       <div className="mt-6">

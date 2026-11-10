@@ -17,12 +17,12 @@ const SURFACE: Record<string, string> = { hero: "Top banner", top_picks: "Top Pi
 /** How Well Does Flickeraven Know You? Outcomes of recommendations you rated, with counts and honest limits. */
 export default function Performance() {
   const q = useQuery({ queryKey: ["report"], queryFn: () => api<Report>("/me/report") });
-  if (q.isLoading) return <div className="mx-auto h-96 max-w-[1100px] animate-pulse px-4 pt-24" />;
+  if (q.isLoading) return <div className="mx-auto h-96 max-w-[1100px] animate-pulse px-4 pt-20" />;
   if (q.isError || !q.data) return <PageMessage title="Your report could not be loaded">Something went wrong. <button className="underline" onClick={() => q.refetch()}>Try again</button></PageMessage>;
   const d = q.data;
   const stat = (v: string, l: string) => <div className="rounded-lg border border-white/10 bg-surface p-4"><p className="font-display text-3xl font-extrabold">{v}</p><p className="mt-1 text-xs text-muted">{l}</p></div>;
   return (
-    <div className="mx-auto max-w-[1100px] px-4 pb-24 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1100px] px-4 pb-24 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">How Well Does Flickeraven Know You?</h1>
       <p className="mt-1 text-sm text-muted">A look at how our recommendations performed for you, from the last {d.log_days} days.</p>
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">

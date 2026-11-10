@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/layout/AppShell";
 import Account from "./pages/Account";
 import Activity from "./pages/Activity";
@@ -14,7 +14,6 @@ import MyList from "./pages/MyList";
 import Onboarding from "./pages/Onboarding";
 import Person from "./pages/Person";
 import SeriesFit from "./pages/SeriesFit";
-import Missions from "./pages/Missions";
 import TasteDna from "./pages/TasteDna";
 import Performance from "./pages/Performance";
 import Search from "./pages/Search";
@@ -34,7 +33,8 @@ export default function App() {
         <Route path="/person/:id" element={<Person />} />
         <Route path="/my-list" element={<MyList />} />
         <Route path="/activity" element={<Activity />} />
-        <Route path="/missions" element={<Missions />} />
+        {/* The Discovery Journey page was removed; old links go Home. Its API and table are still there. */}
+        <Route path="/missions" element={<Navigate to="/" replace />} />
         <Route path="/taste-dna" element={<TasteDna />} />
         <Route path="/performance" element={<Performance />} />
         <Route path="/search" element={<Search />} />

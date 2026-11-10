@@ -38,7 +38,7 @@ export default function Onboarding() {
   const canNext = [picks.length >= 5, langs.length >= 1, true][step];
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-20 md:px-10">
       <p className="text-sm text-muted">Step {step + 1} of 3</p>
       <h1 className="mt-1 font-display text-3xl font-extrabold">{STEPS[step]}</h1>
       {step === 0 && (

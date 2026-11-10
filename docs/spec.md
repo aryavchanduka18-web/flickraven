@@ -303,14 +303,20 @@ Dropped from v1.0: **Trending Now** (no live trend data; merged into New & Notab
 ## 8. Pages, navigation and UI
 
 ### 8.1 Navigation
+Desktop (v5, 2026-11-11, Apple TV look): a floating dark-glass sidebar on the left, no top bar.
 ```
-[FlickRaven logo]  Home  Discover  Genres  My List  Activity        [search]  [avatar]
+[FlickRaven logo] [hide]
+[Search]
+Home  Discover  Genres  My List  Activity
+...
+[avatar + name]  (menu: Taste DNA, Taste Profile, Recommendation report, Preferences, Account, Sign in / out)
 ```
-- Active tab: light pill, dark text. Inactive: plain. Hover: subtle gray pill.
-- Navbar: slightly see-through at the top of the page, solid near-black after about 80 px of scroll.
-- Avatar menu: Taste Profile, Preferences (edit onboarding answers), Sign out. Guests see "Create account".
-- Phone: logo, search and avatar at the top; the five tabs in a bottom tab bar.
+- Active page: light pill that slides to the new page. Inactive: plain, subtle hover.
+- A tall button at the top right of the sidebar hides it (a window icon, left half filled). When hidden, a small glass button with the same icon (and a search button) floats at the top left; the choice is remembered in this browser. Content and hero glide over when it opens or closes (transforms only, no layout animation); reduced-motion users get no glide.
+- Phone: logo, search and avatar at the top; the five tabs in a bottom tab bar (no sidebar).
+- There is no Missions tab: the Discovery Journey page and its link were removed (2026-11-11). `/missions` redirects Home. The API and the `mission_state` table remain, unused.
 - `/lab` is not in the navigation (a small footer link for the demo).
+- The logo is Aryav's own artwork (`web/public/flickraven-logo.png`, bird alone in `flickraven-mark.png`, also the browser icon), made transparent from the PNG he supplied; a larger or SVG original would be sharper.
 
 ### 8.2 Routes
 `/` Home · `/discover` · `/genres` · `/genres/:slug` · `/movie/:id` · `/my-list` · `/activity` · `/search?q=` · `/login` · `/register` · `/onboarding` · `/lab`
@@ -339,10 +345,10 @@ Dropped from v1.0: **Trending Now** (no live trend data; merged into New & Notab
 - **Rail arrows:** glass style (see-through, light blur, thin light border, round), fade in when the pointer enters the rail, smooth scroll.
 
 ### 8.5 Hero
-- Large backdrop of the current pick, blurred artwork plus a subtle tint from its precomputed dominant color, dark overlay for readable text.
-- Shows: title, year, runtime, genres, language, Match %, community rating, one-line reason, View Details, Add to My List, Like, Dislike. **No Play button.**
-- Arrows and dots to move between the 5 picks. Changing pick: 400–600 ms crossfade, metadata moves slightly.
-- On scroll: the hero compresses and the navbar turns solid.
+- Full-bleed header (reaches behind the sidebar): the pick's own 16:9 backdrop fills the screen, black fade on the left for the text, picture clear on the right (v5, from Aryav's reference screenshot of a film page).
+- Shows: title, year, runtime, genres, language, Match % chip, IMDb score, short synopsis, one-line reason, and three glass buttons: **View details**, **Add to list** (toggles), **Why this?** (opens the explanation panel). Like and Dislike live on cards and film pages. **No Play button.**
+- Side arrows (desktop) and dots to move between the 5 picks. Changing pick: 0.9 s eased crossfade with a slight zoom, text rises in.
+- On scroll: the picture drifts and dims.
 
 ### 8.6 Visual identity
 - Colors: background `#080808`, surface `#141414`, surface 2 `#1B1B1B`, text `#FFFFFF`, muted `#A7A7A7`. Accent: FlickRaven crimson about `#C8102E` (hover `#E0263F`), used for Match %, active rating stars and focus rings, never for large blocks.
@@ -669,7 +675,9 @@ A plain, professional page for the professor. It exposes the engine; it is not a
 - **Use:** the Taste DNA row re-orders the recommender's own top 300 by trait fit; it is NOT part of the hybrid score or Match %. Explanations name only traits the title has (value 0.5+) and the user prefers.
 - **Not yet evaluated offline:** no ratings exist with which to test whether the fit improves ranking, so it is not blended into the hybrid.
 
-### 14.2c Discovery Journey (missions, v3, 2026-11-10)
+### 14.2c Discovery Journey (missions, v3, 2026-11-10) — page removed 2026-11-11
+
+The page and its navigation links were removed at Aryav's request (see 8.1); the API and table below remain but nothing in the website calls them.
 
 - Page `/missions` ("Your Discovery Journey"), tabs: Recommended (not started), Active (some progress), Completed, Explore (hidden missions and extra genre ideas).
 - Missions: International Explorer (5 countries beyond the US and India), Beyond your language (4 other languages), Through the decades (5 decades), Classic cinema (3 films before 1980), Mini-series weekend (1 series of 8 episodes or fewer), and personal "New to <genre>" missions (the biggest genres with fewer than 3 of your titles).

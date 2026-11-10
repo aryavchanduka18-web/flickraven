@@ -13,7 +13,19 @@ type UI = {
   /** Film just disliked: the "why not?" sheet asks for a reason. */
   dislikeId: number | null;
   askDislikeReason: (movieId: number | null) => void;
+  /** Desktop sidebar: open or hidden. Remembered in this browser. */
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
 };
+
+const SIDEBAR_KEY = "fr-sb";
+function sidebarWasOpen(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 const Ctx = createContext<UI | null>(null);
 
@@ -22,13 +34,22 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<string | null>(null);
   const [whyId, setWhyId] = useState<number | null>(null);
   const [dislikeId, setDislikeId] = useState<number | null>(null);
+  const [sidebarOpen, setSidebar] = useState(sidebarWasOpen);
+  const setSidebarOpen = useCallback((open: boolean) => {
+    setSidebar(open);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, open ? "1" : "0");
+    } catch {
+      /* private mode: it just resets next visit */
+    }
+  }, []);
   const notify = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 2600);
   }, []);
   return (
     <Ctx.Provider value={{ quickView, openQuickView: setQuickView, closeQuickView: () => setQuickView(null), toast, notify,
-      whyId, openWhy: setWhyId, dislikeId, askDislikeReason: setDislikeId }}>
+      whyId, openWhy: setWhyId, dislikeId, askDislikeReason: setDislikeId, sidebarOpen, setSidebarOpen }}>
       {children}
     </Ctx.Provider>
   );

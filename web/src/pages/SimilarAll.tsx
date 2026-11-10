@@ -22,7 +22,7 @@ export default function SimilarAll() {
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
   const total = q.data?.pages[0]?.total ?? 0;
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pb-20 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pb-20 pt-20 md:px-10">
       <Link to={`/movie/${id}`} className="text-sm text-muted hover:text-white">← Back to {movie.data?.title ?? "the title"}</Link>
       <h1 className="mt-2 font-display text-3xl font-extrabold">More like {movie.data?.title ?? "this"}</h1>
       <p className="mb-6 mt-1 text-sm text-muted">Most similar first, by story, themes, people and language. Same for everyone.</p>

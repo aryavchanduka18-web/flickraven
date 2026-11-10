@@ -18,7 +18,7 @@ function useLab<T>(key: string) {
 
 export default function Lab() {
   return (
-    <div className="mx-auto max-w-[1200px] space-y-14 px-4 pb-20 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1200px] space-y-14 px-4 pb-20 pt-20 md:px-10">
       <header>
         <h1 className="font-display text-3xl font-extrabold">Research Lab</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted">

@@ -10,7 +10,7 @@ export default function MyList() {
   const q = useQuery({ queryKey: ["list", sort], queryFn: () => api<{ items: RecItem[] }>(`/list?sort=${sort}`) });
   if (q.data && !q.data.items.length) return <PageMessage title="Your list is empty">Use the + button on any film to save it here.</PageMessage>;
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl font-extrabold">My List</h1>
         <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"

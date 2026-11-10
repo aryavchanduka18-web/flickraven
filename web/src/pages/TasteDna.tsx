@@ -23,7 +23,7 @@ export default function TasteDna() {
   const picks = useQuery({ queryKey: ["taste-dna-picks"], queryFn: () => api<{ items: RecItem[]; ready: boolean }>("/recs/taste-dna"), enabled: !!q.data?.ready });
   const [refine, setRefine] = useState(false);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
-  if (q.isLoading) return <div className="mx-auto h-96 max-w-[1400px] animate-pulse px-4 pt-24 md:px-10" />;
+  if (q.isLoading) return <div className="mx-auto h-96 max-w-[1400px] animate-pulse px-4 pt-20 md:px-10" />;
   if (q.isError || !q.data)
     return <PageMessage title="Your Taste DNA could not be loaded">Something went wrong. <button className="underline" onClick={() => q.refetch()}>Try again</button></PageMessage>;
   const d = q.data, by = Object.fromEntries(d.traits.map((t) => [t.key, t])) as Record<string, Trait>;
@@ -43,7 +43,7 @@ export default function TasteDna() {
     for (const k of ["taste-dna", "taste-dna-picks"]) qc.invalidateQueries({ queryKey: [k] });
   };
   return (
-    <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-24 md:px-10">
+    <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">Your Taste DNA</h1>
       <p className="mt-1 text-sm text-muted">Discover what makes your movie taste unique.</p>
       {!d.ready ? (
