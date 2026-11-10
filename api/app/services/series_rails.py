@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 EAST_ASIA = {"KR", "JP", "CN", "TW", "HK"}
 MIN_ROW = 8
+WEEKEND_HOURS = 15      # "get through in a weekend": at most this many hours in total (episodes x episode length)
 ROW_SIZE = 20
 
 
@@ -21,7 +22,7 @@ class Theme:
 
 THEMES = {
     "east_asian": Theme("east_asian", "East Asian TV dramas", "Korean, Japanese, Chinese and Taiwanese dramas."),
-    "kdrama": Theme("kdrama", "Popular K-dramas", "The most-watched Korean dramas."),
+    "kdrama": Theme("kdrama", "Popular K-dramas", "Well-known Korean dramas, in the order that suits you."),
     "acclaimed": Theme("acclaimed", "Critically acclaimed TV dramas", "The highest-rated drama series, by viewer ratings on TMDB."),
     "weekend": Theme("weekend", "Perfect binge-watches", "Short, finished series you can get through in a weekend."),
     "binge": Theme("binge", "Can't stop at just one episode", "Much-loved series with plenty of seasons to get lost in."),
@@ -35,14 +36,17 @@ def in_theme(key: str, s: dict) -> bool:
     pop = s.get("popularity") or 0
     seasons, episodes = s.get("seasons") or 0, s.get("episodes") or 0
     live_action = "Animation" not in (s.get("genres") or [])           # dramas and sitcoms, not cartoons
+    drama = "Drama" in (s.get("genres") or [])                        # the rows say "dramas"
     if key == "east_asian":
-        return live_action and bool(EAST_ASIA & set(s.get("countries") or []))
+        return live_action and drama and bool(EAST_ASIA & set(s.get("countries") or []))
     if key == "kdrama":
-        return live_action and s.get("lang") == "ko"
+        return live_action and drama and s.get("lang") == "ko"
     if key == "acclaimed":
         return live_action and "Drama" in (s.get("genres") or []) and pop >= 8.3 and (s.get("votes") or 0) >= 1000
     if key == "weekend":
-        return s.get("status") == "Ended" and 1 <= seasons <= 3 and 6 <= episodes <= 36 and pop >= 7.8
+        runtime = s.get("runtime") or 0                                   # unknown length: not promised as a weekend
+        return (s.get("status") == "Ended" and 1 <= seasons <= 3 and 6 <= episodes <= 36 and pop >= 7.8
+                and 0 < episodes * runtime <= WEEKEND_HOURS * 60)
     if key == "binge":
         return seasons >= 3 and episodes >= 30 and pop >= 7.5
     if key == "quick_comedy":
