@@ -78,8 +78,10 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
                        m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
                        ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres
                 FROM movies m WHERE m.title_type = 'series'""")).mappings()]
+    engaged = {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
+    interest = series_rails_service.affinity([cat.language[r] for r in engaged], list(st.languages))
     rails = [{"key": t["key"], "title": t["title"], "subtitle": t["subtitle"], "ids": t["ids"]}
-             for t in series_rails_service.build(series, ranked)]
+             for t in series_rails_service.build(series, ranked, interest)]
 
     # "Because you liked X": the series most like the one the user liked or rated highest.
     liked = {r: 1.0 for r in st.likes | st.picks}
