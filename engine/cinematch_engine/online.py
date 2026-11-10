@@ -540,27 +540,49 @@ class OnlineEngine:
                 counts[g] = counts.get(g, 0) + 1
         return counts
 
-    # More Like This weights (similarity only, nothing personal): the tuned content cosine, plus genre
-    # overlap (Jaccard), same original language, and release years close together (12-year scale).
+    # Fallback More Like This (titles added after similar_titles.npz was built): the tuned content cosine plus
+    # genre overlap, same language and year closeness. The main path is the offline neighbour table
+    # (cinematch_engine/similar.py, pipeline/similar_titles.py), measured to be closer to what people call similar.
     SIMILAR_GENRE_W, SIMILAR_LANGUAGE_W, SIMILAR_ERA_W, SIMILAR_ERA_SCALE = 0.3, 0.2, 0.1, 12.0
 
     def similar(self, row: int, k: int = 20) -> list[int]:
-        """More Like This: the films most similar to this one, by content alone (no user, no co-ratings).
-        Score = content cosine + 0.3 genre Jaccard + 0.2 same language + 0.1 exp(-|year gap| / 12)."""
+        """More Like This rows (same type as `row`), most similar first."""
+        return [d["row"] for d in self.similar_items(row, k)]
+
+    def similar_items(self, row: int, k: int = 20) -> list[dict]:
+        """More Like This with evidence: [{row, score, signals, method}], same type only (film to film, series to
+        series, anime to anime), never the title itself. Uses the offline neighbour table when it has this title,
+        otherwise the fallback formula. Nothing personal: every user sees the same list for a title."""
+        table = getattr(self, "similar_table", None)
+        if table is not None and table["rows"][row, 0] >= 0:
+            nb = table["rows"][row]
+            keep = nb >= 0
+            keep[keep] = np.asarray(self.cat.kind)[nb[keep]] == self.cat.kind[row]
+            idx = np.nonzero(keep)[0][:k]
+            return [{"row": int(nb[j]), "score": float(table["scores"][row, j]), "method": "neighbours",
+                     "signals": {s: float(table["comps"][i, row, j]) / 255 for i, s in enumerate(table["stored"])}}
+                    for j in idx]
+        return self._similar_fallback(row, k)
+
+    def _similar_fallback(self, row: int, k: int) -> list[dict]:
         cat = self.cat
-        cos = np.asarray((cat.content @ cat.content[row].T).todense()).ravel()
+        same = np.nonzero(np.asarray(cat.kind) == cat.kind[row])[0]
+        same = same[same != row]
+        if not len(same):
+            return []
+        cos = np.asarray((cat.content[same] @ cat.content[row].T).todense()).ravel()
         g = self._genre_matrix()
-        shared = np.asarray((g @ g[row].T).todense()).ravel()
-        sizes = np.asarray(g.sum(axis=1)).ravel()
-        union = sizes + sizes[row] - shared
+        shared = np.asarray((g[same] @ g[row].T).todense()).ravel()
+        sizes = np.asarray(g[same].sum(axis=1)).ravel()
+        union = sizes + g[row].sum() - shared
         jac = np.divide(shared, union, out=np.zeros_like(shared, dtype=np.float64), where=union > 0)
-        same_lang = np.array([l == cat.language[row] and l != "" for l in cat.language], dtype=np.float64)
-        gap = np.abs(cat.year - cat.year[row])
+        same_lang = np.array([cat.language[r] == cat.language[row] and cat.language[r] != "" for r in same], dtype=np.float64)
+        gap = np.abs(cat.year[same] - cat.year[row])
         era = np.where(np.isfinite(gap), np.exp(-np.nan_to_num(gap, nan=0.0) / self.SIMILAR_ERA_SCALE), 0.0)
         score = cos + self.SIMILAR_GENRE_W * jac + self.SIMILAR_LANGUAGE_W * same_lang + self.SIMILAR_ERA_W * era
-        score[row] = -np.inf
-        top = np.argpartition(-score, k)[:k]
-        return [int(r) for r in top[np.argsort(-score[top])]]
+        order = np.lexsort((same, -np.round(score, 6)))[:k]
+        return [{"row": int(same[j]), "score": float(score[j]), "method": "fallback",
+                 "signals": {"genre": float(jac[j])}} for j in order]
 
     def _genre_matrix(self) -> sp.csr_matrix:
         """Films x genres, 1 where the film has the genre (built once, for More Like This)."""

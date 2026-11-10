@@ -161,7 +161,7 @@ Scripts in `pipeline/`, run in order; `python -m pipeline.run_all` runs everythi
 | # | Model | How it works | Settings tuned on validation | Role on the site |
 |---|---|---|---|---|
 | 1 | **Popularity** | Bayesian average: `score = v/(v+m)·R + m/(v+m)·C` (R = film's mean, v = its rating count, C = global mean, m = minimum-count constant). Language-aware variant. | m | "Most Loved", cold-start fallback, baseline |
-| 2 | **Content-based** | TF-IDF on overview + keywords + tagline (English stop words, sublinear tf, ignore words in >50% of films) plus weighted blocks for genres, language, country, director, top-5 cast, studio. Cosine similarity. User profile = weighted average of liked films' vectors minus disliked ones. | block weights, n-grams | New films, international films, cold start, "More Like This" (with item CF), explanations |
+| 2 | **Content-based** | TF-IDF on overview + keywords + tagline (English stop words, sublinear tf, ignore words in >50% of films) plus weighted blocks for genres, language, country, director, top-5 cast, studio. Cosine similarity. User profile = weighted average of liked films' vectors minus disliked ones. | block weights, n-grams | New films, international films, cold start, explanations (More Like This uses its own title-to-title model, `cinematch_engine/similar.py`) |
 | 3 | **User-based CF** | Pearson correlation on co-rated films, with significance weighting `min(n, 50)/50` (n = films in common). Prediction from the k most similar users' mean-centered ratings. | k, minimum overlap | "People With Your Taste Loved", explanations |
 | 4 | **Item-based CF** | Adjusted cosine (ratings centered on each user's mean), shrunk when few users rated both films. Top-50 neighbors per film stored offline. | shrinkage, neighbors | "Because You Liked X", "More Like This" |
 | 5 | **Funk SVD** | Matrix factorization with user and film biases, learned by SGD from known ratings only (scikit-surprise `SVD`). **Fold-in** for new users: film factors fixed, solve a small regularized least-squares problem for the user's vector from their ratings. | factors, epochs, learning rate, regularization | "Based On Your Ratings", main ranker for established users |
@@ -318,7 +318,7 @@ Dropped from v1.0: **Trending Now** (no live trend data; merged into New & Notab
 |---|---|
 | Onboarding | Step 1: pick 5–10 liked films from a grid mixing popular and international titles. Step 2: languages (only those with ≥ 150 films). Step 3: favorite genres. Step 4: optional disliked genres. Step 5: first recommendations. |
 | Home | Hero, Discovery Mode control, For Tonight entry button, rails (section 7). |
-| Movie page | Backdrop, poster, title, Match %, community rating, year, runtime, genres, language, country, certification, release date, synopsis, the user's rating (5 stars, half steps), rating distribution (1–10 bars), "Why you're seeing this", director, writers, cast, studios, keywords, awards (when Wikidata has them), More Like This (content + item CF). Actions: Add to / Remove from List, Like, Dislike, Rate, Mark Watched. |
+| Movie page | Backdrop, poster, title, Match %, community rating, year, runtime, genres, language, country, certification, release date, synopsis, the user's rating (5 stars, half steps), rating distribution (1–10 bars), "Why you're seeing this", director, writers, cast, studios, keywords, awards (when Wikidata has them), More Like This (poster grid, 8 titles, "View all" page at `/movie/:id/similar` with Load more; same type only, with reasons). Actions: Add to / Remove from List, Like, Dislike, Rate, Mark Watched. |
 | Quick View | Opened by the card's chevron: backdrop, title, Match %, rating, year, runtime, genres, language, short synopsis, Why This, actions, "View full details". |
 | Discover | Filters (genre, language, decade, runtime, country, rating), search, Surprise Me, Discovery Mode, For Tonight panel. |
 | Genres | Genre grid; a genre page ranks its films **for this user** with the hybrid score. |
@@ -546,7 +546,7 @@ Auth: JWT in an httpOnly cookie. Guests get a cookie-based guest user on first v
 | | `POST /onboarding` | Save picks, languages, liked/disliked genres |
 | Preferences | `GET/PUT /me/preferences` | Edit languages, genres, discovery mode |
 | Movies | `GET /movies/:id` | Full detail page payload |
-| | `GET /movies/:id/similar` | More like this (item CF + content) |
+| | `GET /movies/:id/similar?offset=&limit=` | More like this: same-type titles from the offline similarity table (keywords, plot, topic, genre, people, language, era, fame) with reasons; see decisions-log 2026-11-10. `GET /admin/similar/:id` (owner only) shows every candidate with its signals |
 | | `GET /movies?genre=&lang=&decade=&runtime=&country=&min_rating=&sort=&page=` | Discover filters |
 | Search | `GET /search?q=` | Title, cast, director, genre, language (Postgres full-text search) |
 | Genres | `GET /genres`, `GET /genres/:slug/movies` | Genre grid and personally ranked genre page |

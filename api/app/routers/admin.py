@@ -56,3 +56,16 @@ def stats(_=Depends(require_admin), db: Session = Depends(get_db)) -> dict:
         "daily": [dict(r) for r in daily],
         "top_films_7d": [dict(r) for r in top],
     }
+
+
+@router.get("/similar/{movie_id}")
+def similar_debug(movie_id: int, _=Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    """Owner-only debug view of More Like This for one title: every candidate with its signals and score."""
+    from app.services import recommender as rec
+    from app.services import similar as similar_svc
+    if not rec.artifacts_ready():
+        raise HTTPException(503, "Models not loaded")
+    engine = rec.load_engine(db)
+    if engine.cat.row_of.get(movie_id) is None:
+        raise HTTPException(404, "Unknown movie")
+    return similar_svc.debug_rows(engine, movie_id)
