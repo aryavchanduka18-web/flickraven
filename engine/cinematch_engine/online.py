@@ -16,7 +16,7 @@ from cinematch_engine.availability import AvailabilityMap, renormalized
 from cinematch_engine.blend import candidate_pool, contributions
 from cinematch_engine.config import event_weights
 from cinematch_engine.explain import explain
-from cinematch_engine.profile import stage_of
+from cinematch_engine.profile import WEAK_EVENTS, stage_of
 from cinematch_engine.rerank import MODES, TAIL_PCT, TOP_N, mmr, spread, tail_slots
 from cinematch_engine.sources import SOURCES, Profiles, SourceModels
 from cinematch_engine.surprise import REASON as SURPRISE_REASON
@@ -121,7 +121,7 @@ class OnlineEngine:
         w: dict[int, float] = {}
         # Each kind of event counts once per title: opening the same page ten times is not ten times the interest.
         for kind, row in dict.fromkeys(st.events):
-            if kind in self.event_weights and kind != "rate":
+            if kind in self.event_weights and kind != "rate" and kind not in WEAK_EVENTS:
                 w[row] = w.get(row, 0.0) + self.event_weights[kind]
         for row, r in st.ratings.items():
             w[row] = w.get(row, 0.0) + self.event_weights.get("rate", 1.0) + max(r - 6, 0)
