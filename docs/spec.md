@@ -894,3 +894,7 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - Grounding: titles the person names are looked up in our catalog and their synopsis is sent with the question; the model is told to say when it is unsure. Titles it recommends are written [[Title (Year)]] and are linked only if they exist in the catalog; others show as plain text. Plot spoilers are written between || || and shown blurred until tapped.
 - Privacy: the model gets the chat, a taste summary (top genres, up to 6 liked titles) and the synopses; never name, email or ids. The privacy page says free-tier prompts may be used by Google. Chats are not stored.
 - Not built: taste-aware ranking inside the assistant, saving chats, AI-written Taste DNA text.
+
+### 14.2e Taste Evolution (2026-11-11)
+
+- On `/taste-dna`, "How your taste changed": per month (last 6 with activity) the top 3 genres of titles liked or rated 7+, and, with 5+ titles in the latest two months and 5+ before, the genre that rose and the one that fell (change of 10 points or more). Counts only; `GET /api/me/taste-evolution`.

@@ -16,6 +16,40 @@ type Dna = { ready: boolean; titles_used: number; titles_tagged: number; traits:
   personality: string | null };
 
 /** Your Taste DNA: storytelling traits learned from what you rated, liked and tagged, next to the catalog average. */
+type Evolution = { months: { month: string; titles: number; top: { genre: string; share: number }[] }[];
+  shift: { earlier_titles: number; recent_titles: number; rising: { genre: string; from: number; to: number } | null; falling: { genre: string; from: number; to: number } | null } | null };
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+
+/** How your taste changed: the genres of what you liked or rated 7+, month by month. Counts only. */
+function TasteEvolution() {
+  const q = useQuery({ queryKey: ["taste-evolution"], queryFn: () => api<Evolution>("/me/taste-evolution") });
+  const d = q.data;
+  if (!d || d.months.length < 2) return null;
+  return (
+    <section className="mt-10" aria-label="How your taste changed">
+      <h2 className="font-display text-xl font-bold">How your taste changed</h2>
+      <p className="mt-1 text-sm text-muted">The genres of what you liked or rated 7+, month by month.</p>
+      {d.shift && (d.shift.rising || d.shift.falling) ? (
+        <p className="glass mt-4 rounded-2xl px-4 py-3 text-sm">
+          {d.shift.rising && <>Lately more <b>{d.shift.rising.genre}</b> ({pct(d.shift.rising.from)} of your liked titles before, {pct(d.shift.rising.to)} now). </>}
+          {d.shift.falling && <>Less <b>{d.shift.falling.genre}</b> ({pct(d.shift.falling.from)} before, {pct(d.shift.falling.to)} now). </>}
+          <span className="text-white/50">From {d.shift.earlier_titles} earlier and {d.shift.recent_titles} recent titles.</span>
+        </p>
+      ) : (
+        <p className="mt-4 text-sm text-white/60">No clear change yet: it needs at least 5 liked titles in the latest two months and 5 before.</p>
+      )}
+      <ol className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {d.months.map((m) => (
+          <li key={m.month} className="rounded-2xl border border-white/10 bg-surface p-4">
+            <div className="flex items-baseline justify-between"><b>{new Date(`${m.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</b><span className="text-xs text-muted">{m.titles} title{m.titles === 1 ? "" : "s"}</span></div>
+            <ul className="mt-2 space-y-1 text-sm">{m.top.map((t) => <li key={t.genre} className="flex justify-between"><span>{t.genre}</span><span className="text-white/60">{pct(t.share)}</span></li>)}</ul>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export default function TasteDna() {
   const qc = useQueryClient();
   const me = useMe();
@@ -133,6 +167,7 @@ export default function TasteDna() {
             {picks.data?.items.length ? <Rail title="Picked for your Taste DNA" subtitle="From your recommendations, ordered by how well their storytelling fits you. Separate from your Match %." items={picks.data.items} source="taste_dna" />
               : picks.isFetched && <p className="px-4 text-sm text-muted md:px-10">No title in your recommendations clearly fits your traits yet.</p>}
           </div>
+          <TasteEvolution />
         </>
       )}
     </div>
