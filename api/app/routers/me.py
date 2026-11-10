@@ -142,6 +142,26 @@ def put_tuning(body: TuningBody, user=Depends(current_user), db: Session = Depen
     return body.model_dump()
 
 
+@router.get("/me/report")
+def report(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """How the titles recommended to you turned out (app/services/report.py): only titles you rated after they
+    were first recommended count; percentages appear only from 10 such titles."""
+    from collections import Counter
+
+    from app.services.report import summarize
+    p = {"u": user["id"]}
+    rows = [dict(r) for r in db.execute(text("""
+        WITH shown AS (SELECT movie_id, min(created_at) AS first_shown, max(match_pct) AS match_pct
+                       FROM recommendation_logs WHERE user_id = :u GROUP BY movie_id)
+        SELECT s.movie_id, s.match_pct, r.rating,
+               ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = s.movie_id) AS genres
+        FROM shown s JOIN ratings r ON r.user_id = :u AND r.movie_id = s.movie_id AND r.created_at >= s.first_shown"""), p).mappings()]
+    reasons = Counter(r[0] for r in db.execute(text("""
+        SELECT i.source FROM interactions i WHERE i.user_id = :u AND i.event_type = 'dislike_reason'
+          AND i.movie_id IN (SELECT movie_id FROM recommendation_logs WHERE user_id = :u)"""), p) if r[0])
+    return summarize(rows, reasons)
+
+
 MISSION_SUGGESTIONS = {
     "world": "m.title_type = 'movie' AND NOT (m.countries && ARRAY['US','IN']::text[])",
     "languages": "m.original_language <> :main_lang",
