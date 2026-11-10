@@ -885,3 +885,12 @@ Needed from Aryav:
 5. **College rule:** whether AI-written code is allowed for the mini project and whether it must be disclosed.
 
 Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 are installed. PostgreSQL runs in Docker.
+
+
+### 14.2d AI assistant (Gemini Flash, 2026-11-11)
+
+- Floating "Ask FlickRaven" chat (bottom right). `POST /api/assistant/chat`, `GET /api/assistant/status`. Model: Google Gemini Flash (`GEMINI_MODEL`, default `gemini-2.5-flash`; check the current model name and the free-tier terms before relying on it). Key only in the Render environment variable `GEMINI_API_KEY`. Hidden entirely when the key is missing or `ASSISTANT_ENABLED=false`.
+- Open topics are allowed (recommendations, a title's story, general film chat). Limits: 30 messages per signed-in person per day, 8 for guests (in process memory: a restart resets them), 1,000 characters per message, 12 messages of history, 700 output tokens.
+- Grounding: titles the person names are looked up in our catalog and their synopsis is sent with the question; the model is told to say when it is unsure. Titles it recommends are written [[Title (Year)]] and are linked only if they exist in the catalog; others show as plain text. Plot spoilers are written between || || and shown blurred until tapped.
+- Privacy: the model gets the chat, a taste summary (top genres, up to 6 liked titles) and the synopses; never name, email or ids. The privacy page says free-tier prompts may be used by Google. Chats are not stored.
+- Not built: taste-aware ranking inside the assistant, saving chats, AI-written Taste DNA text.

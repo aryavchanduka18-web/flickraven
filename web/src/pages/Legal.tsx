@@ -21,7 +21,7 @@ export function Privacy() {
     <Page title="Privacy policy">
       <p>
         FlickRaven is a free movie recommendation website run by one person as a personal project. It does not stream
-        films, show ads, or sell or share your data with anyone.
+        films, show ads, or sell your data. The only thing sent to another company is what you type into the AI assistant (see below).
       </p>
       <section>
         <h2>What we store</h2>
@@ -36,6 +36,16 @@ export function Privacy() {
       <section>
         <h2>Guests</h2>
         <p>If you browse without an account, the same data is kept under a guest session. A guest session with no activity for 30 days is deleted automatically, with everything in it.</p>
+      </section>
+      <section>
+        <h2>The AI assistant</h2>
+        <p>
+          The "Ask FlickRaven" assistant uses Google's Gemini model. When you send it a message, Google receives your recent messages
+          in that chat, a short summary of your taste (favourite genres and a few titles you rated highly) and the catalog's own
+          synopsis of titles you name. It does not receive your name, email address or account number. Chats are not stored by
+          FlickRaven. On Google's free tier, prompts may be used by Google to improve its products, so do not type anything private.
+          The assistant can be wrong, and the number of messages per day is limited.
+        </p>
       </section>
       <section>
         <h2>Cookies</h2>

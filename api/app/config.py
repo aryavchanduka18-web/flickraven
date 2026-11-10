@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Show IMDb ratings (IMDb's dataset is licensed for non-commercial use; see docs/decisions-log.md).
     # IMDB_RATINGS=false hides them everywhere at the next restart, without touching the data.
     imdb_ratings: bool = True
+    # AI assistant (Google Gemini). The key lives only in this environment variable, never in the repository.
+    # ASSISTANT_ENABLED=false switches the assistant off at the next restart. Caps are messages per person per day.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    assistant_enabled: bool = True
+    assistant_daily_cap: int = 30
+    assistant_guest_cap: int = 8
 
     @field_validator("database_url")
     @classmethod

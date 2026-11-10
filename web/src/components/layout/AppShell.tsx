@@ -7,6 +7,7 @@ import NavBar from "./NavBar";
 import Sidebar from "./Sidebar";
 import { useUI } from "./ui";
 import QuickViewPanel from "../card/QuickViewPanel";
+import Assistant from "../assistant/Assistant";
 import GuestBanner from "../account/GuestBanner";
 import WhyPanel from "../explain/WhyPanel";
 import DislikeReasonSheet from "../feedback/DislikeReasonSheet";
@@ -62,6 +63,7 @@ export default function AppShell() {
       </main>
       <div className="shell-main"><Footer /></div>
       <MobileTabBar />
+      <Assistant />
       <QuickViewPanel />
       <WhyPanel />
       <DislikeReasonSheet />

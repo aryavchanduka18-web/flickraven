@@ -20,3 +20,5 @@ services:
         sync: false        # Render asks for it: the site address, e.g. https://cinematch.onrender.com
       - key: ADMIN_EMAILS
         sync: false        # your FlickRaven account email: it may open the private /stats page
+      - key: GEMINI_API_KEY
+        sync: false        # Google AI Studio key for the Ask FlickRaven assistant; leave empty to switch it off
