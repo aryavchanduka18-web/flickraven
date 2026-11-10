@@ -7,6 +7,7 @@ import { ApiError } from "../api/client";
 import { useFeedback, useFranchise, useLogEvent, useMovie, useSimilar } from "../api/hooks";
 import ConfidenceCard from "../components/explain/ConfidenceCard";
 import WhyThis from "../components/explain/WhyThis";
+import RecOutcomeFeedback from "../components/explain/RecOutcomeFeedback";
 import ActionButtons from "../components/feedback/ActionButtons";
 import RatingDistribution from "../components/feedback/RatingDistribution";
 import RatingStars from "../components/feedback/RatingStars";
@@ -76,6 +77,7 @@ export default function Movie() {
               <RatingStars value={m.user_state.rating} onChange={(r) => fb.mutate({ kind: "rate", rating: r })} />
             </div>
             <div className="mt-3"><TasteTags movieId={m.id} rated={m.user_state.rating != null || m.user_state.reaction !== 0 || m.user_state.watched} /></div>
+            {m.user_state.rating != null && <div className="mt-3"><RecOutcomeFeedback movieId={m.id} /></div>}
           </div>
         </div>
       </section>

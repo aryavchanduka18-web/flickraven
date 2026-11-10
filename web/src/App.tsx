@@ -16,6 +16,7 @@ import Person from "./pages/Person";
 import SeriesFit from "./pages/SeriesFit";
 import Missions from "./pages/Missions";
 import TasteDna from "./pages/TasteDna";
+import Performance from "./pages/Performance";
 import Search from "./pages/Search";
 import StatsPage from "./pages/Stats";
 import { PageMessage } from "./components/Loading";
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/activity" element={<Activity />} />
         <Route path="/missions" element={<Missions />} />
         <Route path="/taste-dna" element={<TasteDna />} />
+        <Route path="/performance" element={<Performance />} />
         <Route path="/search" element={<Search />} />
         <Route path="/series-fit" element={<SeriesFit />} />
         <Route path="/onboarding" element={<Onboarding />} />
