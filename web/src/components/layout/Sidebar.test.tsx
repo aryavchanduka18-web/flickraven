@@ -23,11 +23,11 @@ function setup() {
 }
 
 describe("Sidebar", () => {
-  it("has the five main pages and no Missions tab", () => {
+  it("has the six main pages and no Missions tab", () => {
     setup();
     const nav = screen.getByRole("navigation");
     for (const t of TABS) expect(nav.querySelector(`a[href="${t.to}"]`)).not.toBeNull();
-    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Genres", "My List", "Activity"]);
+    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Perfect Pick", "Genres", "My List", "Activity"]);
     expect(screen.queryByText("Missions")).toBeNull();
   });
 
