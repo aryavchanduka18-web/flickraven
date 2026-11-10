@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
+from app.services import series_fit as fit
+from app.services import series_rails as series_rails_service
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
 from cinematch_engine.tonight import Request as TonightRequest
@@ -51,6 +53,79 @@ def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_
     page = slice(max(offset, 0), max(offset, 0) + min(limit, 60))
     extra = {int(engine.cat.movie_ids[r]): {"score": float(s)} for r, s in zip(rows[page], scores[page])}
     return {"items": cards(db, list(extra), user["id"], extra), "total": int(len(rows))}
+
+
+@router.get("/series-rails")
+def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Themed series rows for Home (see app/services/series_rails.py), a "because you liked ..." row from the series
+    the user liked or rated 7+, and one row that mixes films and series. Ordered for this user like the Series row.
+    There is no Match % on any of them (series have no ratings here)."""
+    engine = engine_or_503(db)
+    uid = user["id"]
+    st = rec.user_state(db, uid, engine)
+    cat = engine.cat
+    rows, scores = engine.kind_rank(st, "series")
+    ranked = [int(cat.movie_ids[r]) for r in rows]
+    series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
+               "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
+               "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
+               "has_art": r["backdrop_path"] is not None}
+              for r in db.execute(text("""
+                SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
+                       m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
+                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres
+                FROM movies m WHERE m.title_type = 'series'""")).mappings()]
+    rails = [{"key": t["key"], "title": t["title"], "subtitle": t["subtitle"], "ids": t["ids"]}
+             for t in series_rails_service.build(series, ranked)]
+
+    # "Because you liked X": the series most like the one the user liked or rated highest.
+    liked = {r: 1.0 for r in st.likes | st.picks}
+    liked.update({r: (v - 6) / 4 for r, v in st.ratings.items() if v >= 7})
+    liked = {r: w for r, w in liked.items() if cat.kind[r] == "series"}
+    if liked:
+        base = min(liked, key=lambda r: (-liked[r], r))
+        seen = set(rows.tolist())
+        similar = [int(cat.movie_ids[r]) for r in engine.similar(base, k=120) if cat.kind[r] == "series" and r in seen][:20]
+        if len(similar) >= series_rails_service.MIN_ROW:
+            rails.insert(0, {"key": "because", "title": f"Because you liked {cat.titles[base]}",
+                             "subtitle": "Series with a similar feel.", "ids": similar})
+
+    # Films and series, alternating.
+    film_scores = engine.rail_scores(st)
+    films = [int(cat.movie_ids[r]) for r in np.argsort(-film_scores)[:30] if np.isfinite(film_scores[r])][:12]
+    mixed = series_rails_service.interleave(films, ranked[:12])
+    if len(mixed) >= series_rails_service.MIN_ROW:
+        rails.append({"key": "mix", "title": "Films and series picked for you", "subtitle": "A mix of both.", "ids": mixed})
+
+    out = []
+    for r in rails:
+        items = cards(db, r["ids"], uid)
+        if len(items) >= series_rails_service.MIN_ROW:
+            out.append({"key": r["key"], "title": r["title"], "subtitle": r["subtitle"], "items": items})
+    return {"rails": out}
+
+
+@router.get("/series-fit")
+def series_fit(budget: str = "", status: str = "", episode_length: str = "", per_day: int = 2,
+               user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Series that fit the time the user has (see app/services/series_fit.py), best first for this user, each with
+    total hours and days to finish at `per_day` episodes a day."""
+    if budget not in ("", *fit.BUDGETS) or status not in ("", *fit.STATUS) or episode_length not in ("", *fit.EPISODE_LENGTHS):
+        raise HTTPException(422, "Unknown filter value")
+    per_day = max(1, min(per_day, 10))
+    engine = engine_or_503(db)
+    st = rec.user_state(db, user["id"], engine)
+    rows, _ = engine.kind_rank(st, "series")
+    ranked = [int(engine.cat.movie_ids[r]) for r in rows]
+    info = {r["id"]: dict(r) for r in db.execute(text("""SELECT id, episodes, runtime_min AS runtime, series_status AS status
+        FROM movies WHERE title_type = 'series'""")).mappings()}
+    matching = [i for i in ranked if i in info and fit.fits(info[i], budget, status, episode_length)]
+    ids = matching[:40]
+    items = cards(db, ids, user["id"])
+    for it in items:
+        s = info[it["movie"]["id"]]
+        it["plan"] = fit.plan(s["episodes"], s["runtime"], per_day)
+    return {"items": items, "total": len(matching)}
 
 
 @router.get("/home")
