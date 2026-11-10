@@ -233,3 +233,16 @@ def title_fit(movie_id: int, user=Depends(current_user), db: Session = Depends(g
     clash = [k for k in prof.avoided() if v.get(k, 0) >= 0.5]
     return {"reason": dna.reason(because), "traits": [dna.TRAIT[k].label for k in because],
             "clash": [dna.TRAIT[k].label for k in clash], "known": True}
+
+
+@router.get("/me/taste-evolution")
+def taste_evolution(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Genres of the titles the person liked or rated 7+, by month (last 6 months with activity), and what rose or fell
+    between the earlier months and the latest two. Counts only; see app/services/taste_evolution.py."""
+    from app.services import taste_evolution as ev
+    rows = db.execute(text("""SELECT to_char(t.at, 'YYYY-MM') AS month,
+            ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = t.movie_id) AS genres
+        FROM (SELECT movie_id, created_at AS at FROM ratings WHERE user_id = :u AND rating >= 7
+              UNION SELECT movie_id, updated_at FROM reactions WHERE user_id = :u AND value = 1) t"""), {"u": user["id"]}).all()
+    events = [(r[0], list(r[1])) for r in rows]
+    return {"months": ev.by_month(events), "shift": ev.shift(events), "titles": len(events)}
