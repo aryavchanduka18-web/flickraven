@@ -140,7 +140,7 @@ def dislike_reason(body: DislikeReasonBody, user=Depends(current_user), db: Sess
     """Why a disliked film was not for you; one or several reasons. Each is logged as an event, and each reason
     changes something real on top of the dislike itself (which already removes the film and steers the content
     profile away from it):
-    genre -> its main genre goes to your disliked genres (unless you said you like it); long -> the Length slider
+    genre -> of its genres (minus ones you said you like), the one you have enjoyed least goes to your disliked genres; long -> the Length slider
     moves 20 towards shorter; slow -> the Length slider moves 10 towards shorter (shorter films are usually
     tighter); predictable -> the Adventurous slider moves 15 up and Hidden gems 10 up (less obvious picks);
     language -> the International slider moves 20 towards your languages if the film is outside them, else away;
@@ -164,9 +164,17 @@ def dislike_reason(body: DislikeReasonBody, user=Depends(current_user), db: Sess
 
     for reason in reasons:
         if reason == "genre":
+            # Of this title's genres (minus ones you said you like), the one you have enjoyed least: fewest titles
+            # liked, rated 7+ or watched. (It used to take the lowest genre id, i.e. the alphabetically first genre,
+            # so "wrong genre" on a crime drama could ban Crime even for a crime fan.)
             g = db.execute(text("""SELECT g.id, g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id
-                WHERE mg.movie_id = :m ORDER BY g.id LIMIT 1"""), {"m": body.movie_id}).first()
-            if g and g[0] not in (pref["liked_genre_ids"] or []):
+                WHERE mg.movie_id = :m AND NOT (g.id = ANY(:liked))
+                ORDER BY (SELECT count(*) FROM movie_genres x WHERE x.genre_id = g.id AND x.movie_id IN (
+                    SELECT movie_id FROM reactions WHERE user_id = :u AND value > 0
+                    UNION SELECT movie_id FROM ratings WHERE user_id = :u AND rating >= 7
+                    UNION SELECT movie_id FROM watched WHERE user_id = :u)), g.name
+                LIMIT 1"""), {"m": body.movie_id, "u": uid, "liked": list(pref["liked_genre_ids"] or [])}).first()
+            if g:
                 db.execute(text("""UPDATE user_preferences SET disliked_genre_ids =
                     ARRAY(SELECT DISTINCT unnest(coalesce(disliked_genre_ids, '{}') || ARRAY[CAST(:g AS int)])) WHERE user_id = :u"""),
                            {"g": g[0], "u": uid})

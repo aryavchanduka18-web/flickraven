@@ -23,6 +23,13 @@ def test_acclaimed_and_weekend_rules():
     assert not sr.in_theme("acclaimed", s(1, popularity=8.7, votes=5000, genres=["Animation", "Drama"]))
     assert sr.in_theme("weekend", s(1, seasons=1, episodes=8, popularity=8.0)) and not sr.in_theme("weekend", s(1, seasons=6, episodes=100, popularity=8.0))
     assert not sr.in_theme("weekend", s(1, seasons=1, episodes=8, status="Returning Series", popularity=8.0))
+    assert not sr.in_theme("weekend", s(1, seasons=3, episodes=36, runtime=45, popularity=8.0))     # 27 hours is not a weekend
+    assert not sr.in_theme("weekend", s(1, seasons=1, episodes=8, runtime=None, popularity=8.0))    # unknown length
+
+
+def test_drama_rows_hold_dramas_only():
+    assert not sr.in_theme("kdrama", s(1, lang="ko", countries=["KR"], genres=["Comedy"]))         # e.g. a variety show
+    assert not sr.in_theme("east_asian", s(1, countries=["JP"], genres=[]))
 
 
 def test_rows_follow_the_users_ranking_and_need_enough_titles():

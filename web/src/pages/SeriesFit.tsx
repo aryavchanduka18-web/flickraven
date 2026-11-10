@@ -14,7 +14,7 @@ type Item = RecItem & { plan: Plan; series: Facts };
 type Res = { items: Item[]; total: number; unknown_length: number; more_with_next_budget: { budget: string; extra: number } | null;
   options: { languages: string[]; genres: string[] } };
 
-const BUDGET: [string, string][] = [["3", "3 hours"], ["5", "5 hours"], ["10", "10 hours"], ["20", "20 hours"], ["long", "More than 20 hours"], ["", "Any"]];
+const BUDGET: [string, string][] = [["3", "Up to 3 hours"], ["5", "Up to 5 hours"], ["10", "Up to 10 hours"], ["20", "Up to 20 hours"], ["long", "More than 20 hours"], ["", "Any"]];
 const PER_DAY: [string, string][] = [["1", "One episode a day"], ["2", "Two episodes a day"], ["3", "Three episodes a day"], ["0", "Flexible"]];
 const TYPE: [string, string][] = [["", "No preference"], ["mini", "Mini-series (10 episodes or fewer)"], ["short", "Short (11-30 episodes)"], ["medium", "Medium (31-80 episodes)"], ["long", "Long-running (81+ episodes)"]];
 const STATUS: [string, string][] = [["", "Either"], ["ended", "Completed"], ["airing", "Currently airing"]];

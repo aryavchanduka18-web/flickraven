@@ -66,6 +66,6 @@ def plan(episodes: int, runtime: int, per_day: int) -> dict:
     if per_day <= 0:                                          # "flexible": no schedule was asked for
         return {"hours": h, "days": None, "finish": None, "text": f"{episodes} episodes, about {h:g} hours"}
     days = math.ceil(episodes / max(per_day, 1))
-    when = "one weekend" if days <= 2 else f"{days} days" if days < 14 else f"about {round(days / 7)} weeks"
+    when = "one day" if days == 1 else "one weekend" if days == 2 else f"{days} days" if days < 14 else f"about {round(days / 7)} weeks"
     return {"hours": h, "days": days, "finish": f"{when} at {per_day} a day",
             "text": f"{episodes} episodes, about {h:g} hours: {when} at {per_day} a day"}

@@ -188,14 +188,14 @@ def missions(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     by_size = [r[0] for r in db.execute(text("""SELECT g.name FROM genres g JOIN movie_genres mg ON mg.genre_id = g.id
         GROUP BY g.name ORDER BY count(*) DESC"""))]
     genre = ms.pick_new_genre(titles, by_size)
-    langs = [t["lang"] for t in titles if t["lang"]]
-    main_lang = max(set(langs), key=langs.count) if langs else "en"
+    main_lang = ms.main_language(titles) or "en"
+    hidden_sql = f"{seen_sql} UNION SELECT movie_id FROM reactions WHERE user_id = :u AND value < 0"
     out = []
     for m in ms.progress(titles, genre):
         kind = "genre" if m.key.startswith("genre:") else m.key
         ids = [] if m.done else [r[0] for r in db.execute(text(f"""
             SELECT m.id FROM movies m WHERE {MISSION_SUGGESTIONS[kind]} AND m.backdrop_path IS NOT NULL
-              AND m.id NOT IN ({seen_sql}) AND coalesce(m.popularity_score, 0) >= 6.5
+              AND m.id NOT IN ({hidden_sql}) AND coalesce(m.popularity_score, 0) >= 6.5
             ORDER BY m.tmdb_vote_count DESC NULLS LAST LIMIT 8"""), {**p, "main_lang": main_lang, "genre": genre})]
         out.append({"key": m.key, "title": m.title, "description": m.description, "goal": m.goal,
                     "progress": m.progress, "done": m.done, "suggestions": cards(db, ids, user["id"])})

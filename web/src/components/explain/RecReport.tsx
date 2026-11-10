@@ -30,7 +30,7 @@ export default function RecReport() {
           <ul className="mt-4 space-y-1 text-sm text-white/85">
             {!!data.best_genres?.length && <li>What works for you: {data.best_genres.join(", ")}.</li>}
             {!!data.missed_genres?.length && <li>Where we miss: {data.missed_genres.join(", ")}.</li>}
-            {!!data.top_reasons?.length && <li>When you hide our picks, it is mostly because they are {data.top_reasons.join(", ")}.</li>}
+            {!!data.top_reasons?.length && <li>Your most common reasons for hiding our picks: {data.top_reasons.join(", ")}.</li>}
           </ul>
           <p className="mt-3 text-xs text-muted">From the last 60 days. Recommendations you never rated are not counted as misses.</p>
         </>
