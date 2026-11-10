@@ -19,10 +19,10 @@ beforeEach(() => {
   });
 });
 
-function setup() {
+function setup(url = "/discover") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}><UIProvider><MemoryRouter><Discover /></MemoryRouter></UIProvider></QueryClientProvider>,
+    <QueryClientProvider client={client}><UIProvider><MemoryRouter initialEntries={[url]}><Discover /></MemoryRouter></UIProvider></QueryClientProvider>,
   );
 }
 const lastMovies = () => [...urls].reverse().find((u) => u.includes("/movies?")) ?? "";
@@ -69,4 +69,11 @@ describe("Discover filters", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Anime" }));
     await waitFor(() => expect(lastMovies()).toContain("genre=anime"));
   });
+
+  it("?type=show opens Discover on Shows", async () => {
+    setup("/discover?type=show");
+    expect(screen.getByRole("tab", { name: "Shows" }).getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => expect(lastMovies()).toContain("type=show"));
+  });
+
 });
