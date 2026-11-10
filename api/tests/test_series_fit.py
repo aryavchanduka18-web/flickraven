@@ -23,3 +23,31 @@ def test_plan_text():
     assert (p["hours"], p["days"]) == (7.0, 4) and "4 days" in p["text"]
     assert "one weekend" in fit.plan(4, 50, 2)["text"] and "one day" in fit.plan(2, 50, 2)["text"]
     assert "weeks" in fit.plan(236, 22, 2)["text"]
+
+
+def full(episodes=8, runtime=45, status="Ended", genres=("Crime",), lang="en"):
+    return {"episodes": episodes, "runtime": runtime, "status": status, "genres": list(genres), "lang": lang}
+
+
+def test_series_type_genre_and_language_filters():
+    assert fit.fits(full(8), series_type="mini") and not fit.fits(full(11), series_type="mini")
+    assert fit.fits(full(25), series_type="short") and fit.fits(full(120), series_type="long")
+    assert fit.fits(full(), genre="Crime") and not fit.fits(full(), genre="Comedy")
+    assert fit.fits(full(lang="ko"), language="ko") and not fit.fits(full(), language="ko")
+
+
+def test_ordering_and_ties_follow_the_users_ranking():
+    items = [{"id": 1, "hours": 10.0, "status": "Returning Series", "rating": 8.0, "rank": 0},
+             {"id": 2, "hours": 5.0, "status": "Ended", "rating": None, "rank": 1},
+             {"id": 3, "hours": 5.0, "status": "Ended", "rating": 9.0, "rank": 2}]
+    ids = lambda sort: [i["id"] for i in fit.order(items, sort)]
+    assert ids("best") == [1, 2, 3]
+    assert ids("shortest") == [2, 3, 1] and ids("longest")[0] == 1
+    assert ids("rated") == [3, 1, 2]                       # no IMDb score goes last
+    assert ids("completed") == [2, 3, 1]
+
+
+def test_flexible_pace_has_no_schedule():
+    p = fit.plan(8, 45, 0)
+    assert p["days"] is None and p["finish"] is None and p["hours"] == 6.0
+    assert fit.plan(8, 45, 2)["finish"] == "4 days at 2 a day"
