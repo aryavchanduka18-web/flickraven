@@ -12,6 +12,7 @@ fresh data once and a rerun in the same month costs nothing. TMDB asks that Just
 this data is shown; the movie page does that.
 """
 import argparse
+import time
 from datetime import date
 from pathlib import Path
 
@@ -47,17 +48,47 @@ def pick(tmdb_id: int, response: dict | None, region: str = CFG["region"],
     return []
 
 
+FAILED = object()
+RETRY_PAUSE = 120        # seconds before the second try of titles TMDB refused
+
+
+def fetch_one(tmdb, cache_file: Path, path: str):
+    """The cached or fetched answer for one title, or FAILED when TMDB keeps refusing (the error is logged)."""
+    try:
+        return tmdb.cached(cache_file, path)
+    except RuntimeError as e:
+        log.warning("skipping for now: %s", e)
+        return FAILED
+
+
 def fetch(today: date) -> pd.DataFrame:
     films = pd.read_parquet(PROCESSED / "movies_clean.parquet", columns=["tmdb_id", "title_type"])
     ids = films["tmdb_id"].astype(int)
     tmdb, folder = TMDB(), CACHE / today.strftime("%Y-%m")
-    rows = []
+    rows, failed = [], []
     for n, (tmdb_id, kind) in enumerate(zip(ids, films["title_type"]), 1):
         # A series is stored as 10,000,000 + its TV id and has its own TMDB endpoint.
         path = f"/movie/{tmdb_id}/watch/providers" if kind == "movie" else f"/tv/{tv_id(tmdb_id)}/watch/providers"
-        rows += pick(tmdb_id, tmdb.cached(folder / f"{tmdb_id}.json", path))
+        got = fetch_one(tmdb, folder / f"{tmdb_id}.json", path)
+        if got is FAILED:
+            failed.append((tmdb_id, path))
+        else:
+            rows += pick(tmdb_id, got)
         if n % 1000 == 0:
-            log.info("%d / %d films", n, len(ids))
+            log.info("%d / %d films (%d to retry)", n, len(ids), len(failed))
+    # One more try for the titles TMDB refused, after a pause; any still failing are skipped (not cached, so the
+    # next run asks again) instead of stopping the whole refresh.
+    skipped = 0
+    if failed:
+        log.info("retrying %d titles after a pause", len(failed))
+        time.sleep(RETRY_PAUSE)
+        for tmdb_id, path in failed:
+            got = fetch_one(tmdb, folder / f"{tmdb_id}.json", path)
+            if got is FAILED:
+                skipped += 1
+            else:
+                rows += pick(tmdb_id, got)
+    log.info("%d titles skipped (TMDB did not answer); the next run asks for them again", skipped)
     df = pd.DataFrame(rows, columns=COLUMNS)
     df["fetched_on"] = today
     df.to_parquet(OUT, index=False)
