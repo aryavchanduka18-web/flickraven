@@ -667,6 +667,16 @@ A plain, professional page for the professor. It exposes the engine; it is not a
 - **Use:** the Taste DNA row re-orders the recommender's own top 300 by trait fit; it is NOT part of the hybrid score or Match %. Explanations name only traits the title has (value 0.5+) and the user prefers.
 - **Not yet evaluated offline:** no ratings exist with which to test whether the fit improves ranking, so it is not blended into the hybrid.
 
+### 14.2c Discovery Journey (missions, v3, 2026-11-10)
+
+- Page `/missions` ("Your Discovery Journey"), tabs: Recommended (not started), Active (some progress), Completed, Explore (hidden missions and extra genre ideas).
+- Missions: International Explorer (5 countries beyond the US and India), Beyond your language (4 other languages), Through the decades (5 decades), Classic cinema (3 films before 1980), Mini-series weekend (1 series of 8 episodes or fewer), and personal "New to <genre>" missions (the biggest genres with fewer than 3 of your titles).
+- Progress is read from real activity (watched, rated, liked) on every request and never stored. A completed mission shows the date of the activity that reached the goal (replayed from activity times).
+- Every mission has a "Why this" sentence built only from counts in the user's own history. Recommended is ordered by a simple fit (for example, the more of your films are US/Indian, the higher International Explorer ranks); this is a heuristic, not a model.
+- "Not for me" hides a mission (it moves to Explore and can be brought back); a finished mission cannot be hidden. Only dismissals and the date of a personal genre mission are stored (`mission_state`).
+- Ideas under each open mission are well-known unseen titles. When Taste DNA has at least 5 liked titles they are re-ordered by trait fit and the page says so; otherwise by popularity.
+- The completion card is drawn in the browser and downloaded on click; nothing is shared automatically.
+
 ### 14.3 NCF (lab only)
 - NeuMF (GMF + MLP) in PyTorch on CPU, trained on positives (rating ≥ 7/10) with 4 sampled negatives per positive.
 - Evaluated with exactly the same full-ranking protocol as the other models.

@@ -118,3 +118,15 @@ class TitleFeedbackTag(Base):
     movie_id: Mapped[int] = movie_fk(primary_key=True, index=True)
     tag: Mapped[str] = mapped_column(Text, primary_key=True)
     created_at: Mapped[datetime] = created_now()
+
+
+class MissionState(Base):
+    """A user's choices about discovery missions. Progress is never stored (it is read from real activity); this
+    holds only a dismissal, and the completion date of a personal genre mission so it stays in Completed."""
+
+    __tablename__ = "mission_state"
+
+    user_id: Mapped[int] = user_fk(primary_key=True)
+    mission_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

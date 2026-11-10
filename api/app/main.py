@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 
 from app.config import ROOT_DIR, get_settings
 from app.services import cleanup
-from app.routers import activity, admin, auth, catalog, imports, collections, feedback, health, lab, me, onboarding, people, recs, taste
+from app.routers import activity, admin, auth, catalog, imports, collections, feedback, health, lab, me, onboarding, people, recs, taste, missions
 
 settings = get_settings()
 log = logging.getLogger("uvicorn.error")      # shows in the server log next to uvicorn's own lines
@@ -48,7 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (health, auth, me, imports, admin, onboarding, catalog, collections, people, feedback, recs, activity, lab, taste):
+for r in (health, auth, me, imports, admin, onboarding, catalog, collections, people, feedback, recs, activity, lab, taste, missions):
     app.include_router(r.router, prefix="/api")
 
 

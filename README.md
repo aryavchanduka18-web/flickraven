@@ -16,7 +16,9 @@ where to watch (India first, via TMDB / JustWatch) and, for series, seasons and 
 series rows (East Asian dramas, Popular K-dramas, binge-worthy, quick comedy, because you liked ..., a films-and-series
 mix). Taste DNA (`/taste-dna`, avatar menu) shows which storytelling traits (pacing, plot complexity, dark
 atmosphere, ...) you lean towards, from what you rate, like and tag after rating; it has its own recommendation row and a
-shareable card you download yourself. The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
+shareable card you download yourself. Your Discovery Journey (`/missions`) has personal challenges (other countries, languages,
+decades, classics, a new genre, a mini-series) in Recommended / Active / Completed / Explore tabs, each with a reason from your own
+history, progress counted only from titles you mark watched, rate or like, and a completion card you download yourself. The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
 Not available (no email service): email verification and password reset.
 
 | Part | Folder | Tech |
