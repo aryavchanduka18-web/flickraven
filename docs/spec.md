@@ -716,7 +716,7 @@ Every phase ends with: run it, test it (unit + scenario tests), fix it, commit a
 5. **Dislike:** a disliked film never appears again; a disliked genre disappears from personal rails.
 6. **My List:** adding a film raises the scores of similar films (implicit signal works).
 7. **Discovery Mode:** Discover gives higher intra-list diversity than Familiar for the same user.
-8. **New movie:** a New & Notable film with zero MovieLens ratings can reach a user's rails through content.
+8. **New movie:** a New & Notable film with zero MovieLens ratings can reach a user's rails through content. Since 2026-11-10 any film without collaborative factors is scored by content and popularity alone, mapped onto the MovieLens scale by probability matching (decisions-log), so it also reaches Top Picks when it fits the user's taste.
 9. **Item similarity:** "Because You Liked *Prisoners*" contains films a person would accept as similar (checked by hand once, then frozen as a regression list).
 10. **User CF:** the prepared demo account has at least 20 usable neighbors and a full "People With Your Taste" rail.
 11. **No duplicates:** no film appears twice on the home page.

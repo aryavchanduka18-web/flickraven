@@ -100,6 +100,7 @@ database running:
 .\.venv\Scripts\python.exe -m pipeline.14_taste_map
 .\.venv\Scripts\python.exe -m pipeline.15_ncf
 .\.venv\Scripts\python.exe -m pipeline.report_validation   # refresh docs/phase-*-results.md
+.\.venv\Scripts\python.exe -m pipeline.availability_calibration   # how films without MovieLens factors are ranked (after (re)training; writes availability_calibration.json)
 .\.venv\Scripts\python.exe -m pipeline.similar_titles   # More Like This table (also after every catalog change; --evaluate prints the comparison)
 .\.venv\Scripts\python.exe -m pipeline.demo_accounts       # the prepared demo account
 ```

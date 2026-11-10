@@ -2,7 +2,8 @@
 
 Catalog space = every film in the product catalog (parts A-D). Content and popularity score every
 film; item CF, user CF, SVD and ALS only know the MovieLens films (the evaluation universe) and give
-no score elsewhere, so they never propose parts B, C or D. Everything else (candidate pool, percentile
+no score elsewhere. Films they cannot score are scored by the sources that can, mapped onto the MovieLens scale
+(availability.py), so parts B, C and D can compete. Everything else (candidate pool, percentile
 normalization, stage blend, Match %, MMR, explanations) is the same code that was evaluated offline.
 """
 from dataclasses import dataclass, field
@@ -11,6 +12,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 
+from cinematch_engine.availability import AvailabilityMap, renormalized
 from cinematch_engine.blend import candidate_pool, contributions
 from cinematch_engine.config import event_weights
 from cinematch_engine.explain import explain
@@ -112,6 +114,7 @@ class OnlineEngine:
         self.nb_idx, self.nb_vals = item_neighbors
         self.train_csc = train.tocsc()
         self.event_weights = event_weights()
+        self.availability: AvailabilityMap | None = None   # set by the API when availability_calibration.json exists
 
     # ------------------------------------------------------------------ profile -> source scores
     def implicit_strength(self, st: UserState) -> dict[int, float]:
@@ -237,6 +240,8 @@ class OnlineEngine:
         pool, norm = pool[0][valid], norm[:, 0, valid]
         w = self.weights[st.stage]
         final = np.tensordot(np.array([w.get(s, 0) for s in SOURCES], dtype=np.float32), norm, axes=1)
+        if self.availability is not None:
+            pool, norm, final = self._add_unavailable_candidates(st, scores, excl, pool, norm, final, w)
         order = np.argsort(-final)
         pool, norm, final = pool[order], norm[:, order], final[order]
         top = slice(0, TOP_N)
@@ -263,6 +268,34 @@ class OnlineEngine:
             out.append({"row": int(row), "score": float(sc), "match_pct": int(self.match(st.stage, float(catalog[row]))),
                         "shares": share, "reranked": blend_rank[int(row)] > pos + 3})
         return out
+
+    def _add_unavailable_candidates(self, st, scores, excl, pool, norm, final, w, per_source: int = 50):
+        """Films without collaborative factors can be proposed by no model but content and popularity, which the
+        candidate pool then scored 0 for the rest. Add the best of them by their availability-aware score
+        (rail_scores), on the pool's scale: the map from catalog-wide score to pool score is fitted (isotonic)
+        on the MovieLens films already in the pool, so the two kinds are ranked against each other fairly."""
+        from sklearn.isotonic import IsotonicRegression
+        lifted = self.language_lift(st, scores)
+        rail = self.rail_scores(st, lifted)
+        rows = self.unavailable_rows()
+        rows = rows[np.isfinite(rail[rows]) & ~np.isin(rows, excl) & ~np.isin(rows, pool)]
+        if not len(rows):
+            return pool, norm, final
+        top = rows[np.argsort(-rail[rows], kind="stable")[:per_source]]
+        known = np.isfinite(rail[pool]) & (self.cat.universe_of_row[pool] >= 0)
+        if known.sum() >= 5 and np.ptp(rail[pool][known]) > 0:
+            iso = IsotonicRegression(out_of_bounds="clip", increasing=True).fit(rail[pool][known], final[known])
+            extra_final = iso.predict(rail[top]).astype(np.float32)
+        else:
+            extra_final = rail[top].astype(np.float32)
+        extra_norm = np.zeros((len(SOURCES), len(top)), dtype=np.float32)
+        for si, src in enumerate(SOURCES):
+            v = lifted[src]
+            ok = np.isfinite(v)
+            if w.get(src, 0) and ok[top].all() and ok.any():
+                extra_norm[si] = (np.argsort(np.argsort(v[ok]))[np.searchsorted(np.nonzero(ok)[0], top)] + 1) / ok.sum()
+        return (np.concatenate([pool, top]), np.concatenate([norm, extra_norm], axis=1),
+                np.concatenate([final, extra_final]))
 
     def language_lift(self, st: UserState, scores: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         """New users: films in the languages picked at onboarding get a popularity lift, so someone who
@@ -347,7 +380,36 @@ class OnlineEngine:
             pct = np.zeros(self.cat.n, dtype=np.float32)
             pct[ok] = (np.argsort(np.argsort(v[ok])) + 1) / ok.sum()
             total += w[s] * pct
+        if self.availability is not None:
+            total = self._score_unavailable(st, scores, total)
         total[self.excluded(st)] = -np.inf
+        return total
+
+    def unavailable_rows(self) -> np.ndarray:
+        """Films that MovieLens never rated (no item CF / user CF / SVD / ALS factors). Series and anime are
+        handled by kind_rank, not here."""
+        rows = getattr(self, "_unavailable_rows", None)
+        if rows is None:
+            cat = self.cat
+            rows = np.nonzero((cat.universe_of_row < 0) & (np.asarray(cat.kind) == "movie"))[0]
+            self._unavailable_rows = rows
+        return rows
+
+    def _score_unavailable(self, st: UserState, scores: dict, total: np.ndarray) -> np.ndarray:
+        """Films without collaborative factors: average of the sources that can score them (not a sum with zeros),
+        mapped onto the MovieLens films' scale (cinematch_engine/availability.py)."""
+        w = self.weights[st.stage]
+        pct = {}
+        for s in SOURCES:
+            v = scores[s]
+            ok = np.isfinite(v)
+            p = np.full(self.cat.n, np.nan, dtype=np.float32)
+            if ok.any():
+                p[ok] = (np.argsort(np.argsort(v[ok])) + 1) / ok.sum()
+            pct[s] = p
+        rows = self.unavailable_rows()
+        total = total.copy()
+        total[rows] = self.availability.map_unavailable(st.stage, renormalized(pct, w, rows))
         return total
 
     # ------------------------------------------------------------------ explanations
