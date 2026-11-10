@@ -59,9 +59,11 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     uid = user["id"]
     mode = mode_of(db, uid, mode)
     st = rec.user_state(db, uid, engine)
-    plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine))
+    scores = engine.scores(st)            # scored once: Home and the agreement numbers share it
+    plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
+                       scores=scores)
     cat = engine.cat
-    agree = agreement_all(engine, st, engine.scores(st))
+    agree = agreement_all(engine, st, scores)
     request_id, page_id = str(uuid.uuid4()), str(uuid.uuid4())
 
     def agreement(row):

@@ -407,9 +407,9 @@ class OnlineEngine:
 
     # ------------------------------------------------------------------ home page plan (spec 7)
     def home(self, st: UserState, mode: str = "balanced", rail_size: int = 20, min_rail: int = 8,
-             tuning: Tuning | None = None, recent_rows: list[int] | None = None) -> dict:
+             tuning: Tuning | None = None, recent_rows: list[int] | None = None, scores: dict | None = None) -> dict:
         cat = self.cat
-        scores = self.scores(st)
+        scores = scores or self.scores(st)           # callers that already scored this user pass them in
         rail = self.rail_scores(st, scores)
         used: set[int] = set()
         picks = self.top_picks(st, mode, k=5 + rail_size, scores=scores, tuning=tuning)
