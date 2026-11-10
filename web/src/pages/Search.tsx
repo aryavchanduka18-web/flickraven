@@ -48,7 +48,10 @@ export default function Search() {
         </div>
       )}
       <div className="mt-6">
-        {d && (d.items.length ? <MovieGrid items={d.items} source="search" personal={false} /> : <p className="text-muted">No films match. Try fewer words or another spelling.</p>)}
+        {d && (d.items.length ? <MovieGrid items={d.items} source="search" personal={false} /> : <div role="status" className="py-10">
+          <p className="text-lg font-semibold">No match found</p>
+          <p className="mt-1 text-sm text-muted">We couldn&apos;t find a title matching &quot;{q}&quot;. Try fewer words, another spelling, or the original title.</p>
+        </div>)}
       </div>
     </div>
   );

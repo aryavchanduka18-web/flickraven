@@ -199,6 +199,8 @@ Knowledge/constraint-based recommendation is covered by onboarding constraints, 
 | rate | explicit rating, plus +1 for showing interest |
 | hover | not logged |
 
+Each kind of event counts at most once per film when the weights are added up (2026-11-10), so opening the same film many times on different days is not many times the interest.
+
 ### 6.3 Candidates
 About 50 films from each source: popularity, content, item CF, user CF, SVD, ALS. Merged into one pool of up to ~300.
 

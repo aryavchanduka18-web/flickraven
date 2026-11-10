@@ -1,4 +1,4 @@
-"""Recommendation confidence for one film: how each model ranks it for this user, and how much they agree.
+"""Model Agreement for one title: how each model ranks it for this user, and how much they agree.
 
 Every number comes from the live engine. For each source the film's score is turned into a percentile
 among all films that source can score for this user (100 = its top film). Sources are grouped in user

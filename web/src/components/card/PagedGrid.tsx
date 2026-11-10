@@ -35,7 +35,7 @@ export default function PagedGrid({ queryKey, path, source, personal = true, onT
   if (q.isLoading) return <div className="h-64 animate-pulse rounded-md bg-surface" />;
   if (q.isError) return <p className="text-sm text-red-300">Could not load these films. Try again in a moment.</p>;
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
-  if (!items.length) return <p className="text-sm text-muted">No films match.</p>;
+  if (!items.length) return <p className="text-sm text-muted">No match found.</p>;
   return (
     <div>
       <MovieGrid items={items} source={source} personal={personal} />

@@ -110,7 +110,7 @@ export default function SearchBox() {
           ) : res.isFetching ? (
             <p className="p-3 text-sm text-muted">Searching…</p>
           ) : (
-            <p className="p-3 text-sm text-muted">No matches yet. Press Enter to search everything.</p>
+            <p className="p-3 text-sm text-muted">No match found yet. Press Enter to search everything.</p>
           )}
         </div>
       )}

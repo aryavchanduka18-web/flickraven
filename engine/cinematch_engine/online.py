@@ -119,7 +119,8 @@ class OnlineEngine:
     # ------------------------------------------------------------------ profile -> source scores
     def implicit_strength(self, st: UserState) -> dict[int, float]:
         w: dict[int, float] = {}
-        for kind, row in st.events:
+        # Each kind of event counts once per title: opening the same page ten times is not ten times the interest.
+        for kind, row in dict.fromkeys(st.events):
             if kind in self.event_weights and kind != "rate":
                 w[row] = w.get(row, 0.0) + self.event_weights[kind]
         for row, r in st.ratings.items():
