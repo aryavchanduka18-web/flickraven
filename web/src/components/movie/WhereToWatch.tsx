@@ -1,3 +1,4 @@
+import { providerSearchUrl } from "../../lib/providers";
 import { tmdbImage } from "../../lib/tmdb";
 
 export type Watch = {
@@ -11,12 +12,12 @@ const KINDS = [["flatrate", "Stream"], ["free", "Free"], ["ads", "Free with ads"
 const COUNTRY: Record<string, string> = { IN: "India", US: "the US" };
 
 /** Services TMDB lists for this film (data by JustWatch). Only links out; the section is hidden when TMDB lists none. */
-export default function WhereToWatch({ watch }: { watch: Watch | null | undefined; title?: string }) {
+export default function WhereToWatch({ watch, title = "" }: { watch: Watch | null | undefined; title?: string }) {
   // Nothing is listed (or the data has not been loaded yet): show nothing, never a claim about availability.
   if (!watch) return null;
   const where = COUNTRY[watch.region] ?? watch.region;
   return (
-    <section>
+    <section id="where-to-watch" className="scroll-mt-24">
       <h2 className="font-display text-xl font-bold">Where to watch <span className="text-sm font-normal text-muted">in {where}</span></h2>
       {watch.region !== "IN" && <p className="mt-1 text-xs text-muted">Not listed on any service in India, so this shows {where}.</p>}
       <div className="mt-3 space-y-3">
@@ -24,9 +25,10 @@ export default function WhereToWatch({ watch }: { watch: Watch | null | undefine
           <div key={k} className="flex flex-wrap items-center gap-3">
             <span className="w-24 text-sm text-white/70">{label}</span>
             {watch.providers[k]!.map((p) => (
-              <a key={p.name} href={watch.link ?? undefined} target="_blank" rel="noopener noreferrer" title={`${label} on ${p.name}`}
-                 className="flex items-center gap-2 rounded-md border border-white/10 bg-surface px-2 py-1 text-sm hover:border-white/40">
-                {p.logo && <img src={tmdbImage(p.logo, "w92")} alt="" className="h-6 w-6 rounded" />}
+              <a key={p.name} href={title ? providerSearchUrl(p.name, title) : watch.link ?? undefined} target="_blank" rel="noopener noreferrer"
+                 title={`${label} on ${p.name}: opens ${p.name}'s search for this title`}
+                 className="glass-btn rounded-xl px-3 py-1.5 text-sm font-medium">
+                {p.logo && <img src={tmdbImage(p.logo, "w92")} alt="" className="h-6 w-6 rounded-md" />}
                 {p.name}
               </a>
             ))}
@@ -34,6 +36,9 @@ export default function WhereToWatch({ watch }: { watch: Watch | null | undefine
         ))}
       </div>
       <p className="mt-3 text-xs text-muted">
+        Each button opens that service's search for the title (TMDB does not give direct links).{watch.link && (<> <a href={watch.link} target="_blank" rel="noopener noreferrer" className="underline">See every option on JustWatch</a>.</>)}
+      </p>
+      <p className="mt-1 text-xs text-muted">
         Availability from <a href="https://www.justwatch.com" target="_blank" rel="noopener noreferrer" className="underline">JustWatch</a> via TMDB,
         updated {new Date(watch.updated).toLocaleDateString(undefined, { month: "long", year: "numeric" })}. Check the service before you pay.
       </p>
