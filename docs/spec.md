@@ -189,9 +189,10 @@ Knowledge/constraint-based recommendation is covered by onboarding constraints, 
 ### 6.2 Event weights (config file `engine/config/event_weights.yaml`, starting values, not "truth")
 | Event | Weight |
 |---|---|
-| detail_view | +0.5 (once per film per day) |
-| quick_view | +0.25 |
-| search_click | +0.5 |
+| detail_view | 0 for taste (weak, short-term only; logged once per film per day) |
+| quick_view | 0 for taste (weak) |
+| search_click | 0 for taste (weak) |
+| hero_view | 0 for taste (weak) |
 | list_add | +3 |
 | list_remove | -2 |
 | watched | +2 |
@@ -200,7 +201,7 @@ Knowledge/constraint-based recommendation is covered by onboarding constraints, 
 | rate | explicit rating, plus +1 for showing interest |
 | hover | not logged |
 
-Each kind of event counts at most once per film when the weights are added up (2026-11-10), so opening the same film many times on different days is not many times the interest.
+Three tiers (2026-11-10, `cinematch_engine/profile.py`): **weak** (opening a page, quick view, search click, banner click) never enters the long-term taste profile, because anyone opens a page for any reason and what is opened depends on what was shown; it only drives short-term things such as Continue Exploring. **Strong** (list add / remove, watched, like, dislike) uses the weights above. **Confirmed** (a rating) sets its own weight from the rating. Exposure and position bias: each recommendation shown is logged with its surface and rank (`recommendation_logs`), and clicks with their source and position, so click rates by position can be measured; no click feeds taste any more, so there is nothing to correct yet. Each kind of event counts at most once per film when the weights are added up (2026-11-10), so opening the same film many times on different days is not many times the interest.
 
 ### 6.3 Candidates
 About 50 films from each source: popularity, content, item CF, user CF, SVD, ALS. Merged into one pool of up to ~300.
