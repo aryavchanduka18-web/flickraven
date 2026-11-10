@@ -57,9 +57,10 @@ export default function Missions() {
         {shown.map((m) => (
           <section key={m.key}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-display text-xl font-bold">{m.title}{m.done && <span className="ml-2 text-sm text-accent">Completed{m.completed_at ? ` on ${completedOn(m.completed_at)}` : ""}</span>}</h2>
+              <h2 className="font-display text-xl font-bold">{m.title}</h2>
               <span className="text-sm text-muted">{m.progress} / {m.goal}</span>
             </div>
+            {m.done && <p className="text-sm font-medium text-accent">Completed{m.completed_at ? ` on ${completedOn(m.completed_at)}` : ""}</p>}
             <p className="text-sm text-muted">{m.description}</p>
             {m.why && <p className="mt-1 text-sm text-white/80"><span className="text-muted">Why this: </span>{m.why}</p>}
             <div className="mt-2 h-2 w-full max-w-md overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={m.goal} aria-valuenow={m.progress} aria-label={`${m.title} progress`}>
