@@ -44,17 +44,24 @@ describe("Discover filters", () => {
     expect(screen.getByRole("button", { name: /^Filters · 4/ })).toBeTruthy();
   });
 
-  it("offers a Match % filter only for films, and drops it when the type changes to series", async () => {
+  it("offers a Match % filter only for films, and drops it when the type changes to shows", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     const match = screen.getByLabelText("Minimum match") as HTMLSelectElement;
     expect(match.disabled).toBe(false);
     fireEvent.change(match, { target: { value: "80" } });
     await waitFor(() => expect(lastMovies()).toContain("min_match=80"));
-    fireEvent.click(screen.getByRole("tab", { name: "Series" }));
-    await waitFor(() => expect(lastMovies()).toContain("type=series"));
+    fireEvent.click(screen.getByRole("tab", { name: "Shows" }));
+    await waitFor(() => expect(lastMovies()).toContain("type=show"));
     expect(lastMovies()).not.toContain("min_match");
     expect((screen.getByLabelText("Minimum match") as HTMLSelectElement).disabled).toBe(true);
+  });
+
+  it("Movies and Shows pages are locked to one kind", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><UIProvider><MemoryRouter><Discover fixed="show" /></MemoryRouter></UIProvider></QueryClientProvider>);
+    await waitFor(() => expect(lastMovies()).toContain("type=show"));
+    expect(screen.queryByRole("tablist", { name: "Type" })).toBeNull();
   });
 
   it("Anime is a genre pill", async () => {

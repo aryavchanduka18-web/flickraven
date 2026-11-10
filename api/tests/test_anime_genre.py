@@ -38,3 +38,37 @@ def test_anime_is_japanese_animation_and_animation_is_the_rest(test_engine):
     finally:
         with test_engine.begin() as conn:
             conn.execute(text("DELETE FROM movies WHERE id = ANY(:i)"), {"i": list(ids.values())})
+
+
+def test_media_type_filters_on_every_genre_page(test_engine):
+    """All = films and shows, Movies = films only, Shows = TV only (also for Anime), on genre pages too."""
+    ids = {}
+    with test_engine.begin() as conn:
+        gid = conn.execute(text("""INSERT INTO genres (name, slug) VALUES ('Animation', 'animation')
+            ON CONFLICT (name) DO UPDATE SET slug = 'animation' RETURNING id""")).scalar()
+        for n, (kind, lang) in enumerate([("movie", "ja"), ("anime", "ja"), ("series", "en"), ("movie", "en")]):
+            key = f"{kind}-{lang}"
+            ids[key] = conn.execute(text("""INSERT INTO movies (tmdb_id, title, year, original_language, countries, backdrop_path,
+                popularity_score, tmdb_vote_count, title_type) VALUES (:t, :n, 2015, :l, ARRAY['JP'], '/b.jpg', 8.0, 99999, :k)
+                RETURNING id"""), {"t": 990200 + n, "n": f"Type {key}", "l": lang, "k": kind}).scalar()
+            conn.execute(text("INSERT INTO movie_genres (movie_id, genre_id) VALUES (:m, :g)"), {"m": ids[key], "g": gid})
+    film_ja, tv_ja, tv_en, film_en = ids["movie-ja"], ids["anime-ja"], ids["series-en"], ids["movie-en"]
+
+    def listed(c, path):
+        return [i["movie"]["id"] for i in c.get(path).json()["items"]]
+    try:
+        with TestClient(app) as c:
+            both = listed(c, "/api/genres/anime/movies")
+            assert film_ja in both and tv_ja in both
+            assert listed(c, "/api/genres/anime/movies?type=movie") and tv_ja not in listed(c, "/api/genres/anime/movies?type=movie")
+            shows = listed(c, "/api/genres/anime/movies?type=show")
+            assert tv_ja in shows and film_ja not in shows
+            # Shows never contain a film; Movies never contain a show
+            assert set(listed(c, "/api/movies?type=show&genre=animation")) >= {tv_en} and not {film_ja, film_en} & set(listed(c, "/api/movies?type=show&genre=animation"))
+            mv = listed(c, "/api/movies?type=movie&genre=animation")
+            assert film_en in mv and tv_en not in mv and tv_ja not in mv
+            allv = listed(c, "/api/genres/animation/movies?type=all")
+            assert film_en in allv and tv_en in allv
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(text("DELETE FROM movies WHERE id = ANY(:i)"), {"i": list(ids.values())})

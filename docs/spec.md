@@ -900,6 +900,12 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - Stability (2026-11-11): the chat panel is opaque (no blur, and no blurred buttons inside it: nested backdrop filters can render a black screen), it scrolls only its own list, a failure shows the reason with "Try again" (the message is kept), a crash inside the chat hides only the chat (error boundary), and a message is given back when Gemini fails. Connect timeout 5 s, total 25 s. Logs hold the error type or HTTP status only.
 - Not built: taste-aware ranking inside the assistant, saving chats, AI-written Taste DNA text.
 
+### 14.2f Movies, Shows and media types (2026-11-11)
+
+- Nav: Home, Discover, Movies, Shows, Perfect Pick, Genres, My List, Activity (phones: six tabs). `/movies` = films only. `/shows` = TV series and anime TV only, built from the series rows (`/recs/series-rails`, `/recs/kind/*`), never the film list filtered. Discover tabs: Movies, Shows, Movies and shows; `?type=show` opens it on Shows.
+- API: `type` on `/movies` = movie (default), show (series + anime TV), series, anime, all. Genre pages (`/genres/{slug}/movies?type=all|movie|show`) work for every genre; films are ranked by the hybrid, shows by `kind_rank`, and the two lists are woven by relative position because their scores are not on one scale. Match % is shown for films only.
+- Anime genre = Japanese-language animation with title_type movie (films) or anime (TV anime); plain `series` titles are not Anime.
+
 ### 14.2e Taste Evolution (2026-11-11)
 
 - On `/taste-dna`, "How your taste changed": per month (last 6 with activity) the top 3 genres of titles liked or rated 7+, and, with 5+ titles in the latest two months and 5+ before, the genre that rose and the one that fell (change of 10 points or more). Counts only; `GET /api/me/taste-evolution`.

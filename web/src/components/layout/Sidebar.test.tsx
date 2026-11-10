@@ -27,7 +27,7 @@ describe("Sidebar", () => {
     setup();
     const nav = screen.getByRole("navigation");
     for (const t of TABS) expect(nav.querySelector(`a[href="${t.to}"]`)).not.toBeNull();
-    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Perfect Pick", "Genres", "My List", "Activity"]);
+    expect(TABS.map((t) => t.label)).toEqual(["Home", "Discover", "Movies", "Shows", "Perfect Pick", "Genres", "My List", "Activity"]);
     expect(screen.queryByText("Missions")).toBeNull();
   });
 

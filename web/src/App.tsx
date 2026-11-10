@@ -17,6 +17,7 @@ import Person from "./pages/Person";
 import SeriesFit from "./pages/SeriesFit";
 import TasteDna from "./pages/TasteDna";
 import Performance from "./pages/Performance";
+import Shows from "./pages/Shows";
 import Search from "./pages/Search";
 import StatsPage from "./pages/Stats";
 import { PageMessage } from "./components/Loading";
@@ -27,6 +28,8 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/discover" element={<Discover />} />
+        <Route path="/movies" element={<Discover fixed="movie" />} />
+        <Route path="/shows" element={<Shows />} />
         <Route path="/genres" element={<Genres />} />
         <Route path="/genres/:slug" element={<Genre />} />
         <Route path="/movie/:id" element={<Movie />} />

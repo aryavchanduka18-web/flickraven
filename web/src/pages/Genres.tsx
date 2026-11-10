@@ -26,17 +26,30 @@ export function Genres() {
   );
 }
 
+const KINDS: [string, string][] = [["all", "Movies and shows"], ["movie", "Movies"], ["show", "Shows"]];
+
 export function Genre() {
   const slug = useParams().slug!;
+  const [kind, setKind] = useState("all");
   const [total, setTotal] = useState<number | null>(null);
   const name = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { name: string; slug: string }[] }>("/genres") })
     .data?.genres.find((x) => x.slug === slug)?.name;
+  const what = kind === "movie" ? "films" : kind === "show" ? "shows" : "titles";
   return (
     <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">{name ?? ""}</h1>
-      <p className="mt-1 text-sm text-muted">{total != null ? `${total.toLocaleString()} ${slug === "anime" ? "titles" : "films"}, ` : ""}{slug === "anime" ? "most popular first (Japanese animation: TV anime and films)." : "ranked for you by the recommender."}</p>
+      <p className="mt-1 text-sm text-muted">
+        {total != null ? `${total.toLocaleString()} ${what}, ` : ""}ranked for you
+        {slug === "anime" ? ". Anime is Japanese animation: TV anime and animated films." : ": films by the recommender, shows by how close they are to your taste."}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Type">
+        {KINDS.map(([v, l]) => (
+          <button key={v} role="tab" aria-selected={kind === v} onClick={() => setKind(v)}
+            className={`glass-btn rounded-full px-5 py-2 text-sm font-semibold ${kind === v ? "on" : ""}`}>{l}</button>
+        ))}
+      </div>
       <div className="mt-6">
-        <PagedGrid queryKey={["genre", slug]} path={(p) => `/genres/${slug}/movies?page=${p}`} source={`genre:${slug}`} onTotal={setTotal} />
+        <PagedGrid queryKey={["genre", slug, kind]} path={(p) => `/genres/${slug}/movies?type=${kind}&page=${p}`} source={`genre:${slug}`} onTotal={setTotal} />
       </div>
     </div>
   );
