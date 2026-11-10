@@ -10,7 +10,7 @@ type Res = { items: (RecItem & { plan: Plan })[]; total: number };
 
 const BUDGET: [string, string][] = [["", "Any amount"], ["3", "Up to 3 hours"], ["5", "Up to 5 hours"], ["10", "Up to 10 hours"], ["20", "Up to 20 hours"], ["long", "20+ hours"]];
 const STATUS: [string, string][] = [["", "Finished or airing"], ["ended", "Finished only"], ["airing", "Still airing"]];
-const LENGTH: [string, string][] = [["", "Any episode length"], ["short", "Under 30 min"], ["medium", "30-45 min"], ["long", "45-60 min"], ["xl", "Over 60 min"]];
+const LENGTH: [string, string][] = [["", "Any episode length"], ["short", "30 min or less"], ["medium", "31-45 min"], ["long", "46-60 min"], ["xl", "Over 60 min"]];
 
 /** Series Commitment Matcher: series that fit the time you have, with how long they take to finish. */
 export default function SeriesFit() {

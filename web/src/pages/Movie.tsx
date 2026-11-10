@@ -10,6 +10,8 @@ import WhyThis from "../components/explain/WhyThis";
 import ActionButtons from "../components/feedback/ActionButtons";
 import RatingDistribution from "../components/feedback/RatingDistribution";
 import RatingStars from "../components/feedback/RatingStars";
+import TasteTags from "../components/taste/TasteTags";
+import TasteReason from "../components/taste/TasteReason";
 import { PageMessage } from "../components/Loading";
 import Rail from "../components/rail/Rail";
 import { PosterGrid } from "../components/card/PosterCard";
@@ -73,6 +75,7 @@ export default function Movie() {
               <ActionButtons movieId={m.id} state={m.user_state} source="movie_page" size="md" showWatched />
               <RatingStars value={m.user_state.rating} onChange={(r) => fb.mutate({ kind: "rate", rating: r })} />
             </div>
+            <div className="mt-3"><TasteTags movieId={m.id} rated={m.user_state.rating != null || m.user_state.reaction !== 0 || m.user_state.watched} /></div>
           </div>
         </div>
       </section>
@@ -88,6 +91,7 @@ export default function Movie() {
             </p>
           )}
           <WhyThis reasons={m.why} />
+          <TasteReason movieId={m.id} />
           <ConfidenceCard c={m.confidence} />
           <Credits title="Directed by" people={m.directors} />
           <Credits title={m.title_type && m.title_type !== "movie" ? "Created by" : "Written by"} people={m.writers} />

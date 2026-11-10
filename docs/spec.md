@@ -659,6 +659,14 @@ A plain, professional page for the professor. It exposes the engine; it is not a
 - Not t-SNE: t-SNE cannot place a new user without redrawing the whole map.
 - It is a picture of the model, not a recommender.
 
+### 14.2b Taste DNA (v3, 2026-11-10)
+- **Traits** (15): plot complexity, fast pacing, slow burn, psychological tension, emotional depth, dark atmosphere, character focus, mystery and suspense, unexpected twists, humour, romance, world-building, realism, violence (dialogue only from viewer tags).
+- **Provenance:** TMDB has no such data. Values come from `RULES` in `api/app/services/taste_dna.py`: our own mapping of TMDB keywords and genres to traits (value 1 - exp(-sum of weights)); a title with fewer than 3 keywords is "unknown", never zero. Viewer tags count for a title only once 3 different users tagged it. The page says this.
+- **Feedback:** optional tags after rating (`title_feedback_tags`; "what did you enjoy" and "what did not work"); only for titles you rated, liked or marked watched.
+- **Profile:** weighted by liked (rated 7+, liked, picks, watched) and disliked titles with a catalog-mean prior worth 4 titles; negatives kept separate; a trait counts as a preference only with 3+ supporting titles and a lean of 0.05 over the catalog mean. Refine My Taste sets a trait to more/less (`user_preferences.taste_overrides`).
+- **Use:** the Taste DNA row re-orders the recommender's own top 300 by trait fit; it is NOT part of the hybrid score or Match %. Explanations name only traits the title has (value 0.5+) and the user prefers.
+- **Not yet evaluated offline:** no ratings exist with which to test whether the fit improves ranking, so it is not blended into the hybrid.
+
 ### 14.3 NCF (lab only)
 - NeuMF (GMF + MLP) in PyTorch on CPU, trained on positives (rating ≥ 7/10) with 4 sampled negatives per positive.
 - Evaluated with exactly the same full-ranking protocol as the other models.

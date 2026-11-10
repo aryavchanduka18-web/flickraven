@@ -21,5 +21,5 @@ def test_status_and_episode_length():
 def test_plan_text():
     p = fit.plan(7, 60, 2)
     assert (p["hours"], p["days"]) == (7.0, 4) and "4 days" in p["text"]
-    assert "one weekend" in fit.plan(4, 50, 2)["text"]
+    assert "one weekend" in fit.plan(4, 50, 2)["text"] and "one day" in fit.plan(2, 50, 2)["text"]
     assert "weeks" in fit.plan(236, 22, 2)["text"]
