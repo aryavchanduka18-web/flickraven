@@ -36,8 +36,8 @@ const countryName = (code: string) => {
 };
 const YEARS = Array.from({ length: new Date().getFullYear() - 1920 + 1 }, (_, i) => new Date().getFullYear() - i);
 
-export default function Discover() {
-  const [f, setF] = useState<Filters>(EMPTY);
+export default function Discover({ initialType = "movie" }: { initialType?: Filters["type"] }) {
+  const [f, setF] = useState<Filters>(() => ({ ...EMPTY, type: initialType }));
   const [open, setOpen] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
   const genres = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { slug: string; name: string }[] }>("/genres") });
@@ -59,6 +59,7 @@ export default function Discover() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-display text-3xl font-extrabold md:text-4xl">Discover</h1>
         <div className="flex items-center gap-3">
+          <Link to="/shows" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Browse shows</Link>
           <Link to="/series-fit" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Find a series that fits your time</Link>
           <SurpriseMeButton />
         </div>

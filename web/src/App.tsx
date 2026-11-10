@@ -27,6 +27,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/discover" element={<Discover />} />
+        <Route path="/shows" element={<Discover initialType="series" />} />
         <Route path="/genres" element={<Genres />} />
         <Route path="/genres/:slug" element={<Genre />} />
         <Route path="/movie/:id" element={<Movie />} />
