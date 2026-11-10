@@ -328,7 +328,7 @@ Home  Discover  Genres  My List  Activity
 | Home | Hero, Discovery Mode control, For Tonight entry button, rails (section 7). |
 | Movie page | Backdrop, poster, title, Match %, community rating, year, runtime, genres, language, country, certification, release date, synopsis, the user's rating (5 stars, half steps), rating distribution (1–10 bars), "Why you're seeing this", director, writers, cast, studios, keywords, awards (when Wikidata has them), More Like This (poster grid, 8 titles, "View all" page at `/movie/:id/similar` with Load more; same type only, with reasons). Actions: Add to / Remove from List, Like, Dislike, Rate, Mark Watched. |
 | Quick View | Opened by the card's chevron: backdrop, title, Match %, rating, year, runtime, genres, language, short synopsis, Why This, actions, "View full details". |
-| Discover | Filters (genre, language, decade, runtime, country, rating), search, Surprise Me, Discovery Mode, For Tonight panel. |
+| Discover | Type tabs (Movies, Series, Anime, All), a scrolling genre pill row (Anime is its own genre), a Filters panel (language, country, released from / until, length, IMDb score, Match % for films with a personal sort, streaming service, with a count of filters on and Clear), sort, Surprise Me, For Tonight panel. Country and streaming-service choices come from `GET /api/discover/options` (what the catalog really holds); the streaming filter means a subscription or free service as TMDB lists it for India. |
 | Genres | Genre grid; a genre page ranks its films **for this user** with the hybrid score. |
 | Search | Title, cast, director, genre, language (Postgres full-text search). |
 | My List | Saved films; sort by recently added, rating, year, genre. |
@@ -342,7 +342,7 @@ Home  Discover  Genres  My List  Activity
 - **Normal state:** artwork, title, year, community rating, language, Match % on personal rails.
 - **Hover (desktop only):** scale about 1.05, lift 4 px, 150–250 ms, after a short hover-intent delay so moving across a rail doesn't flicker. Reveals Match %, genre, one-line synopsis, Like, Dislike, Add to List, and the Quick View chevron. Rails have vertical padding so enlarged cards are never clipped.
 - **Touch:** no hover panel. Tap opens the movie page. The chevron is always visible.
-- **Rail arrows:** glass style (see-through, light blur, thin light border, round), fade in when the pointer enters the rail, smooth scroll.
+- **Rail arrows (v5):** dark-glass round buttons, always visible on every rail (desktop), hidden at the start and end of a rail, eased smooth scroll of about one screen. Card widths are a share of the space next to the sidebar.
 
 ### 8.5 Hero
 - Full-bleed header (reaches behind the sidebar): the pick's own 16:9 backdrop fills the screen, black fade on the left for the text, picture clear on the right (v5, from Aryav's reference screenshot of a film page).
