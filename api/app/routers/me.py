@@ -142,24 +142,76 @@ def put_tuning(body: TuningBody, user=Depends(current_user), db: Session = Depen
     return body.model_dump()
 
 
+
+
 @router.get("/me/report")
 def report(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    """How the titles recommended to you turned out (app/services/report.py): only titles you rated after they
-    were first recommended count; percentages appear only from 10 such titles."""
+    """How the titles recommended to you turned out (rules and thresholds: app/services/report.py). The outcome is the
+    first rating you gave AFTER a title was first shown (imports excluded); titles you had rated before they were shown
+    are left out; unrated recommendations are never counted as dislikes."""
     from collections import Counter
 
     from app.services.report import summarize
     p = {"u": user["id"]}
-    rows = [dict(r) for r in db.execute(text("""
-        WITH shown AS (SELECT movie_id, min(created_at) AS first_shown, max(match_pct) AS match_pct
-                       FROM recommendation_logs WHERE user_id = :u GROUP BY movie_id)
-        SELECT s.movie_id, s.match_pct, r.rating,
+    after = f"""i.user_id = :u AND i.movie_id = s.movie_id AND i.created_at >= s.first_shown"""
+    rows = [dict(r) for r in db.execute(text(f"""
+        WITH shown AS (SELECT DISTINCT ON (movie_id) movie_id, created_at AS first_shown, match_pct, surface
+                       FROM recommendation_logs WHERE user_id = :u ORDER BY movie_id, created_at, id)
+        SELECT s.movie_id, s.match_pct, s.surface, s.first_shown AS shown_at,
+               (SELECT i.value FROM interactions i WHERE {after} AND i.event_type = 'rate'
+                  AND coalesce(i.source, '') NOT LIKE 'import:%' ORDER BY i.id LIMIT 1) AS rating,
+               EXISTS (SELECT 1 FROM interactions i WHERE i.user_id = :u AND i.movie_id = s.movie_id
+                  AND i.event_type = 'rate' AND i.created_at < s.first_shown) AS known_before,
+               EXISTS (SELECT 1 FROM interactions i WHERE {after} AND i.event_type IN ('detail_view', 'quick_view', 'search_click', 'hero_view')) AS opened,
+               EXISTS (SELECT 1 FROM interactions i WHERE {after} AND i.event_type = 'watched') AS watched,
                ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = s.movie_id) AS genres
-        FROM shown s JOIN ratings r ON r.user_id = :u AND r.movie_id = s.movie_id AND r.created_at >= s.first_shown"""), p).mappings()]
+        FROM shown s"""), p).mappings()]
     reasons = Counter(r[0] for r in db.execute(text("""
         SELECT i.source FROM interactions i WHERE i.user_id = :u AND i.event_type = 'dislike_reason'
           AND i.movie_id IN (SELECT movie_id FROM recommendation_logs WHERE user_id = :u)"""), p) if r[0])
-    return summarize(rows, reasons)
+    feedback = Counter(r[0] for r in db.execute(text("""
+        SELECT DISTINCT ON (i.movie_id) i.source FROM interactions i WHERE i.user_id = :u AND i.event_type = 'rec_feedback'
+        ORDER BY i.movie_id, i.id DESC"""), p) if r[0])
+    return summarize(rows, reasons, feedback)
+
+
+class RecFeedbackBody(BaseModel):
+    answer: str
+
+
+def _rec_eligible(db: Session, uid: int, movie_id: int) -> bool:
+    """True when the title was recommended to you and your first rating of it came after that (so it is an outcome)."""
+    return bool(db.execute(text("""
+        WITH s AS (SELECT min(created_at) AS first_shown FROM recommendation_logs WHERE user_id = :u AND movie_id = :m)
+        SELECT 1 FROM s WHERE first_shown IS NOT NULL
+          AND EXISTS (SELECT 1 FROM interactions i WHERE i.user_id = :u AND i.movie_id = :m AND i.event_type = 'rate'
+                      AND i.created_at >= s.first_shown AND coalesce(i.source, '') NOT LIKE 'import:%')
+          AND NOT EXISTS (SELECT 1 FROM interactions i WHERE i.user_id = :u AND i.movie_id = :m AND i.event_type = 'rate'
+                      AND i.created_at < s.first_shown)"""), {"u": uid, "m": movie_id}).first())
+
+
+@router.get("/feedback/rec-outcome/{movie_id}")
+def get_rec_feedback(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    from app.services.report import FEEDBACK
+    mine = db.execute(text("""SELECT source FROM interactions WHERE user_id = :u AND movie_id = :m AND event_type = 'rec_feedback'
+        ORDER BY id DESC LIMIT 1"""), {"u": user["id"], "m": movie_id}).scalar()
+    return {"eligible": _rec_eligible(db, user["id"], movie_id), "answer": mine,
+            "options": [{"key": k, "label": l} for k, l in FEEDBACK.items()]}
+
+
+@router.put("/feedback/rec-outcome/{movie_id}")
+def put_rec_feedback(movie_id: int, body: RecFeedbackBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """"How well did this recommendation match your taste?" Only for titles we recommended and you then rated. It is
+    stored as an event and shown in your report; it does not change any model."""
+    from app.services import events as ev
+    from app.services.report import FEEDBACK
+    if body.answer not in FEEDBACK:
+        raise HTTPException(422, f"answer must be one of {sorted(FEEDBACK)}")
+    if not _rec_eligible(db, user["id"], movie_id):
+        raise HTTPException(409, "This title was not recommended to you before you rated it")
+    ev.log(db, user["id"], movie_id, "rec_feedback", None, body.answer)
+    db.commit()
+    return {"answer": body.answer}
 
 
 MISSION_SUGGESTIONS = {

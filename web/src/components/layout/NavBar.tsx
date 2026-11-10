@@ -91,6 +91,7 @@ function AvatarMenu() {
           onMouseLeave={() => setOpen(false)}
         >
           <MenuLink to="/activity" onClick={() => setOpen(false)}>Taste Profile</MenuLink>
+          <MenuLink to="/performance" onClick={() => setOpen(false)}>Recommendation report</MenuLink>
           <MenuLink to="/onboarding" onClick={() => setOpen(false)}>Preferences</MenuLink>
           <MenuLink to="/account" onClick={() => setOpen(false)}>Account</MenuLink>
           {me?.is_guest ? (

@@ -12,7 +12,7 @@ models agree), browse franchises ("More from John Wick", "More from Marvel"), ca
 (Rom-Com, Crime Thriller, ...), genre and Discover pages with every title (Movies / Series / Anime tabs),
 For Tonight, and the Research Lab. Search understands genre, language, year and series/anime words ("hindi comedy",
 "90s action", "korean series") and suggests films, people and genres as you type. Film pages show the IMDb score,
-where to watch (India first, via TMDB / JustWatch) and, for series, seasons and episodes. Home has Netflix-style
+where to watch (India first, via TMDB / JustWatch) and, for series, seasons and episodes. Your recommendation report (`/performance`) compares the Match % we showed with what you then rated, with counts and honest limits. Home has Netflix-style
 series rows (East Asian dramas, Popular K-dramas, binge-worthy, quick comedy, because you liked ..., a films-and-series
 mix). The catalog has about 33,000 titles (27,000 films, 4,300 series, 1,500 anime).
 Not available (no email service): email verification and password reset.
