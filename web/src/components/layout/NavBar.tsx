@@ -10,6 +10,7 @@ export const TABS = [
   { to: "/discover", label: "Discover" },
   { to: "/genres", label: "Genres" },
   { to: "/my-list", label: "My List" },
+  { to: "/missions", label: "Missions" },
   { to: "/activity", label: "Activity" },
 ];
 
