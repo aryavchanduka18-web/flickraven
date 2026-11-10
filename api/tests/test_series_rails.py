@@ -10,7 +10,7 @@ def s(i, **kw):
 
 def test_theme_rules():
     assert sr.in_theme("kdrama", s(1, lang="ko", countries=["KR"])) and not sr.in_theme("kdrama", s(1))
-    assert sr.in_theme("east_asian", s(1, countries=["JP"])) and not sr.in_theme("east_asian", s(1, countries=["JP"], genres=["Animation"]))
+    assert sr.in_theme("jdrama", s(1, lang="ja", countries=["JP"])) and not sr.in_theme("jdrama", s(1, lang="ja", countries=["JP"], genres=["Animation"]))
     assert sr.in_theme("binge", s(1, seasons=5, episodes=60, popularity=8.2)) and not sr.in_theme("binge", s(1, seasons=1, episodes=60, popularity=8.2))
     assert sr.in_theme("quick_comedy", s(1, genres=["Comedy"], runtime=22, episodes=236, popularity=8.0))
     assert not sr.in_theme("quick_comedy", s(1, genres=["Comedy", "Animation"], runtime=22, episodes=60))     # cartoons are not sitcoms
@@ -29,7 +29,7 @@ def test_acclaimed_and_weekend_rules():
 
 def test_drama_rows_hold_dramas_only():
     assert not sr.in_theme("kdrama", s(1, lang="ko", countries=["KR"], genres=["Comedy"]))         # e.g. a variety show
-    assert not sr.in_theme("east_asian", s(1, countries=["JP"], genres=[]))
+    assert not sr.in_theme("jdrama", s(1, lang="ja", countries=["JP"], genres=[]))
 
 
 def test_rows_follow_the_users_ranking_and_need_enough_titles():
@@ -37,7 +37,7 @@ def test_rows_follow_the_users_ranking_and_need_enough_titles():
     rows = sr.build(series, [5, 3, 99, 1, 2, 4, 6, 7, 8, 9, 10, 11, 12])
     kd = next(r for r in rows if r["key"] == "kdrama")
     assert kd["ids"][:4] == [5, 3, 1, 2] and 99 not in kd["ids"]          # the user's order, only Korean series
-    assert [r["key"] for r in rows] == ["east_asian", "kdrama"]            # themes with fewer than 8 titles are left out
+    assert [r["key"] for r in rows] == ["kdrama"]                          # themes with fewer than 8 titles are left out
     assert sr.build(series, [1, 2, 3]) == []                               # series the user already saw are not offered
 
 
@@ -50,3 +50,21 @@ def test_mix_alternates_films_and_series_without_repeats():
     assert sr.interleave([1, 2, 3], [10, 11, 12]) == [1, 10, 2, 11, 3, 12]
     assert sr.interleave([1, 2], [2, 3]) == [1, 2, 3]
     assert len(sr.interleave(list(range(30)), list(range(100, 130)), n=20)) == 20
+
+
+def test_language_rows_split_series_by_language():
+    assert sr.in_theme("indian", s(1, lang="hi", countries=["IN"], genres=["Comedy"])) and not sr.in_theme("indian", s(1))
+    assert sr.in_theme("anglo", s(1, lang="en", countries=["GB"])) and not sr.in_theme("anglo", s(1, lang="en", countries=["IN"]))
+    assert sr.in_theme("international", s(1, lang="es", countries=["ES"])) and sr.in_theme("international", s(1, lang="zh", countries=["CN"]))
+    for lang in ("en", "ko", "ja", "hi", "ta"):
+        assert not sr.in_theme("international", s(1, lang=lang))                    # the other rows own these languages
+
+
+def test_interest_orders_rows_but_never_hides_one():
+    series = ([s(i, lang="ko", countries=["KR"]) for i in range(1, 11)] + [s(i, lang="hi", countries=["IN"]) for i in range(11, 21)]
+              + [s(i, lang="en", countries=["US"]) for i in range(21, 31)])
+    ids = list(range(1, 31))
+    assert [r["key"] for r in sr.build(series, ids)] == ["kdrama", "indian", "anglo"]
+    interest = sr.affinity(["hi", "hi", "hi", "en"], [])                            # a user who likes Hindi
+    assert [r["key"] for r in sr.build(series, ids, interest)] == ["indian", "anglo", "kdrama"]
+    assert sr.affinity([], ["ko"])["kdrama"] == 3 and sr.affinity([], [])["kdrama"] == 0

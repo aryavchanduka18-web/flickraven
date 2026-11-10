@@ -1,4 +1,4 @@
-"""Themed series rows for Home (East Asian dramas, popular K-dramas, binge-worthy, quick comedy, rewatch favourites).
+"""Themed series rows for Home ("... dramas for you" by language, binge-worthy, quick comedy, rewatch favourites).
 
 Each theme is a plain rule over what we know about a series (country, language, seasons, episodes, episode length,
 status, genres, popularity). Inside a theme the series are ordered the way the recommender ranks series for this
@@ -7,7 +7,10 @@ There is no "most rewatched" data, so the rewatch row says what it is: finished 
 """
 from dataclasses import dataclass
 
-EAST_ASIA = {"KR", "JP", "CN", "TW", "HK"}
+INDIAN_LANGUAGES = {"hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "gu", "ur"}
+ANGLO_COUNTRIES = {"US", "GB"}
+# Language groups behind the "... for you" rows, used to put the rows a user has shown interest in first.
+FOR_YOU_LANGUAGES = {"kdrama": {"ko"}, "jdrama": {"ja"}, "indian": INDIAN_LANGUAGES, "anglo": {"en"}}
 MIN_ROW = 8
 WEEKEND_HOURS = 15      # "get through in a weekend": at most this many hours in total (episodes x episode length)
 ROW_SIZE = 20
@@ -21,8 +24,11 @@ class Theme:
 
 
 THEMES = {
-    "east_asian": Theme("east_asian", "East Asian TV dramas", "Korean, Japanese, Chinese and Taiwanese dramas."),
-    "kdrama": Theme("kdrama", "Popular K-dramas", "Well-known Korean dramas, in the order that suits you."),
+    "kdrama": Theme("kdrama", "Korean dramas for you", "Korean dramas, in the order that suits your taste."),
+    "jdrama": Theme("jdrama", "Japanese dramas for you", "Japanese live-action dramas, in the order that suits your taste."),
+    "indian": Theme("indian", "Indian series for you", "Hindi, Tamil, Telugu, Malayalam and other Indian-language series, in the order that suits your taste."),
+    "anglo": Theme("anglo", "American and British dramas for you", "Dramas made in the US and UK, in the order that suits your taste."),
+    "international": Theme("international", "International dramas for you", "Dramas in other languages, such as Spanish, French, Turkish and Chinese, in the order that suits your taste."),
     "acclaimed": Theme("acclaimed", "Critically acclaimed TV dramas", "The highest-rated drama series, by viewer ratings on TMDB."),
     "weekend": Theme("weekend", "Perfect binge-watches", "Short, finished series you can get through in a weekend."),
     "binge": Theme("binge", "Can't stop at just one episode", "Much-loved series with plenty of seasons to get lost in."),
@@ -37,10 +43,17 @@ def in_theme(key: str, s: dict) -> bool:
     seasons, episodes = s.get("seasons") or 0, s.get("episodes") or 0
     live_action = "Animation" not in (s.get("genres") or [])           # dramas and sitcoms, not cartoons
     drama = "Drama" in (s.get("genres") or [])                        # the rows say "dramas"
-    if key == "east_asian":
-        return live_action and drama and bool(EAST_ASIA & set(s.get("countries") or []))
+    lang = s.get("lang")
     if key == "kdrama":
-        return live_action and drama and s.get("lang") == "ko"
+        return live_action and drama and lang == "ko"
+    if key == "jdrama":
+        return live_action and drama and lang == "ja"
+    if key == "indian":
+        return live_action and lang in INDIAN_LANGUAGES
+    if key == "anglo":
+        return live_action and drama and lang == "en" and bool(ANGLO_COUNTRIES & set(s.get("countries") or []))
+    if key == "international":
+        return live_action and drama and bool(lang) and lang not in {"en", "ko", "ja"} | INDIAN_LANGUAGES
     if key == "acclaimed":
         return live_action and "Drama" in (s.get("genres") or []) and pop >= 8.3 and (s.get("votes") or 0) >= 1000
     if key == "weekend":
@@ -56,15 +69,31 @@ def in_theme(key: str, s: dict) -> bool:
     return False
 
 
-def build(series: list[dict], ranked_ids: list[int]) -> list[dict]:
+def affinity(liked_languages: list[str], chosen_languages: list[str]) -> dict[str, int]:
+    """How much the user has shown interest in each "... for you" row: titles they liked, rated 7+ or saved in that
+    language group (1 each) plus 3 when they chose the language at sign-up. Nothing is hidden by a low value: it only
+    decides which rows come first."""
+    out = {}
+    for key, langs in FOR_YOU_LANGUAGES.items():
+        out[key] = sum(1 for l in liked_languages if l in langs) + 3 * bool(langs & set(chosen_languages))
+    out["international"] = (sum(1 for l in liked_languages if l and l not in {"en", "ko", "ja"} | INDIAN_LANGUAGES)
+                            + 3 * bool(set(chosen_languages) - ({"en", "ko", "ja"} | INDIAN_LANGUAGES)))
+    return out
+
+
+def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | None = None) -> list[dict]:
     """[{key, title, subtitle, ids}] for every theme with at least MIN_ROW series, each ordered like `ranked_ids`
-    (the user's series ranking, best first); series missing from the ranking (already seen) are left out."""
+    (the user's series ranking, best first); series missing from the ranking (already seen) are left out.
+    With `interest` (see affinity), rows the user has shown interest in come first; the rest keep their order and
+    are still shown, so nobody is shut out of a language."""
     by_id = {s["id"]: s for s in series}
     out = []
     for theme in THEMES.values():
         ids = [i for i in ranked_ids if i in by_id and by_id[i].get("has_art") and in_theme(theme.key, by_id[i])][:ROW_SIZE]
         if len(ids) >= MIN_ROW:
             out.append({"key": theme.key, "title": theme.title, "subtitle": theme.subtitle, "ids": ids})
+    if interest:
+        out.sort(key=lambda r: -interest.get(r["key"], 0))        # stable: ties keep THEMES order
     return out
 
 

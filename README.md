@@ -13,7 +13,7 @@ models agree), browse franchises ("More from John Wick", "More from Marvel"), ca
 For Tonight, and the Research Lab. Search understands genre, language, year and series/anime words ("hindi comedy",
 "90s action", "korean series") and suggests films, people and genres as you type. Film pages show the IMDb score,
 where to watch (India first, via TMDB / JustWatch) and, for series, seasons and episodes. "Find a Series That Fits Your Time" (Discover) filters series by time, pace, type, genre and language. Your recommendation report (`/performance`) compares the Match % we showed with what you then rated, with counts and honest limits. Home has Netflix-style
-series rows (East Asian dramas, Popular K-dramas, binge-worthy, quick comedy, because you liked ..., a films-and-series
+series rows (Korean, Japanese, Indian, American and British and international dramas "for you", binge-worthy, quick comedy, because you liked ..., a films-and-series
 mix). Taste DNA (`/taste-dna`, avatar menu) shows which storytelling traits (pacing, plot complexity, dark
 atmosphere, ...) you lean towards, from what you rate, like and tag after rating; it has its own recommendation row and a
 shareable card you download yourself. Your Discovery Journey (`/missions`) has personal challenges (other countries, languages,

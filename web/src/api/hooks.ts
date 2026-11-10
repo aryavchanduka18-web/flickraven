@@ -29,7 +29,7 @@ export const useKindRail = (kind: "series" | "anime") =>
 
 export type SeriesRail = { key: string; title: string; subtitle: string; items: RecItem[] };
 
-/** Themed series rows (East Asian dramas, quick comedy, because you liked ..., a films-and-series mix). */
+/** Themed series rows (Korean, Japanese, Indian, Anglo and international dramas for you, quick comedy, because you liked ..., a films-and-series mix). */
 export const useSeriesRails = () =>
   useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[] }>("/recs/series-rails"), staleTime: 60_000 });
 
