@@ -25,6 +25,7 @@ Change log:
 **Problems it addresses (and the claim we make):**
 - New-user cold start, new-movie cold start, popularity bias, repetitive lists, unexplained recommendations, no user control.
 - Claim: the hybrid gives a **better overall trade-off** between relevance, cold-start performance, coverage, diversity and novelty than any single model. Not "hybrid wins every metric". Never "better than Netflix".
+- **Hybrid versus ALS, stated plainly:** on the offline test (5,000 users) the hybrid scores NDCG@10 0.163 [0.157, 0.168] and Implicit ALS 0.157 [0.152, 0.162]. The intervals overlap, so the difference is inside the statistical noise: **the hybrid is not shown to be more accurate than ALS.** What the hybrid adds is cold-start handling, films without MovieLens data, explanations, a diversity control and a long-tail channel. Do not describe it as more accurate.
 
 **Three ideas that define the product:**
 1. **Why this movie?** Every personal recommendation carries a real, plain-English reason.
@@ -235,6 +236,8 @@ Each source's scores become a 0–1 percentile rank within the user's candidate 
 | Discover | 0.55 | 0.20 | small boost for films outside the user's languages and for genres rare in their history |
 
 The mode is saved in `user_preferences.discovery_mode`.
+
+**Long-tail channel (2026-11-10).** MMR only reorders the top 100, and ALS carries 70% of the established blend, so the offline long-tail share was 0.1% (films outside the 20% most-rated MovieLens films). A tail channel now adds the best long-tail films (outside the 20% most-voted films of the catalog, scored by the same availability-aware hybrid) to the candidate pool and **reserves slots** for them: Familiar 0%, Balanced 10%, Discover 20% of a list (never more than half), spread through the list rather than piled at the end. Measured on 500 test users (`pipeline/tail_eval.py`, `artifacts/metrics/long_tail.json`), Balanced: NDCG@10 0.110 with no slots, 0.105 with 10%, 0.100 with 20%; Discover: 0.105, 0.102 (10%), 0.095 (20%). Coverage of MovieLens films in the top 10 rises from 7.6% to 9.7% (Balanced 20%). The NDCG cost is an upper bound, because a film nobody in MovieLens rated cannot score. Note the two definitions of "long tail": the report's 0.1% counts MovieLens rating counts; the engine counts TMDB votes across the whole catalog, so its no-slot figure is 1.3%.
 
 ### 6.9 Surprise Me
 1. Unseen hybrid candidates with Match % ≥ 60 and community rating ≥ 6.5/10.
