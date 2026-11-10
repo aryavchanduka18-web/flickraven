@@ -104,10 +104,8 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     (release period), `min_imdb` (IMDb score), `provider` (a TMDB provider id that streams it for free or on subscription
     in the stored region) and `min_match` (Match %, needs a personal sort and a signed-in user)."""
     where, p = ["true"], {}
-    if genre == ANIME_SLUG and type in (None, "movie", "all"):
-        where.append("m.title_type IN ('movie', 'anime')")          # Japanese animation: TV anime and animated films
-    elif type in ("movie", "series", "anime") or type is None:
-        where.append("m.title_type = :type"); p["type"] = type or "movie"
+    kinds = media_kinds(type, genre)
+    where.append("m.title_type = ANY(:kinds)"); p["kinds"] = kinds
     if genre == ANIME_SLUG:
         where.append(f"m.original_language = 'ja' AND {ANIMATION_IDS}")
     elif genre:
@@ -139,16 +137,14 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     order = {"popular": "m.tmdb_vote_count DESC NULLS LAST", "rating": "m.popularity_score DESC NULLS LAST",
              "newest": "m.release_date DESC NULLS LAST", "title": "m.title"}.get(sort, "m.tmdb_vote_count DESC NULLS LAST")
     uid = user_id_from(request, db)
-    if type in ("series", "anime") and sort in ("recommended", "match") and uid is not None and rec.artifacts_ready():
-        # No ratings exist for series and anime: their order is content similarity to the user's taste plus popularity.
-        all_ids = [r[0] for r in db.execute(text(f"SELECT m.id FROM movies m WHERE {' AND '.join(where)}"), p)]
-        engine = rec.load_engine(db)
-        rows, scores = engine.kind_rank(rec.user_state(db, uid, engine), type)
-        allowed, rank = set(all_ids), [(int(engine.cat.movie_ids[r]), float(s)) for r, s in zip(rows, scores)]
-        ranked = [(i, s) for i, s in rank if i in allowed]
+    personal = sort in PERSONAL_SORTS and uid is not None and rec.artifacts_ready()
+    if personal and any(k != "movie" for k in kinds):
+        # Shows (series and anime) have no ratings: they are ranked by taste similarity plus popularity (kind_rank).
+        # Films are ranked by the hybrid. When both are asked for, the two lists are woven together by relative position.
+        ranked, extra = mixed_order(db, uid, " AND ".join(where), p, order, sort, kinds, min_match)
         start = (max(page, 1) - 1) * 40
         shown = ranked[start:start + 40]
-        return {"items": cards(db, [i for i, _ in shown], uid, {i: {"score": s} for i, s in shown}),
+        return {"items": cards(db, shown, uid, {i: extra[i] for i in shown if i in extra}),
                 "total": len(ranked), "page": page, "sort": sort}
     if sort in PERSONAL_SORTS and uid is not None and rec.artifacts_ready():
         all_ids = [r[0] for r in db.execute(text(f"SELECT m.id FROM movies m WHERE {' AND '.join(where)} ORDER BY {order}"), p)]
@@ -169,6 +165,49 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
 
 
 PERSONAL_SORTS = {"recommended", "match", "hidden", "novel"}
+
+# `type` on /movies: movie (default), show (TV series and anime TV), series, anime, all (films and shows).
+MEDIA_KINDS = {"movie": ["movie"], "series": ["series"], "anime": ["anime"], "show": ["series", "anime"],
+               "all": ["movie", "series", "anime"]}
+
+
+def media_kinds(type: str | None, genre: str | None) -> list[str]:
+    """Which title_type values a request covers. Anime TV is stored as 'anime', other TV as 'series'; both are Shows."""
+    kinds = MEDIA_KINDS.get(type or "movie", ["movie"])
+    if genre == ANIME_SLUG:
+        return [k for k in kinds if k != "series"] or ["anime"]   # anime = films plus title_type 'anime' (TV anime), never plain series
+    return kinds
+
+
+def mixed_order(db: Session, uid: int, where: str, p: dict, order: str, sort: str, kinds: list[str], min_match: int | None):
+    """Ids best first for a request that includes shows, plus per-id score extras (Match % only for films)."""
+    rows = db.execute(text(f"SELECT m.id, m.title_type FROM movies m WHERE {where} ORDER BY {order}"), p).all()
+    film_ids = [r[0] for r in rows if r[1] == "movie"]
+    show_ids = [r[0] for r in rows if r[1] != "movie"]
+    lists: list[list[int]] = []
+    extra: dict[int, dict] = {}
+    if film_ids:
+        ranked, scores, engine, stage = personal_order(db, uid, film_ids, sort)
+        if min_match:
+            ranked = [i for i in ranked if i in scores and engine.match(stage, scores[i]) >= min_match]
+        for i in ranked:
+            if i in scores:
+                extra[i] = {"score": scores[i], "match_pct": engine.match(stage, scores[i])}
+        lists.append(ranked)
+    if show_ids and not min_match:
+        engine = rec.load_engine(db)
+        st = rec.user_state(db, uid, engine)
+        allowed, pairs = set(show_ids), []
+        for kind in sorted({k for k in kinds if k != "movie"}):
+            r, sc = engine.kind_rank(st, kind)
+            pairs += [(int(engine.cat.movie_ids[x]), float(y)) for x, y in zip(r, sc) if int(engine.cat.movie_ids[x]) in allowed]
+        pairs.sort(key=lambda t: -t[1])
+        seen = {i for i, _ in pairs}
+        for i, sc in pairs:
+            extra[i] = {"score": sc}
+        lists.append([i for i, _ in pairs] + [i for i in show_ids if i not in seen])
+    keyed = sorted(((j + 0.5) / len(lst), n, i) for n, lst in enumerate(lists) for j, i in enumerate(lst))
+    return [i for _, _, i in keyed], extra
 
 
 @router.get("/discover/options")
@@ -275,24 +314,17 @@ def genres(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/genres/{slug}/movies")
-def genre_movies(slug: str, request: Request, page: int = 1, db: Session = Depends(get_db)) -> dict:
-    """A genre page ranks its films FOR THIS USER with the hybrid score (spec 8.3). "anime" (Japanese animation, TV and
-    films) is listed most popular first: TV anime and films have no common score to rank them together."""
+def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", db: Session = Depends(get_db)) -> dict:
+    """A genre page lists films AND shows (type=all, the default), only films (movie) or only shows (show), ranked for
+    this user: films by the hybrid, shows by taste similarity, woven together by relative position. Anime is Japanese
+    animation (TV anime and animated films); Animation is the rest."""
     if slug == ANIME_SLUG:
-        return discover(request, genre=ANIME_SLUG, sort="popular", page=page, type="all", db=db) | {"genre": "Anime"}
-    g = db.execute(text("SELECT id, name FROM genres WHERE slug = :s"), {"s": slug}).first()
-    if g is None:
-        raise HTTPException(404, "Unknown genre")
-    uid = user_id_from(request, db)
-    if uid is None or not rec.artifacts_ready():
-        return discover(request, genre=slug, page=page, db=db) | {"genre": g[1]}
-    engine = rec.load_engine(db)
-    st = rec.user_state(db, uid, engine)
-    scores = engine.rail_scores(st)
-    rows = [r for r in np.argsort(-scores) if g[1] in engine.cat.genres[r] and np.isfinite(scores[r])
-            and not (slug == ANIMATION_SLUG and engine.cat.language[r] == "ja")]
-    start = (max(page, 1) - 1) * 40
-    pick = rows[start:start + 40]
-    extra = {int(engine.cat.movie_ids[r]): {"score": float(scores[r]), "match_pct": engine.match(st.stage, float(scores[r]))}
-             for r in pick}
-    return {"genre": g[1], "items": cards(db, list(extra), uid, extra), "total": len(rows), "page": page}
+        name = "Anime"
+    else:
+        g = db.execute(text("SELECT id, name FROM genres WHERE slug = :s"), {"s": slug}).first()
+        if g is None:
+            raise HTTPException(404, "Unknown genre")
+        name = g[1]
+    if type not in ("all", "movie", "show"):
+        type = "all"
+    return discover(request, genre=slug, sort="recommended", page=page, type=type, db=db) | {"genre": name}

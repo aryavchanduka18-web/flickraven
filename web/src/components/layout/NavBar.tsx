@@ -8,11 +8,16 @@ import SearchBox from "./SearchBox";
 export const TABS = [
   { to: "/", label: "Home" },
   { to: "/discover", label: "Discover" },
+  { to: "/movies", label: "Movies" },
+  { to: "/shows", label: "Shows" },
   { to: "/pick", label: "Perfect Pick" },
   { to: "/genres", label: "Genres" },
   { to: "/my-list", label: "My List" },
   { to: "/activity", label: "Activity" },
 ];
+
+/** The phone tab bar has room for six. Genres and Activity stay reachable from the sidebar and the avatar menu. */
+export const MOBILE_TABS = TABS.filter((t) => !["/genres", "/activity"].includes(t.to));
 
 /** Translucent at the top, solid near-black after ~80px of scroll (spec 8.1). */
 function useScrolled(threshold = 80) {

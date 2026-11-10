@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import PagedGrid from "../components/card/PagedGrid";
 import SurpriseMeButton from "../components/discovery/SurpriseMeButton";
@@ -36,8 +36,11 @@ const countryName = (code: string) => {
 };
 const YEARS = Array.from({ length: new Date().getFullYear() - 1920 + 1 }, (_, i) => new Date().getFullYear() - i);
 
-export default function Discover({ initialType = "movie" }: { initialType?: Filters["type"] }) {
-  const [f, setF] = useState<Filters>(() => ({ ...EMPTY, type: initialType }));
+/** `fixed` locks the page to one kind: /movies is films only, /shows' browse link is TV series and anime TV only. */
+export default function Discover({ fixed }: { fixed?: "movie" | "show" } = {}) {
+  const [params] = useSearchParams();
+  const urlType = params.get("type");
+  const [f, setF] = useState<Filters>({ ...EMPTY, type: fixed ?? (urlType === "show" || urlType === "all" ? urlType : "movie"), genre: params.get("genre") ?? "" });
   const [open, setOpen] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
   const genres = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { slug: string; name: string }[] }>("/genres") });
@@ -48,7 +51,7 @@ export default function Discover({ initialType = "movie" }: { initialType?: Filt
   const set = (k: keyof Filters) => (e: React.ChangeEvent<HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   // Series and anime have no ratings, so only these sorts apply to them (hidden gems and most novel need ratings).
   const sorts = f.type === "movie" || f.type === "all" ? SORTS : SORTS.filter(([v]) => !["hidden", "novel"].includes(v));
-  const pickType = (type: string) => setF({ ...f, type, min_match: type === "series" || type === "anime" ? "" : f.min_match,
+  const pickType = (type: string) => setF({ ...f, type, min_match: type === "show" ? "" : f.min_match,
     sort: ["hidden", "novel"].includes(f.sort) && type !== "movie" && type !== "all" ? "recommended" : f.sort });
   const pickGenre = (genre: string) => setF({ ...f, genre, sort: genre === "anime" && PERSONAL.includes(f.sort) ? "popular" : f.sort });
   const active = (["lang", "country", "year_min", "year_max", "runtime", "min_imdb", "min_match", "provider"] as const).filter((k) => f[k] && (k !== "min_match" || matchOk)).length;
@@ -57,20 +60,20 @@ export default function Discover({ initialType = "movie" }: { initialType?: Filt
   return (
     <div className="mx-auto max-w-[1800px] px-4 pt-20 md:px-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold md:text-4xl">Discover</h1>
+        <h1 className="font-display text-3xl font-extrabold md:text-4xl">{fixed === "movie" ? "Movies" : fixed === "show" ? "All shows" : "Discover"}</h1>
         <div className="flex items-center gap-3">
-          <Link to="/shows" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Browse shows</Link>
-          <Link to="/series-fit" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Find a series that fits your time</Link>
+          {f.type !== "movie" && <Link to="/series-fit" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Find a series that fits your time</Link>}
           <SurpriseMeButton />
         </div>
       </div>
       <div className="mt-6"><TonightPanel /></div>
-      <div className="mt-8 flex flex-wrap gap-2" role="tablist" aria-label="Type">
-        {[["movie", "Movies"], ["series", "Series"], ["anime", "Anime"], ["all", "All"]].map(([v, l]) => (
+      {!fixed && <div className="mt-8 flex flex-wrap gap-2" role="tablist" aria-label="Type">
+        {[["movie", "Movies"], ["show", "Shows"], ["all", "Movies and shows"]].map(([v, l]) => (
           <button key={v} role="tab" aria-selected={f.type === v} onClick={() => pickType(v)}
             className={`glass-btn rounded-full px-5 py-2 text-sm font-semibold ${f.type === v ? "on" : ""}`}>{l}</button>
         ))}
-      </div>
+      </div>}
+      {fixed && <div className="mt-6" />}
       {/* Genres as one scrolling row of pills; Anime is its own genre next to Animation. */}
       <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 py-1 md:-mx-10 md:px-10" aria-label="Genres">
         <button onClick={() => pickGenre("")} aria-pressed={!f.genre} className={`glass-btn shrink-0 rounded-full px-4 py-1.5 text-sm ${!f.genre ? "on" : ""}`}>All genres</button>
@@ -145,7 +148,7 @@ export default function Discover({ initialType = "movie" }: { initialType?: Filt
         </div>
       )}
       <p className="mt-4 text-sm text-muted">
-        {total != null ? `${total.toLocaleString()} ${f.type === "movie" ? "films" : "titles"}` : "Loading…"} · {SORTS.find(([v]) => v === f.sort)?.[2]}
+        {total != null ? `${total.toLocaleString()} ${f.type === "movie" ? "films" : f.type === "show" ? "shows" : "titles"}` : "Loading…"} · {SORTS.find(([v]) => v === f.sort)?.[2]}
       </p>
       <div className="mt-6">
         <PagedGrid queryKey={["discover", qs.toString()]} path={(p) => `/movies?${qs}${qs.toString() ? "&" : ""}page=${p}`}

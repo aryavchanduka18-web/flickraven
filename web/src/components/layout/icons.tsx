@@ -34,3 +34,10 @@ export function SidebarIcon() {
     </svg>
   );
 }
+
+export const MoviesIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4" /></svg>
+);
+export const ShowsIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}><rect x="3.5" y="6" width="17" height="11.5" rx="2" /><path d="M9 21h6M12 17.5V21" /></svg>
+);

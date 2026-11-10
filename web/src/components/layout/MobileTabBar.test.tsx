@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import MobileTabBar from "./MobileTabBar";
-import { TABS } from "./NavBar";
+import { MOBILE_TABS as TABS } from "./NavBar";
 
 describe("MobileTabBar", () => {
   it("has one column per tab, so adding a tab never wraps the bar", () => {

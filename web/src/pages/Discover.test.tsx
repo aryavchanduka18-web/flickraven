@@ -19,10 +19,10 @@ beforeEach(() => {
   });
 });
 
-function setup(initialType?: "movie" | "series" | "anime" | "all") {
+function setup(url = "/discover") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}><UIProvider><MemoryRouter><Discover initialType={initialType} /></MemoryRouter></UIProvider></QueryClientProvider>,
+    <QueryClientProvider client={client}><UIProvider><MemoryRouter initialEntries={[url]}><Discover /></MemoryRouter></UIProvider></QueryClientProvider>,
   );
 }
 const lastMovies = () => [...urls].reverse().find((u) => u.includes("/movies?")) ?? "";
@@ -44,17 +44,24 @@ describe("Discover filters", () => {
     expect(screen.getByRole("button", { name: /^Filters · 4/ })).toBeTruthy();
   });
 
-  it("offers a Match % filter only for films, and drops it when the type changes to series", async () => {
+  it("offers a Match % filter only for films, and drops it when the type changes to shows", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     const match = screen.getByLabelText("Minimum match") as HTMLSelectElement;
     expect(match.disabled).toBe(false);
     fireEvent.change(match, { target: { value: "80" } });
     await waitFor(() => expect(lastMovies()).toContain("min_match=80"));
-    fireEvent.click(screen.getByRole("tab", { name: "Series" }));
-    await waitFor(() => expect(lastMovies()).toContain("type=series"));
+    fireEvent.click(screen.getByRole("tab", { name: "Shows" }));
+    await waitFor(() => expect(lastMovies()).toContain("type=show"));
     expect(lastMovies()).not.toContain("min_match");
     expect((screen.getByLabelText("Minimum match") as HTMLSelectElement).disabled).toBe(true);
+  });
+
+  it("Movies and Shows pages are locked to one kind", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><UIProvider><MemoryRouter><Discover fixed="show" /></MemoryRouter></UIProvider></QueryClientProvider>);
+    await waitFor(() => expect(lastMovies()).toContain("type=show"));
+    expect(screen.queryByRole("tablist", { name: "Type" })).toBeNull();
   });
 
   it("Anime is a genre pill", async () => {
@@ -63,9 +70,10 @@ describe("Discover filters", () => {
     await waitFor(() => expect(lastMovies()).toContain("genre=anime"));
   });
 
-  it("opens the dedicated Shows view filtered to series", async () => {
-    setup("series");
-    expect(screen.getByRole("tab", { name: "Series" }).getAttribute("aria-selected")).toBe("true");
-    await waitFor(() => expect(lastMovies()).toContain("type=series"));
+  it("?type=show opens Discover on Shows", async () => {
+    setup("/discover?type=show");
+    expect(screen.getByRole("tab", { name: "Shows" }).getAttribute("aria-selected")).toBe("true");
+    await waitFor(() => expect(lastMovies()).toContain("type=show"));
   });
+
 });

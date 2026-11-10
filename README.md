@@ -13,7 +13,7 @@ An "Ask FlickRaven" chat assistant (Google Gemini; needs `GEMINI_API_KEY`, see `
 What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), save to My
 List, tune the recommendations, open "Why?" on any recommendation (what each model contributed, how much the
 models agree), browse franchises ("More from John Wick", "More from Marvel"), cast and crew pages, themed rows
-(Rom-Com, Crime Thriller, ...), genre and Discover pages (Anime is its own genre next to Animation: Anime means Japanese animation, TV and films; Animation is everything else) with every title (Movies / Series / Anime tabs),
+(Rom-Com, Crime Thriller, ...), genre and Discover pages (Anime is its own genre next to Animation: Anime means Japanese animation, TV and films; Animation is everything else) with every title (separate Movies and Shows pages; genre and Discover pages can show films, shows or both),
 For Tonight, and the Research Lab. Search understands genre, language, year and series/anime words ("hindi comedy",
 "90s action", "korean series") and suggests films, people and genres as you type. Film pages show the IMDb score,
 where to watch (India first, via TMDB / JustWatch) and, for series, seasons and episodes. "Find a Series That Fits Your Time" (Discover) filters series by time, pace, type, genre and language. Your recommendation report (`/performance`) compares the Match % we showed with what you then rated, with counts and honest limits. Home has Netflix-style
