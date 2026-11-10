@@ -40,7 +40,15 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
     if not msgs or msgs[-1]["role"] != "user":
         raise HTTPException(422, "Send a question first.")
     ai.spend(user["id"], user["is_guest"])
-    system = "\n\n".join(x for x in (ai.SYSTEM, ai.taste_summary(db, user["id"]), ai.named_titles(db, msgs[-1]["text"])) if x)
-    reply = ai.ask_gemini(msgs, system)
-    ids = ai.resolve_titles(db, reply)
+    try:
+        system = "\n\n".join(x for x in (ai.SYSTEM, ai.taste_summary(db, user["id"]), ai.named_titles(db, msgs[-1]["text"])) if x)
+        reply = ai.ask_gemini(msgs, system)
+        ids = ai.resolve_titles(db, reply)
+    except HTTPException:
+        ai.refund(user["id"], user["is_guest"])
+        raise
+    except Exception:
+        ai.refund(user["id"], user["is_guest"])
+        ai.log.exception("assistant failed")
+        raise HTTPException(502, "The assistant hit a problem. Try again in a moment.")
     return {"reply": reply, "items": cards(db, ids, user["id"]) if ids else [], "remaining": ai.remaining(user["id"], user["is_guest"])}

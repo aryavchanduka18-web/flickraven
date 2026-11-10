@@ -96,6 +96,18 @@ body {
   background: rgba(28, 28, 28, 0.9);
 }
 
+/* The chat panel is opaque on purpose: a blurred panel with blurred buttons inside it (nested backdrop filters) can
+   render as a black screen in Chrome and Safari. Nothing inside it blurs. */
+.chat-panel {
+  background: #151516;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.chat-panel .glass-btn {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* Every control: dark glass, a lit top edge, a small spring on hover, a press on click. */
 .glass-btn {
   display: inline-flex;
