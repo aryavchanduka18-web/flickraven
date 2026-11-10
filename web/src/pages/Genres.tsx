@@ -17,7 +17,7 @@ export function Genres() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-black/10" />
             <div className="absolute bottom-3 left-4">
               <div className="font-display text-xl font-bold">{g.name}</div>
-              <div className="text-xs text-muted">{g.films.toLocaleString()} films</div>
+              <div className="text-xs text-muted">{g.films.toLocaleString()} {g.slug === "anime" ? "titles" : "films"}</div>
             </div>
           </Link>
         ))}
@@ -34,7 +34,7 @@ export function Genre() {
   return (
     <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
       <h1 className="font-display text-3xl font-extrabold">{name ?? ""}</h1>
-      <p className="mt-1 text-sm text-muted">{total != null ? `${total.toLocaleString()} films, ` : ""}ranked for you by the recommender.</p>
+      <p className="mt-1 text-sm text-muted">{total != null ? `${total.toLocaleString()} ${slug === "anime" ? "titles" : "films"}, ` : ""}{slug === "anime" ? "most popular first (Japanese animation: TV anime and films)." : "ranked for you by the recommender."}</p>
       <div className="mt-6">
         <PagedGrid queryKey={["genre", slug]} path={(p) => `/genres/${slug}/movies?page=${p}`} source={`genre:${slug}`} onTotal={setTotal} />
       </div>

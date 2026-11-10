@@ -18,6 +18,8 @@ const SORTS: [string, string, string][] = [
   ["newest", "Newest", "latest releases first"],
 ];
 
+const PERSONAL = ["recommended", "match", "hidden", "novel"];
+
 export default function Discover() {
   const [f, setF] = useState({ type: "movie", genre: "", lang: "", decade: "", runtime: "", min_rating: "", sort: "recommended" });
   const [total, setTotal] = useState<number | null>(null);
@@ -45,7 +47,9 @@ export default function Discover() {
         ))}
       </div>
       <div className="mt-4 flex flex-wrap gap-3" aria-label="Filters">
-        <select className={sel} value={f.genre} onChange={set("genre")} aria-label="Genre">
+        {/* Anime (Japanese animation, TV and films) has no recommender score across both, so it opens on "Most popular". */}
+        <select className={sel} value={f.genre} aria-label="Genre"
+          onChange={(e) => setF({ ...f, genre: e.target.value, sort: e.target.value === "anime" && PERSONAL.includes(f.sort) ? "popular" : f.sort })}>
           <option value="">All genres</option>
           {genres.data?.genres.map((g) => <option key={g.slug} value={g.slug}>{g.name}</option>)}
         </select>
@@ -72,7 +76,7 @@ export default function Discover() {
       </p>
       <div className="mt-6">
         <PagedGrid queryKey={["discover", qs.toString()]} path={(p) => `/movies?${qs}${qs.toString() ? "&" : ""}page=${p}`}
-          source="discover" personal={["recommended", "match", "hidden", "novel"].includes(f.sort)} onTotal={setTotal} />
+          source="discover" personal={PERSONAL.includes(f.sort)} onTotal={setTotal} />
       </div>
     </div>
   );
