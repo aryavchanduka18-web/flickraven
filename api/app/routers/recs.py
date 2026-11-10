@@ -111,27 +111,51 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     return {"rails": out}
 
 
+NEXT_BUDGET = {"3": "5", "5": "10", "10": "20", "20": "long"}
+
+
 @router.get("/series-fit")
-def series_fit(budget: str = "", status: str = "", episode_length: str = "", per_day: int = 2,
-               user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    """Series that fit the time the user has (see app/services/series_fit.py), best first for this user, each with
-    total hours and days to finish at `per_day` episodes a day."""
-    if budget not in ("", *fit.BUDGETS) or status not in ("", *fit.STATUS) or episode_length not in ("", *fit.EPISODE_LENGTHS):
+def series_fit(budget: str = "", status: str = "", episode_length: str = "", series_type: str = "", genre: str = "",
+               language: str = "", sort: str = "best", per_day: int = 2, user=Depends(current_user),
+               db: Session = Depends(get_db)) -> dict:
+    """Series that fit the time the user has (see app/services/series_fit.py), each with seasons, episodes, total
+    hours and days to finish at `per_day` episodes a day (0 = flexible: no schedule). "best" is the user's own series
+    ranking (series have no Match %: there are no ratings for them). Series without an episode count or episode
+    length are left out and counted in `unknown_length`; nothing is guessed."""
+    if (budget not in ("", *fit.BUDGETS) or status not in ("", *fit.STATUS) or episode_length not in ("", *fit.EPISODE_LENGTHS)
+            or series_type not in ("", *fit.SERIES_TYPES) or sort not in fit.SORTS):
         raise HTTPException(422, "Unknown filter value")
-    per_day = max(1, min(per_day, 10))
+    per_day = max(0, min(per_day, 10))
+    from app.config import get_settings
+    show_imdb = get_settings().imdb_ratings
     engine = engine_or_503(db)
     st = rec.user_state(db, user["id"], engine)
     rows, _ = engine.kind_rank(st, "series")
-    ranked = [int(engine.cat.movie_ids[r]) for r in rows]
-    info = {r["id"]: dict(r) for r in db.execute(text("""SELECT id, episodes, runtime_min AS runtime, series_status AS status
-        FROM movies WHERE title_type = 'series'""")).mappings()}
-    matching = [i for i in ranked if i in info and fit.fits(info[i], budget, status, episode_length)]
-    ids = matching[:40]
+    rank = {int(engine.cat.movie_ids[r]): n for n, r in enumerate(rows)}
+    info = {r["id"]: dict(r) for r in db.execute(text("""SELECT m.id, m.episodes, m.seasons, m.runtime_min AS runtime,
+        m.series_status AS status, m.original_language AS lang, m.imdb_rating AS rating,
+        ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres
+        FROM movies m WHERE m.title_type = 'series' AND m.backdrop_path IS NOT NULL""")).mappings()}
+    pool = [i for i in rank if i in info]
+    unknown = sum(1 for i in pool if fit.hours(info[i]["episodes"], info[i]["runtime"]) is None)
+    matching = [i for i in pool if fit.fits(info[i], budget, status, episode_length, series_type, genre, language)]
+    more = None
+    if budget in NEXT_BUDGET:
+        wider = sum(1 for i in pool if fit.fits(info[i], NEXT_BUDGET[budget], status, episode_length, series_type, genre, language))
+        more = {"budget": NEXT_BUDGET[budget], "extra": wider - len(matching)}
+    ordered = fit.order([{"id": i, "hours": fit.hours(info[i]["episodes"], info[i]["runtime"]), "status": info[i]["status"],
+                          "rating": info[i]["rating"] if show_imdb else None, "rank": rank[i]} for i in matching], sort)
+    ids = [o["id"] for o in ordered[:40]]
     items = cards(db, ids, user["id"])
     for it in items:
         s = info[it["movie"]["id"]]
         it["plan"] = fit.plan(s["episodes"], s["runtime"], per_day)
-    return {"items": items, "total": len(matching)}
+        it["series"] = {"seasons": s["seasons"], "episodes": s["episodes"], "runtime": s["runtime"], "status": s["status"],
+                        "hours": fit.hours(s["episodes"], s["runtime"])}
+    languages = sorted({info[i]["lang"] for i in pool if info[i]["lang"]})
+    genres = sorted({g for i in pool for g in info[i]["genres"]})
+    return {"items": items, "total": len(matching), "unknown_length": unknown, "more_with_next_budget": more,
+            "options": {"languages": languages, "genres": genres}}
 
 
 @router.get("/home")

@@ -74,3 +74,34 @@ def test_onboarding_offers_films_and_series_but_not_anime(client):
     assert [i["movie"]["title"] for i in d["series"]] == ["Breaking Bad"]
     assert "Moon Blade" not in {i["movie"]["title"] for i in d["movies"]}
     assert d["genres"] and "languages" in d
+
+
+class FakeEngine:
+    """Just enough engine for the series-fit endpoint: the user's ranking is the order the series were loaded in."""
+    def __init__(self, ids):
+        import numpy as np
+        self.cat = type("Cat", (), {"movie_ids": np.array(ids)})()
+
+    def kind_rank(self, st, kind):
+        import numpy as np
+        return np.arange(len(self.cat.movie_ids)), np.ones(len(self.cat.movie_ids))
+
+
+def test_series_fit_endpoint_filters_sorts_and_never_guesses(client, monkeypatch):
+    from app.routers import recs
+    ids = [i["movie"]["id"] for i in client.get("/api/movies", params={"type": "series", "sort": "popular"}).json()["items"]]
+    monkeypatch.setattr(recs, "engine_or_503", lambda db: FakeEngine(ids))
+    monkeypatch.setattr(recs.rec, "user_state", lambda db, uid, engine: None)
+    ok = client.get("/api/recs/series-fit", params={"budget": "", "per_day": 2})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["total"] + body["unknown_length"] >= 1 and "options" in body
+    assert body["items"], body
+    it = body["items"][0]
+    assert it["series"]["episodes"] == 62 and it["plan"]["finish"] and "a day" in it["plan"]["finish"]
+    assert client.get("/api/recs/series-fit", params={"budget": "3"}).json()["items"] == []      # 62 episodes never fit 3 hours
+    flex = client.get("/api/recs/series-fit", params={"per_day": 0})
+    assert flex.status_code == 200 and all(i["plan"]["finish"] is None for i in flex.json()["items"])
+    assert client.get("/api/recs/series-fit", params={"sort": "nonsense"}).status_code == 422
+    assert client.get("/api/recs/series-fit", params={"series_type": "huge"}).status_code == 422
+    assert client.get("/api/recs/series-fit", params={"genre": "Nonexistent"}).json()["total"] == 0
