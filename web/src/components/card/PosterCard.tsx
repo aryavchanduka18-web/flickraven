@@ -52,3 +52,41 @@ export function PosterGrid({ items, source }: { items: RecItem[]; source: string
     </div>
   );
 }
+
+/** The More Like This tile: a portrait poster with the Match % badge on it (only where the API sent one), and the
+ *  title, rating and year underneath. One real reason under the title when there is one. */
+export function SimilarTile({ item, source, position }: { item: RecItem; source: string; position: number }) {
+  const m = item.movie;
+  const poster = tmdbImage(m.poster, "w342");
+  return (
+    <Link to={`/movie/${m.id}`} state={{ source, position }} className="group block" aria-label={`${m.title}${m.year ? ` (${m.year})` : ""}`}>
+      <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-surface-2 ring-1 ring-white/10 transition duration-500 [transition-timing-function:var(--ease-out)] group-hover:-translate-y-1 group-hover:ring-white/30"
+        style={m.dominant_color ? { backgroundColor: m.dominant_color } : undefined}>
+        {poster ? (
+          <img src={poster} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+        ) : (
+          <div className="grid h-full place-items-center p-3 text-center font-display text-lg font-bold">{m.title}</div>
+        )}
+        {item.match_pct != null && (
+          <span className="glass absolute left-2 top-2 rounded-full px-2.5 py-0.5 text-[11px] font-bold !shadow-none">{item.match_pct}% match</span>
+        )}
+      </div>
+      <h3 className="mt-2 line-clamp-1 text-[15px] font-semibold leading-snug">{m.title}</h3>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-muted">
+        <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
+        {m.year && <span>{m.year}</span>}
+        <TypeBadge type={m.title_type} />
+      </div>
+      {item.reasons[0] && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-white/60">{item.reasons[0].text}</p>}
+    </Link>
+  );
+}
+
+/** Three tiles per row (two on phones). */
+export function SimilarGrid({ items, source }: { items: RecItem[]; source: string }) {
+  return (
+    <div className="grid max-w-[980px] grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3" data-testid="similar-grid">
+      {items.map((it, i) => <SimilarTile key={it.movie.id} item={it} source={source} position={i} />)}
+    </div>
+  );
+}

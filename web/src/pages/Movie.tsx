@@ -2,7 +2,8 @@ import ImdbScore from "../components/movie/ImdbScore";
 import TypeBadge from "../components/movie/TypeBadge";
 import WhereToWatch from "../components/movie/WhereToWatch";
 import { useEffect } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useUI } from "../components/layout/ui";
 import { ApiError } from "../api/client";
 import { useFeedback, useFranchise, useLogEvent, useMovie, useSimilar } from "../api/hooks";
 import ConfidenceCard from "../components/explain/ConfidenceCard";
@@ -15,7 +16,7 @@ import TasteTags from "../components/taste/TasteTags";
 import TasteReason from "../components/taste/TasteReason";
 import { PageMessage } from "../components/Loading";
 import Rail from "../components/rail/Rail";
-import { PosterGrid } from "../components/card/PosterCard";
+import { SimilarGrid } from "../components/card/PosterCard";
 import { languageName, runtime } from "../lib/format";
 import { tmdbImage } from "../lib/tmdb";
 
@@ -23,9 +24,12 @@ export default function Movie() {
   const id = Number(useParams().id);
   const loc = useLocation() as { state?: { source?: string; position?: number } };
   const movie = useMovie(id);
-  const similar = useSimilar(id);
+  const similar = useSimilar(id, 9);
+  const navigate = useNavigate();
+  const { openWhy } = useUI();
   const fb = useFeedback(id, loc.state?.source ?? "movie_page");
   const logEvent = useLogEvent();
+  const back = () => (loc as { key?: string }).key !== "default" ? navigate(-1) : navigate("/");
   useEffect(() => {
     window.scrollTo(0, 0);
     logEvent("detail_view", id, loc.state?.source ?? "direct", loc.state?.position);
@@ -42,49 +46,75 @@ export default function Movie() {
       </PageMessage>
     );
   const m = movie.data;
-  const tint = m.dominant_color ?? "#141414";
+  const isFilm = !m.title_type || m.title_type === "movie";
   const facts: [string, string | null | undefined][] = [
-    [m.title_type && m.title_type !== "movie" ? "First aired" : "Release date", m.release_date], ["Status", m.series_status],
+    [isFilm ? "Release date" : "First aired", m.release_date], ["Status", m.series_status],
     ["Runtime", runtime(m.runtime)], ["Language", languageName(m.language)],
     ["Country", m.countries?.join(", ")], ["Certification", m.certification], ["Studios", m.studios?.slice(0, 3).join(", ")],
   ];
+  const goTo = (anchor: string) => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
     <div>
-      <section className="relative min-h-[70vh] overflow-hidden">
-        <img src={tmdbImage(m.backdrop ?? m.poster, "w1280")} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${tint}dd 0%, ${tint}66 40%, transparent 75%)` }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-black/40" />
-        <div className="relative z-10 mx-auto flex min-h-[70vh] max-w-[1800px] items-end gap-8 px-4 pb-12 pt-28 md:px-10">
-          {m.poster && <img src={tmdbImage(m.poster, "w342")} alt={`${m.title} poster`} className="hidden w-52 rounded-md shadow-2xl md:block" />}
-          <div className="max-w-3xl">
+      {/* Full-bleed header: the title's own backdrop on the right, black fade on the left for the text. */}
+      <section data-sb-bleed className="hero-bleed relative isolate min-h-[78vh] overflow-hidden">
+        <img src={tmdbImage(m.backdrop ?? m.poster, "w1280")} alt="" className="absolute inset-0 h-full w-full object-cover object-[72%_center] md:object-right" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#080808_0%,rgba(8,8,8,0.9)_26%,rgba(8,8,8,0.5)_48%,rgba(8,8,8,0)_74%)]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/10 to-black/40" />
+        <div data-sb-slide className="relative z-10 flex min-h-[78vh] flex-col justify-end px-5 pb-10 pt-24 md:pl-[calc(var(--sb)+76px)] md:pr-16">
+          <button onClick={back} aria-label="Back" className="glass-btn absolute left-4 top-20 h-11 w-11 rounded-full md:left-[calc(var(--sb)+16px)] md:top-8">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M19 12H5m6-6-6 6 6 6" /></svg>
+          </button>
+          <div className="max-w-2xl hero-fade-in">
             {m.logo ? <img src={tmdbImage(m.logo, "w500")} alt={m.title} className="mb-4 max-h-28 max-w-[80%] object-contain object-left" />
-              : <h1 className="font-display text-4xl font-extrabold md:text-5xl">{m.title}</h1>}
-            {m.tagline && <p className="mt-2 text-lg italic text-white/75">{m.tagline}</p>}
+              : <h1 className="font-display text-5xl font-extrabold leading-[1.02] tracking-tight md:text-7xl">{m.title}</h1>}
+            {m.tagline && <p className="mt-2 text-lg italic text-white/70">{m.tagline}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/85">
-              {m.match_pct != null && <span className="text-2xl font-extrabold text-accent">{m.match_pct}% match</span>}
-              <TypeBadge type={m.title_type} />
-              <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
               {m.year && <span>{m.year}</span>}
-              {m.title_type && m.title_type !== "movie" && m.seasons != null && (
-                <span>{m.seasons} season{m.seasons === 1 ? "" : "s"}{m.episodes ? ` · ${m.episodes} episodes` : ""}</span>
-              )}
-              {m.runtime && <span>{runtime(m.runtime)}{m.title_type && m.title_type !== "movie" ? " per episode" : ""}</span>}
               {m.certification && <span className="rounded border border-white/40 px-1.5 text-xs">{m.certification}</span>}
+              {m.runtime && <span>{runtime(m.runtime)}{isFilm ? "" : " per episode"}</span>}
+              {!isFilm && m.seasons != null && <span>{m.seasons} season{m.seasons === 1 ? "" : "s"}{m.episodes ? ` · ${m.episodes} episodes` : ""}</span>}
               <span>{m.genres.join(" · ")}</span>
+              <TypeBadge type={m.title_type} />
             </div>
-            <div className="mt-6 flex flex-wrap items-center gap-6">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {m.match_pct != null && <span className="rounded-lg border border-accent/60 bg-accent/15 px-3 py-1 text-sm font-bold">{m.match_pct}% Match</span>}
+              <ImdbScore rating={m.imdb_rating} votes={m.imdb_votes} />
+            </div>
+            {m.overview && <p className="mt-4 line-clamp-4 max-w-xl text-[15px] leading-relaxed text-white/85">{m.overview}</p>}
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              {m.watch && (
+                <button type="button" onClick={() => goTo("where-to-watch")} className="glass-btn solid rounded-2xl px-6 py-3 text-[15px] font-semibold">Where to watch</button>
+              )}
+              <button type="button" aria-pressed={m.user_state.in_list}
+                onClick={() => fb.mutate({ kind: "list", on: !m.user_state.in_list })}
+                className={`glass-btn rounded-2xl px-5 py-3 text-[15px] font-semibold ${m.user_state.in_list ? "on" : ""}`}>
+                {m.user_state.in_list ? "In your list" : "+ Add to list"}
+              </button>
+              {m.match_pct != null && (
+                <button type="button" onClick={() => openWhy(m.id)} className="glass-btn rounded-2xl px-5 py-3 text-[15px] font-semibold">Why this?</button>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-6">
               <ActionButtons movieId={m.id} state={m.user_state} source="movie_page" size="md" showWatched />
               <RatingStars value={m.user_state.rating} onChange={(r) => fb.mutate({ kind: "rate", rating: r })} />
             </div>
             <div className="mt-3"><TasteTags movieId={m.id} rated={m.user_state.rating != null || m.user_state.reaction !== 0 || m.user_state.watched} /></div>
             {m.user_state.rating != null && <div className="mt-3"><RecOutcomeFeedback movieId={m.id} /></div>}
           </div>
+          <nav className="mt-8 flex gap-1 border-b border-white/10 text-sm" aria-label="On this page">
+            {[["Overview", "overview"], ["More like this", "more-like-this"], ["Cast & crew", "cast"]].map(([l, a], i) => (
+              <button key={a} onClick={() => goTo(a)} className={`relative px-4 py-3 font-medium transition-colors ${i === 0 ? "text-white" : "text-white/60 hover:text-white"}`}>
+                {l}
+                {i === 0 && <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-accent" />}
+              </button>
+            ))}
+          </nav>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-[1800px] gap-10 px-4 md:grid-cols-[2fr_1fr] md:px-10">
+      <div className="mx-auto mt-8 grid max-w-[1800px] gap-10 px-4 md:grid-cols-[2fr_1fr] md:px-10">
         <div className="min-w-0 space-y-8">
-          {m.overview && <p className="max-w-3xl text-base leading-relaxed text-white/90">{m.overview}</p>}
+          <span id="overview" className="block scroll-mt-24" />
           <WhereToWatch watch={m.watch} title={m.title} />
           {m.in_profile && (
             <p className="rounded-lg border border-white/10 bg-surface px-4 py-3 text-sm text-white/85">
@@ -97,7 +127,7 @@ export default function Movie() {
           <ConfidenceCard c={m.confidence} />
           <Credits title="Directed by" people={m.directors} />
           <Credits title={m.title_type && m.title_type !== "movie" ? "Created by" : "Written by"} people={m.writers} />
-          <div>
+          <div id="cast" className="scroll-mt-24">
             <h3 className="mb-3 text-sm font-semibold text-muted">Cast</h3>
             <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
               {m.cast.map((c) => (
@@ -145,7 +175,7 @@ export default function Movie() {
       </div>
       <FranchiseRails id={m.id} />
       {similar.data && similar.data.items.length > 0 && (
-        <section className="mx-auto mt-12 max-w-[1800px] px-4 md:px-10">
+        <section id="more-like-this" className="mx-auto mt-12 max-w-[1800px] scroll-mt-24 px-4 md:px-10">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 className="font-display text-xl font-bold md:text-2xl">More Like This</h2>
@@ -157,7 +187,7 @@ export default function Movie() {
               </Link>
             )}
           </div>
-          <PosterGrid items={similar.data.items} source="more_like_this" />
+          <SimilarGrid items={similar.data.items} source="more_like_this" />
         </section>
       )}
     </div>
