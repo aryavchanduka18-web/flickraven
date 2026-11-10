@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PagedGrid from "../components/card/PagedGrid";
 import SurpriseMeButton from "../components/discovery/SurpriseMeButton";
@@ -31,7 +32,10 @@ export default function Discover() {
     <div className="mx-auto max-w-[1800px] px-4 pt-24 md:px-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-display text-3xl font-extrabold">Discover</h1>
-        <SurpriseMeButton />
+        <div className="flex items-center gap-3">
+          <Link to="/series-fit" className="rounded-full border border-white/20 px-4 py-2 text-sm hover:bg-white/10">Find a series that fits your time</Link>
+          <SurpriseMeButton />
+        </div>
       </div>
       <div className="mt-6"><TonightPanel /></div>
       <div className="mt-8 flex gap-2" role="tablist" aria-label="Type">
