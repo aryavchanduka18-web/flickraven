@@ -182,3 +182,76 @@ def test_show_more_messages_are_honest():
     assert pp.message(1, 2, pf, 0, more=True).startswith("Only 1 more title meets every answer")
     assert "type, length and anime" in pp.message(0, 3, pf, 0, more=True)
     assert pp.message(0, 0, pf, 0, more=True).startswith("That is everything")
+
+
+# ---- tone and keyword support (quality round) ---------------------------------------------------------------
+
+def titem(i, genres, keywords=(), kind="series", lang="en", rec=0.5, inferred=()):
+    return pp.Item(i, kind, list(genres), list(keywords), lang, 300.0 if kind == "series" else 100.0, 1, None, rec, 0.3, inferred=frozenset(inferred))
+
+
+def real_mood(film, rule):      # same rule shape as moods.yaml
+    from cinematch_engine.tonight import matches_mood
+    return matches_mood(film, rule)
+
+
+INTENSE = {"genres": ["Thriller", "Action", "War", "Crime"]}
+
+
+def test_crime_sitcom_is_not_an_exact_match_for_intense_but_is_for_comedy():
+    b99 = titem(1, ["Comedy", "Crime"], ["sitcom", "police"])
+    chucky = titem(2, ["Crime", "Comedy", "Mystery", "Thriller", "Horror"], ["slasher", "horror"], inferred=["Thriller", "Horror"])
+    luther = titem(3, ["Crime", "Drama", "Mystery"])
+    barry = titem(4, ["Comedy", "Crime", "Drama"])
+    items = [b99, chucky, luther, barry]
+    sel = pp.select(items, pp.Prefs(kind="series", genres=["Crime"], mood="Intense"), INTENSE, real_mood)
+    assert {i.id for i in sel.exact} == {3, 4}                                # a dark comedy with real Drama stays
+    assert {i.id: m for i, m in sel.near} == {1: ["tone"], 2: ["tone"]}
+    sel = pp.select(items, pp.Prefs(kind="series", genres=["Crime", "Comedy"], mood="Intense"), INTENSE, real_mood)
+    assert 1 in {i.id for i in sel.exact}                                     # asked for Comedy: the clash is waived
+    sel = pp.select(items, pp.Prefs(kind="series", genres=["Crime"]), None, real_mood)
+    assert {i.id for i in sel.exact} == {1, 2, 3, 4}                          # no mood, no tone check
+
+
+def test_horror_stays_intense_but_not_feel_good():
+    horror = titem(1, ["Horror", "Drama"])
+    assert pp.tone_clash(horror, pp.Prefs(mood="Intense")) is None
+    assert pp.fits_mood(horror, pp.Prefs(mood="Intense"), INTENSE, real_mood)       # Horror fits Intense in Perfect Pick
+    assert pp.tone_clash(horror, pp.Prefs(mood="Feel-good")) == "dark in tone"
+    assert pp.tone_clash(horror, pp.Prefs(mood="Feel-good", genres=["Horror"])) is None
+
+
+def test_keyword_genres_need_a_supporting_real_genre():
+    assert pp.series_genres(["Drama"], ["romance"]) == (["Drama", "Romance"], frozenset({"Romance"}))
+    assert pp.series_genres(["Comedy"], ["romance"])[1] == frozenset({"Romance"})
+    assert pp.series_genres(["Crime"], ["serial killer"])[1] == frozenset({"Thriller"})
+    assert pp.series_genres(["Documentary"], ["romance"])[1] == frozenset()             # no supporting genre
+    assert pp.series_genres(["Comedy"], ["serial killer"])[1] == frozenset()            # a sitcom is not a thriller
+    assert pp.series_genres([], ["thriller"])[1] == frozenset()
+
+
+def test_any_picked_genre_qualifies_and_more_overlap_ranks_higher_and_keyword_counts_less():
+    pf = pp.Prefs(kind="series", genres=["Crime", "Thriller", "Drama"])
+    a = titem(1, ["Crime", "Thriller"])
+    c = titem(3, ["Drama"])
+    d = titem(4, ["Romance", "Comedy"])
+    kw = titem(5, ["Crime", "Drama", "Thriller"], inferred=["Thriller"])
+    sel = pp.select([a, c, d, kw], pf, None, real_mood)
+    assert {i.id for i in sel.exact} == {1, 3, 5} and [(i.id, m) for i, m in sel.near] == [(4, ["genres"])]
+    assert pp.genre_strength(a, pf) > pp.genre_strength(c, pf)
+    assert pp.genre_strength(kw, pf) == (1 + 1 + 0.6) / 3
+
+
+def test_tone_reason_is_named_on_the_card():
+    b99 = titem(1, ["Comedy", "Crime"], ["sitcom"])
+    pf = pp.Prefs(kind="series", genres=["Crime"], mood="Intense")
+    text = [r["text"] for r in pp.reasons_v2(b99, "close", pf, ["tone"], real_mood, INTENSE, None)]
+    assert 'Tone clashes with "intense": a comedy' in text
+
+
+def test_feel_good_rejects_crime_dramas_but_not_crime_comedies():
+    drama = titem(1, ["Crime", "Drama", "Mystery", "Romance"], inferred=["Romance"])
+    sitcom = titem(2, ["Comedy", "Crime"])
+    pf = pp.Prefs(kind="series", mood="Feel-good", genres=["Romance"])
+    assert pp.tone_clash(drama, pf) == "a crime drama" and pp.tone_clash(sitcom, pf) is None
+    assert pp.tone_clash(drama, pp.Prefs(mood="Feel-good", genres=["Crime"])) is None

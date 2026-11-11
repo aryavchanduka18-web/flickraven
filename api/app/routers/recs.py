@@ -389,7 +389,7 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
     message = pp.message(len(items_out), len(alt_out), pf, sel.other_languages, sel.exact_elsewhere, more=body.more)
     if not items_out and not alt_out and not sel.other_languages and not body.more:
         message = f"Nothing fits your {pp.kept(pf)}. Try a longer time, another kind, or more languages."
-    relaxed = [m for m in ("mood", "genres") if any(m in a.get("misses", []) for a in alt_out)]
+    relaxed = [m for m in ("mood", "genres", "tone") if any(m in a.get("misses", []) for a in alt_out)]
     # what a "Show more" would still find: exact matches first, then broader alternatives (the same order as here)
     remaining = {"exact": len(sel.exact) - len(items_out), "alternatives": len(sel.near) - len(alt_out)}
     return {"items": items_out, "alternatives": alt_out, "message": message, "relaxed": relaxed, "remaining": remaining,
