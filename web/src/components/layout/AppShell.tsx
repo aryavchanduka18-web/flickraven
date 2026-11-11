@@ -29,7 +29,7 @@ function slideTargets(root: Element): Element[] {
 }
 
 export default function AppShell() {
-  const { toast, sidebarOpen } = useUI();
+  const { toast, toastAction, sidebarOpen, notify } = useUI();
   const main = useRef<HTMLElement>(null);
   const first = useRef(true);
   const [moving, setMoving] = useState(false);
@@ -80,6 +80,12 @@ export default function AppShell() {
             className="glass fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 text-sm font-medium text-white md:bottom-8"
           >
             {toast}
+            {toastAction && (
+              <button type="button" className="ml-3 font-semibold text-accent underline underline-offset-2"
+                onClick={() => { toastAction.run(); notify("Undone"); }}>
+                {toastAction.label}
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

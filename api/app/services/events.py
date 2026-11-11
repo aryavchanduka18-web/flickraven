@@ -25,9 +25,9 @@ def set_rating(db, uid, mid, rating, source=None):
     log(db, uid, mid, "rate", rating, source)
 
 
-def clear_rating(db, uid, mid):
+def clear_rating(db, uid, mid, source=None):
     db.execute(text("DELETE FROM ratings WHERE user_id = :u AND movie_id = :m"), {"u": uid, "m": mid})
-    log(db, uid, mid, "unrate")
+    log(db, uid, mid, "unrate", None, source)
 
 
 def set_reaction(db, uid, mid, value, source=None):
@@ -36,9 +36,9 @@ def set_reaction(db, uid, mid, value, source=None):
     log(db, uid, mid, "like" if value > 0 else "dislike", value, source)
 
 
-def clear_reaction(db, uid, mid):
+def clear_reaction(db, uid, mid, source=None):
     db.execute(text("DELETE FROM reactions WHERE user_id = :u AND movie_id = :m"), {"u": uid, "m": mid})
-    log(db, uid, mid, "clear_reaction")
+    log(db, uid, mid, "clear_reaction", None, source)
 
 
 def add_to_list(db, uid, mid, source=None):
@@ -57,6 +57,6 @@ def mark_watched(db, uid, mid, source=None):
     log(db, uid, mid, "watched", None, source)
 
 
-def unmark_watched(db, uid, mid):
+def unmark_watched(db, uid, mid, source=None):
     db.execute(text("DELETE FROM watched WHERE user_id = :u AND movie_id = :m"), {"u": uid, "m": mid})
-    log(db, uid, mid, "unwatched")
+    log(db, uid, mid, "unwatched", None, source)

@@ -124,28 +124,41 @@ def row_stats(db: Session, user_id: int) -> dict[str, dict]:
 
 
 def shifts(keys: list[str], stats: dict[str, dict]) -> dict[str, int]:
-    """How many places each row moves (positive = up). A row's value is (good - bad) per showing, steadied towards
-    this person's own average over all their rows; a row clearly above the average moves up 1 or 2 places, clearly
-    below moves down. Nothing moves until the person has done something good from at least one row, and a row needs
-    MIN_SHOWS showings of its own."""
+    """How many places each row moves (positive = up).
+
+    UP: a row's value is (good - bad) per showing, steadied towards this person's own average over all their rows;
+    a row clearly above the average moves up 1 or 2 places. A row needs MIN_SHOWS showings of its own, and nothing
+    moves up until the person has done something good from at least one row.
+
+    DOWN: only on explicit negatives from that row (a dislike or a Not interested on one of its cards). Two or more,
+    and more than the good actions from it, move it down 1; four or more, at least twice the good actions, move it
+    down 2. A row nobody touched never moves down: not acting is not a "no"."""
+    out = {}
+    for k in keys:
+        s = stats.get(k)
+        if s is None or k in PINNED_ROWS:
+            continue
+        if s["bad"] >= 4 and s["bad"] >= 2 * s["good"]:
+            out[k] = -2
+        elif s["bad"] >= 2 and s["bad"] > s["good"]:
+            out[k] = -1
     seen = [stats[k] for k in keys if k in stats and stats[k]["shows"] > 0]
     shows = sum(s["shows"] for s in seen)
     good = sum(s["good"] for s in seen)
     if not shows or good <= 0:
-        return {}
+        return out
     average = max(sum(s["good"] - s["bad"] for s in seen) / shows, 0.0)
     if average <= 0:
         average = good / shows / 2          # more bad than good overall: still rank rows against a positive bar
-    out = {}
     for k in keys:
         s = stats.get(k)
-        if s is None or s["shows"] < MIN_SHOWS or k in PINNED_ROWS:
+        if s is None or s["shows"] < MIN_SHOWS or k in PINNED_ROWS or k in out:
             continue
         value = (s["good"] - s["bad"] + PRIOR_SHOWS * average) / (s["shows"] + PRIOR_SHOWS)
         ratio = value / average
-        step = 2 if ratio >= 1.75 else 1 if ratio >= 1.25 else -2 if ratio <= 0.4 else -1 if ratio <= 0.75 else 0
+        step = 2 if ratio >= 1.75 else 1 if ratio >= 1.25 else 0
         if step:
-            out[k] = max(-MAX_SHIFT, min(MAX_SHIFT, step))
+            out[k] = step
     return out
 
 
@@ -165,3 +178,18 @@ def reorder(keys: list[str], stats: dict[str, dict]) -> tuple[list[int], dict[st
         elif new > old and move.get(keys[old], 0) < 0:
             learned[keys[old]] = "down"
     return order, learned
+
+
+def hero_without_hidden(plan: dict, skip: set[int]) -> tuple[list[dict], set[int]]:
+    """The Home hero without hidden titles. A hidden title never comes back through a fallback: if hiding shortens the
+    hero, the next best Top Picks that are not hidden fill the places, and with nothing left the hero is simply shorter
+    (it may be empty). Returns (hero entries, `skip` plus the rows that moved into the hero so the rows do not repeat them)."""
+    entries = [e for e in plan["hero"] if e["row"] not in skip]
+    missing = len(plan["hero"]) - len(entries)
+    top = next((r for r in plan["rails"] if r["key"] == "top_picks"), None)
+    if missing > 0 and top is not None:
+        spare = [top["scored"][row] for row in top["rows"] if row not in skip and row in top["scored"]][:missing]
+        entries += spare
+        skip = skip | {e["row"] for e in spare}
+    return entries, skip
+

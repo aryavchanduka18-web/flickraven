@@ -42,8 +42,8 @@ def rate(movie_id: int, body: RatingBody, user=Depends(current_user), db: Sessio
 
 
 @router.delete("/ratings/{movie_id}")
-def unrate(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.clear_rating(db, user["id"], movie_id)
+def unrate(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.clear_rating(db, user["id"], movie_id, source)
     db.commit()
     return {"ok": True}
 
@@ -59,8 +59,8 @@ def react(movie_id: int, body: ReactionBody, user=Depends(current_user), db: Ses
 
 
 @router.delete("/reactions/{movie_id}")
-def unreact(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.clear_reaction(db, user["id"], movie_id)
+def unreact(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.clear_reaction(db, user["id"], movie_id, source)
     db.commit()
     return {"ok": True}
 
@@ -74,8 +74,8 @@ def list_add(movie_id: int, body: SourceBody | None = None, user=Depends(current
 
 
 @router.delete("/list/{movie_id}")
-def list_remove(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.remove_from_list(db, user["id"], movie_id)
+def list_remove(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.remove_from_list(db, user["id"], movie_id, source)
     db.commit()
     return {"ok": True}
 
@@ -93,16 +93,16 @@ def get_list(sort: str = "recent", user=Depends(current_user), db: Session = Dep
 
 
 @router.put("/watched/{movie_id}")
-def watched(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+def watched(movie_id: int, body: SourceBody | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     exists(db, movie_id)
-    ev.mark_watched(db, user["id"], movie_id)
+    ev.mark_watched(db, user["id"], movie_id, body.source if body else None)
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/watched/{movie_id}")
-def unwatched(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.unmark_watched(db, user["id"], movie_id)
+def unwatched(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.unmark_watched(db, user["id"], movie_id, source)
     db.commit()
     return {"ok": True}
 

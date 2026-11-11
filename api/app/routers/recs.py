@@ -295,7 +295,8 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     # are left out, and rows this person uses move up while rows they ignore move down.
     skip = {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of}
     hidden_rows = rec_feedback.hidden_rows(db, uid)
-    hero = scored_items([e for e in plan["hero"] if e["row"] not in skip] or plan["hero"])
+    hero_entries, skip = rec_feedback.hero_without_hidden(plan, skip)
+    hero = scored_items(hero_entries)
     shown = [r for r in plan["rails"] if rec_feedback.base_key(f"rail:{r['key']}") not in hidden_rows]
     order, learned = rec_feedback.reorder([rec_feedback.base_key(f"rail:{r['key']}") for r in shown],
                                           rec_feedback.row_stats(db, uid))

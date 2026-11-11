@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, send } from "../api/client";
-import { useMe } from "../api/hooks";
+import { undoNotInterested, useMe } from "../api/hooks";
+import type { RecItem } from "../api/types";
 import { ImportRatings } from "../components/account/ImportRatings";
 import { PasswordChecklist } from "../components/account/PasswordChecklist";
 import { PageMessage } from "../components/Loading";
@@ -23,6 +24,35 @@ function Problem({ error }: { error: unknown }) {
 }
 
 const button = "rounded-md bg-white px-4 py-2 text-sm font-semibold text-black disabled:opacity-60";
+
+type HiddenList = { items: RecItem[]; days: number };
+
+/** Titles marked "Not interested": they stay out of recommendation rows for a while. Bring any of them back here. */
+export function HiddenTitles() {
+  const qc = useQueryClient();
+  const { notify } = useUI();
+  const { data } = useQuery({ queryKey: ["not-interested"], queryFn: () => api<HiddenList>("/feedback/not-interested") });
+  const bring = useMutation({
+    mutationFn: (id: number) => undoNotInterested(qc, id),
+    onSuccess: () => notify("Brought back. It can appear in your picks again."),
+  });
+  if (!data) return null;
+  if (!data.items.length) return <p className="text-sm text-muted">Nothing hidden. The ✕ on a recommendation hides it for {data.days} days without counting as a dislike.</p>;
+  return (
+    <>
+      <p className="text-sm text-muted">Hidden for {data.days} days. This is not a dislike, so it does not change your taste profile.</p>
+      <ul className="divide-y divide-white/10">
+        {data.items.map((it) => (
+          <li key={it.movie.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+            <Link to={`/movie/${it.movie.id}`} className="hover:underline">{it.movie.title}{it.movie.year ? ` (${it.movie.year})` : ""}</Link>
+            <button className="rounded-md px-3 py-1 text-white/85 ring-1 ring-white/20 hover:bg-white/10 disabled:opacity-60"
+              disabled={bring.isPending} onClick={() => bring.mutate(it.movie.id)}>Bring back</button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 type Sharing = { enabled: boolean; summary: string | null; min_liked: number };
 
@@ -141,6 +171,12 @@ export default function Account() {
       <div id="ai" className="scroll-mt-24">
         <Section title="AI assistant">
           <AiTasteSharing />
+        </Section>
+      </div>
+
+      <div id="hidden" className="scroll-mt-24">
+        <Section title="Hidden from your picks">
+          <HiddenTitles />
         </Section>
       </div>
 
