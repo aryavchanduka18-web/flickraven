@@ -29,7 +29,7 @@ THEMES = {
     "indian": Theme("indian", "Indian series for you", "Hindi, Tamil, Telugu, Malayalam and other Indian-language series, in the order that suits your taste."),
     "anglo": Theme("anglo", "American and British dramas for you", "Dramas made in the US and UK, in the order that suits your taste."),
     "international": Theme("international", "International dramas for you", "Dramas in other languages, such as Spanish, French, Turkish and Chinese, in the order that suits your taste."),
-    "acclaimed": Theme("acclaimed", "Critically acclaimed TV dramas", "The highest-rated drama series, by viewer ratings on TMDB."),
+    "acclaimed": Theme("acclaimed", "Highly rated TV dramas", "The highest-rated drama series, by viewer ratings on TMDB."),
     "weekend": Theme("weekend", "Perfect binge-watches", "Short, finished series you can get through in a weekend."),
     "binge": Theme("binge", "Can't stop at just one episode", "Much-loved series with plenty of seasons to get lost in."),
     "quick_comedy": Theme("quick_comedy", "Quick comedy", "Live-action comedy series with short episodes, easy to fit in."),
