@@ -41,3 +41,7 @@ export const MoviesIcon = (p: SVGProps<SVGSVGElement>) => (
 export const ShowsIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base} {...p}><rect x="3.5" y="6" width="17" height="11.5" rx="2" /><path d="M9 21h6M12 17.5V21" /></svg>
 );
+/** Anime: a four-point sparkle star with a small companion sparkle, in the same line style as the other icons. */
+export const AnimeIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}><path d="M10 3.5c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z" /><path d="M18 14.5c.3 1.7 1.1 2.5 2.8 2.8-1.7.3-2.5 1.1-2.8 2.8-.3-1.7-1.1-2.5-2.8-2.8 1.7-.3 2.5-1.1 2.8-2.8z" /></svg>
+);
