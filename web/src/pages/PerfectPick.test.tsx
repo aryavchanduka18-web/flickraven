@@ -60,7 +60,7 @@ describe("Perfect Pick", () => {
     await waitFor(() => expect(requests.length).toBe(1));
     expect(requests[0]).toEqual({
       kind: "series", mood: "Mysterious", genres: ["Thriller", "Crime"], languages: ["ko", "hi"],
-      time: "h20", status: "completed", adventure: "adventurous", other_languages: false, exclude: [],
+      time: "h20", status: "completed", adventure: "adventurous", other_languages: false, exclude: [], more: false,
     });
   });
 
@@ -97,5 +97,29 @@ describe("Perfect Pick", () => {
     fireEvent.click(btn);
     await waitFor(() => expect(requests.length).toBe(2));
     expect(requests[1].other_languages).toBe(true);
+  });
+
+  it("Show more adds the next three below the first ones, then says when there is nothing left", async () => {
+    reply = { items: [card(1, "A"), card(2, "B"), card(3, "C")], alternatives: [], message: null, remaining: { exact: 2, alternatives: 0 } };
+    setup();
+    answerAll();
+    expect(await screen.findByText("2 more titles meet every answer")).toBeTruthy();
+    reply = { items: [card(4, "D"), card(5, "E")], alternatives: [], message: "That is the last of the titles that meet every answer.",
+      remaining: { exact: 0, alternatives: 0 } };
+    fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+    await waitFor(() => expect(requests.length).toBe(2));
+    expect(requests[1].more).toBe(true);
+    expect(requests[1].exclude).toEqual([1, 2, 3]);
+    expect(await screen.findByText("Your 5 picks")).toBeTruthy();
+    for (const t of ["A", "B", "C", "D", "E"]) expect(screen.getByText(t)).toBeTruthy();
+    expect(screen.getByText(/That is everything for these answers/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+  });
+
+  it("offers Anime as a genre", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /A TV series/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Intense/ }));
+    expect(screen.getByRole("button", { name: "Anime" })).toBeTruthy();
   });
 });

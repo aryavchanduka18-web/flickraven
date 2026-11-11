@@ -15,7 +15,7 @@ const MOODS: Option[] = [
   ["Emotional", "Emotional", "Let me feel something"], ["Suspenseful", "Suspenseful", "Keep me guessing"], ["Mysterious", "Mysterious", "A puzzle to solve"],
   ["", "No mood in mind", "Surprise me"],
 ];
-const GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction", "Thriller", "War", "Western"];
+const GENRES = ["Action", "Adventure", "Animation", "Anime", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction", "Thriller", "War", "Western"];
 const LANGS: [string, string][] = [["en", "English"], ["hi", "Hindi"], ["ko", "Korean"], ["ja", "Japanese"], ["ta", "Tamil"], ["te", "Telugu"], ["ml", "Malayalam"], ["other", "Other languages"]];
 const TIMES: Record<string, Option[]> = {
   movie: [["lt90", "Under 90 minutes", "A short film"], ["90_120", "90 to 120 minutes", "A normal film night"], ["120_180", "2 to 3 hours", "An epic is fine"], ["any", "Longer is fine", "No limit"]],
@@ -30,7 +30,10 @@ const ADVENTURE: Option[] = [
 type Answers = { kind: string; mood: string; genres: string[]; languages: string[]; time: string; status: string; adventure: string };
 const EMPTY: Answers = { kind: "", mood: "", genres: [], languages: [], time: "", status: "any", adventure: "" };
 type PickItem = RecItem & { misses?: string[] };
-type Result = { items: PickItem[]; alternatives?: PickItem[]; message: string | null; relaxed?: string[]; offer?: "other_languages" | null };
+type Result = {
+  items: PickItem[]; alternatives?: PickItem[]; message: string | null; relaxed?: string[]; offer?: "other_languages" | null;
+  remaining?: { exact: number; alternatives: number };
+};
 const MISS: Record<string, string> = { mood: "your mood", genres: "your genres" };
 const missText = (m: string[]) => "Misses " + m.map((x) => MISS[x] ?? x).join(" and ");
 const STEPS = ["kind", "mood", "genres", "languages", "time", "adventure"] as const;
@@ -44,15 +47,22 @@ export default function PerfectPick() {
   const [a, setA] = useState<Answers>(EMPTY);
   const [other, setOther] = useState(false);
   const [shown, setShown] = useState<number[]>([]);
+  // every title on the page: "Show more" adds batches below, a new run (answers, Not these, languages) replaces them
+  const [list, setList] = useState<{ exact: PickItem[]; alts: PickItem[] }>({ exact: [], alts: [] });
   const run = useMutation({
-    mutationFn: (v: { answers: Answers; exclude: number[]; other: boolean }) =>
+    mutationFn: (v: { answers: Answers; exclude: number[]; other: boolean; more?: boolean }) =>
       send<Result>("POST", "/recs/perfect-pick", {
         kind: v.answers.kind, mood: v.answers.mood || null, genres: v.answers.genres, languages: v.answers.languages,
         time: v.answers.time, status: v.answers.kind === "movie" ? "any" : v.answers.status, adventure: v.answers.adventure,
-        other_languages: v.other, exclude: v.exclude,
+        other_languages: v.other, exclude: v.exclude, more: !!v.more,
       }),
-    onSuccess: (r) => setShown((s) => [...s, ...r.items.map((i) => i.movie.id), ...(r.alternatives ?? []).map((i) => i.movie.id)]),
+    onSuccess: (r, v) => {
+      const alts = r.alternatives ?? [];
+      setShown((s) => [...s, ...r.items.map((i) => i.movie.id), ...alts.map((i) => i.movie.id)]);
+      setList((l) => (v.more ? { exact: [...l.exact, ...r.items], alts: [...l.alts, ...alts] } : { exact: r.items, alts }));
+    },
   });
+  const loadingMore = run.isPending && !!run.variables?.more;
   const done = step >= STEPS.length;
   const go = (next: Answers) => {
     if (step + 1 < STEPS.length) return setStep(step + 1);
@@ -71,9 +81,12 @@ export default function PerfectPick() {
   const current = STEPS[Math.min(step, STEPS.length - 1)];
   const timeText = TIMES[a.kind]?.find((t) => t[0] === a.time)?.[1];
   const setOtherLanguages = (on: boolean) => { setOther(on); setShown([]); run.mutate({ answers: a, exclude: [], other: on }); };
-  const exact = run.data?.items ?? [];
-  const alts = run.data?.alternatives ?? [];
-  const heading = !run.data || exact.length >= 3 ? "Your three picks" : exact.length ? `${exact.length === 1 ? "One title fits" : "Two titles fit"} every answer` : "No title fits every answer";
+  const { exact, alts } = list;
+  const left = run.data?.remaining;
+  const canMore = !!left && left.exact + left.alternatives > 0;
+  const heading = !run.data || exact.length === 3 ? "Your three picks" : exact.length > 3 ? `Your ${exact.length} picks`
+    : exact.length ? `${exact.length === 1 ? "One title fits" : "Two titles fit"} every answer` : "No title fits every answer";
+  const showMore = () => run.mutate({ answers: a, exclude: shown, other, more: true });
   const pickCard = (it: PickItem, i: number, alt: boolean) => (
     <article key={it.movie.id} className={`glass hero-fade-in flex flex-col overflow-hidden rounded-3xl ${alt ? "opacity-90" : ""}`} style={{ animationDelay: `${i * 90}ms` }}>
       <Link to={`/movie/${it.movie.id}`} state={{ source: alt ? "perfect_pick_alt" : "perfect_pick", position: i }} className="relative block aspect-[2/3]">
@@ -108,7 +121,7 @@ export default function PerfectPick() {
           <p className="text-xs uppercase tracking-widest text-white/50">Question {step + 1} of {STEPS.length}</p>
           <h1 className="mt-1 font-display text-3xl font-extrabold md:text-5xl">{TITLES[current]}</h1>
           {current === "kind" && <p className="mt-2 text-muted">Six quick questions. You can go back and change any answer.</p>}
-          {current === "genres" && <p className="mt-2 text-muted">Pick as many as you like, or none.</p>}
+          {current === "genres" && <p className="mt-2 text-muted">Pick as many as you like, or none. Anime means anime only.</p>}
           {current === "languages" && <p className="mt-2 text-muted">Pick as many as you like. None means any language.</p>}
 
           {(current === "kind" || current === "mood" || current === "adventure") && (
@@ -163,7 +176,7 @@ export default function PerfectPick() {
         <div className="mt-8">
           <h1 className="font-display text-3xl font-extrabold md:text-5xl">{heading}</h1>
           <p className="mt-2 text-muted">{[KINDS.find((k) => k[0] === a.kind)?.[1], a.mood, a.genres.join(", "), a.languages.length ? LANGS.filter(([c]) => a.languages.includes(c)).map(([, n]) => n).join(", ") : "", timeText, ADVENTURE.find((t) => t[0] === a.adventure)?.[1].toLowerCase()].filter(Boolean).join(" · ")}</p>
-          {run.isPending && <div className="mt-8 h-72 animate-pulse rounded-3xl bg-surface" />}
+          {run.isPending && !loadingMore && <div className="mt-8 h-72 animate-pulse rounded-3xl bg-surface" />}
           {run.isError && <p className="mt-6 text-sm text-red-300">{(run.error as Error).message}</p>}
           {run.data?.message && (
             <div className="glass mt-6 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-sm">
@@ -173,13 +186,31 @@ export default function PerfectPick() {
               )}
             </div>
           )}
-          {exact.length > 0 && <div className="mt-8 grid gap-5 md:grid-cols-3">{exact.map((it, i) => pickCard(it, i, false))}</div>}
-          {alts.length > 0 && (
+          {!(run.isPending && !loadingMore) && exact.length > 0 && <div className="mt-8 grid gap-5 md:grid-cols-3">{exact.map((it, i) => pickCard(it, i, false))}</div>}
+          {!(run.isPending && !loadingMore) && alts.length > 0 && (
             <section className="mt-10" aria-label="Broader alternatives">
               <h2 className="font-display text-2xl font-bold">Broader alternatives</h2>
               <p className="mt-1 text-sm text-muted">Same type, length{a.languages.length && !other ? " and languages" : ""}, but each one misses at least one of your answers, named on the card.</p>
               <div className="mt-5 grid gap-5 md:grid-cols-3">{alts.map((it, i) => pickCard(it, exact.length + i, true))}</div>
             </section>
+          )}
+          {run.data && !(run.isPending && !loadingMore) && (
+            <div className="mt-8 flex flex-col items-center gap-2 text-center">
+              {canMore ? (
+                <>
+                  <button onClick={showMore} disabled={loadingMore} className="glass-btn solid rounded-full px-6 py-2.5 text-sm font-semibold disabled:opacity-50">
+                    {loadingMore ? "Loading…" : "Show more"}
+                  </button>
+                  <p className="text-xs text-muted">
+                    {left!.exact > 0
+                      ? `${left!.exact} more ${left!.exact === 1 ? "title meets" : "titles meet"} every answer`
+                      : "Nothing else meets every answer: more will be broader alternatives, each labelled"}
+                  </p>
+                </>
+              ) : (
+                (exact.length + alts.length > 0) && <p className="text-sm text-muted">That is everything for these answers. Change an answer to see other titles.</p>
+              )}
+            </div>
           )}
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-white/75">
