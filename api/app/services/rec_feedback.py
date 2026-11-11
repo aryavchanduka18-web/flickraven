@@ -7,9 +7,10 @@ Everything here is stored as events in `interactions` (no extra table):
   My List add on the same title ends it.
 - `row_hide` / `row_restore` with the row's key in `source` and no title. The row stays off Home for ROW_HIDE_DAYS.
 
-Row learning reads two things that were already being stored: how often a Home row was shown to this person
-(`recommendation_logs`) and what they did from it (`interactions.source` = the row's key). Nothing is shared
-between people.
+Row learning reads two things that are already stored: on how many page loads a Home row was genuinely visible
+(`impressions`, from the browser; before any exist, `recommendation_logs` at half weight) and what the person did from
+it (`interactions.origin`, else `source`, = the row's key). Not acting never counts against a row or a title.
+Nothing is shared between people.
 """
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 HIDE_DAYS = 90            # a "Not interested" title stays out of recommendation rows this long
 ROW_HIDE_DAYS = 30        # a hidden Home row stays away this long
 LEARN_DAYS = 60           # row learning looks this far back (recommendation_logs are kept 60 days)
-MIN_SHOWS = 5             # a row is not moved before it was shown this many times
+MIN_SHOWS = 8             # a row is not moved before it was visible on this many page loads
 PRIOR_SHOWS = 8           # a row counts as this many "average" showings on top of its own (steadies small numbers)
 MAX_SHIFT = 2             # a row moves at most this many places up or down
 PINNED_ROWS = {"rail:top_picks"}      # never moved, never hidden: the main answer of the page
@@ -91,24 +92,42 @@ def hidden_rows(db: Session, user_id: int | None) -> list[str]:
 
 
 def row_stats(db: Session, user_id: int) -> dict[str, dict]:
-    """Per Home film row (key 'rail:<name>'), over the last LEARN_DAYS: `shows` = page loads that showed it,
-    `good` = titles the person liked, saved, marked watched or rated 7+ from it (1 each) or opened from it (0.5),
-    `bad` = titles they disliked or marked Not interested from it. Each title counts once per kind."""
+    """Per Home film row (key 'rail:<name>'), over the last LEARN_DAYS:
+    `shows` = page loads on which the row was genuinely VISIBLE (impressions, services/impressions.py). Until this
+    person has any impression data it falls back to the page loads that returned the row (`served`), counted at half,
+    because a returned row may never have been scrolled to. `good` = titles the person liked, saved, marked watched or
+    rated 7+ from the row (1 each) or opened from it (0.5); `bad` = titles they disliked or marked Not interested from
+    it. Each title counts once per kind. An action is credited to its `origin` (the row that led to the film page)
+    when it has one, else to its `source`. A title that got no action adds nothing anywhere: silence is not a no."""
     p = {"u": user_id, "d": LEARN_DAYS}
-    stats: dict[str, dict] = {}
-    for surface, shows in db.execute(text("""
+    served: dict[str, int] = {}
+    for surface, n in db.execute(text("""
             SELECT split_part(surface, ':', 1), count(DISTINCT request_id) FROM recommendation_logs
             WHERE user_id = :u AND surface IS NOT NULL AND created_at >= now() - make_interval(days => :d)
             GROUP BY 1"""), p):
-        stats[f"rail:{surface}"] = {"shows": int(shows), "good": 0.0, "bad": 0.0}
+        served[f"rail:{surface}"] = int(n)
+    visible: dict[str, int] = {}
+    seen_any = False
+    for surface, n in db.execute(text("""
+            SELECT surface, count(DISTINCT page_id) FROM impressions
+            WHERE user_id = :u AND created_at >= now() - make_interval(days => :d)
+            GROUP BY 1"""), p):
+        seen_any = True
+        if surface.startswith("rail:"):
+            key = base_key(surface)
+            visible[key] = max(visible.get(key, 0), int(n))
+    stats: dict[str, dict] = {}
+    for key in set(served) | set(visible):
+        stats[key] = {"shows": float(visible.get(key, 0)) if seen_any else 0.5 * served.get(key, 0),
+                      "served": served.get(key, 0), "visible": visible.get(key, 0), "good": 0.0, "bad": 0.0}
     for source, kind, n in db.execute(text("""
-            SELECT source, CASE
+            SELECT coalesce(origin, source) AS credit, CASE
                      WHEN event_type IN ('like', 'list_add', 'watched') OR (event_type = 'rate' AND value >= 7) THEN 'good'
                      WHEN event_type = 'detail_view' THEN 'open'
                      WHEN event_type IN ('dislike', 'not_interested') THEN 'bad' END AS kind,
                    count(DISTINCT movie_id)
             FROM interactions
-            WHERE user_id = :u AND movie_id IS NOT NULL AND source LIKE 'rail:%'
+            WHERE user_id = :u AND movie_id IS NOT NULL AND coalesce(origin, source) LIKE 'rail:%'
               AND created_at >= now() - make_interval(days => :d)
             GROUP BY 1, 2"""), p):
         s = stats.get(base_key(source))

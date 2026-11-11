@@ -27,7 +27,9 @@ export default function Movie() {
   const similar = useSimilar(id, 9);
   const navigate = useNavigate();
   const { openWhy } = useUI();
-  const fb = useFeedback(id, loc.state?.source ?? "movie_page");
+  // Actions here happen on the film page ("movie_page"); the row that led here is their origin, so it is still credited.
+  const origin = loc.state?.source;
+  const fb = useFeedback(id, "movie_page", origin);
   const logEvent = useLogEvent();
   const back = () => (loc as { key?: string }).key !== "default" ? navigate(-1) : navigate("/");
   useEffect(() => {
@@ -95,7 +97,7 @@ export default function Movie() {
               )}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-6">
-              <ActionButtons movieId={m.id} state={m.user_state} source="movie_page" size="md" showWatched />
+              <ActionButtons movieId={m.id} state={m.user_state} source="movie_page" origin={origin} size="md" showWatched />
               <RatingStars value={m.user_state.rating} onChange={(r) => fb.mutate({ kind: "rate", rating: r })} />
             </div>
             <div className="mt-3"><TasteTags movieId={m.id} rated={m.user_state.rating != null || m.user_state.reaction !== 0 || m.user_state.watched} /></div>

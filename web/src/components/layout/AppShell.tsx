@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { newPage, startImpressionFlush } from "../../lib/impressions";
 import Footer from "./Footer";
 import MobileTabBar from "./MobileTabBar";
 import NavBar from "./NavBar";
@@ -34,7 +35,10 @@ export default function AppShell() {
   const first = useRef(true);
   const [moving, setMoving] = useState(false);
   // Onboarding is a focused flow with its own bottom bar (Back / Next); the tab bar and chat button would cover it.
-  const focused = useLocation().pathname === "/onboarding";
+  const { pathname } = useLocation();
+  const focused = pathname === "/onboarding";
+  useEffect(() => startImpressionFlush(), []);
+  useEffect(() => newPage(), [pathname]);          // each page load counts its rows and cards again
 
   // The layout changes at once; the content then glides from where it was. Only transforms move, so it stays on
   // the GPU (animating the layout every frame was janky in the prototype). The panel goes solid while it slides.

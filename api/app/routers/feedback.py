@@ -7,6 +7,7 @@ from app.auth import current_user
 from app.db import get_db
 from app.ratelimit import EVENTS
 from app.services import events as ev
+from app.services import impressions as imp
 from app.services import rec_feedback
 from app.services.events import IMPLICIT_EVENTS
 from app.services.movies import cards
@@ -22,28 +23,31 @@ def exists(db: Session, movie_id: int) -> None:
 class RatingBody(BaseModel):
     rating: int = Field(ge=1, le=10)
     source: str | None = None
+    origin: str | None = None            # the row or page that led to the film page (source = where the action happened)
 
 
 class ReactionBody(BaseModel):
     value: int
     source: str | None = None
+    origin: str | None = None
 
 
 class SourceBody(BaseModel):
     source: str | None = None
+    origin: str | None = None
 
 
 @router.put("/ratings/{movie_id}")
 def rate(movie_id: int, body: RatingBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     exists(db, movie_id)
-    ev.set_rating(db, user["id"], movie_id, body.rating, body.source)
+    ev.set_rating(db, user["id"], movie_id, body.rating, body.source, body.origin)
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/ratings/{movie_id}")
-def unrate(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.clear_rating(db, user["id"], movie_id, source)
+def unrate(movie_id: int, source: str | None = None, origin: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.clear_rating(db, user["id"], movie_id, source, origin)
     db.commit()
     return {"ok": True}
 
@@ -53,14 +57,14 @@ def react(movie_id: int, body: ReactionBody, user=Depends(current_user), db: Ses
     if body.value not in (1, -1):
         raise HTTPException(422, "value must be 1 (like) or -1 (dislike)")
     exists(db, movie_id)
-    ev.set_reaction(db, user["id"], movie_id, body.value, body.source)
+    ev.set_reaction(db, user["id"], movie_id, body.value, body.source, body.origin)
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/reactions/{movie_id}")
-def unreact(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.clear_reaction(db, user["id"], movie_id, source)
+def unreact(movie_id: int, source: str | None = None, origin: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.clear_reaction(db, user["id"], movie_id, source, origin)
     db.commit()
     return {"ok": True}
 
@@ -68,14 +72,14 @@ def unreact(movie_id: int, source: str | None = None, user=Depends(current_user)
 @router.put("/list/{movie_id}")
 def list_add(movie_id: int, body: SourceBody | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     exists(db, movie_id)
-    ev.add_to_list(db, user["id"], movie_id, body.source if body else None)
+    ev.add_to_list(db, user["id"], movie_id, body.source if body else None, body.origin if body else None)
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/list/{movie_id}")
-def list_remove(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.remove_from_list(db, user["id"], movie_id, source)
+def list_remove(movie_id: int, source: str | None = None, origin: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.remove_from_list(db, user["id"], movie_id, source, origin)
     db.commit()
     return {"ok": True}
 
@@ -95,14 +99,14 @@ def get_list(sort: str = "recent", user=Depends(current_user), db: Session = Dep
 @router.put("/watched/{movie_id}")
 def watched(movie_id: int, body: SourceBody | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     exists(db, movie_id)
-    ev.mark_watched(db, user["id"], movie_id, body.source if body else None)
+    ev.mark_watched(db, user["id"], movie_id, body.source if body else None, body.origin if body else None)
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/watched/{movie_id}")
-def unwatched(movie_id: int, source: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
-    ev.unmark_watched(db, user["id"], movie_id, source)
+def unwatched(movie_id: int, source: str | None = None, origin: str | None = None, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    ev.unmark_watched(db, user["id"], movie_id, source, origin)
     db.commit()
     return {"ok": True}
 
@@ -181,6 +185,30 @@ def rows_feedback(user=Depends(current_user), db: Session = Depends(get_db)) -> 
     move = rec_feedback.shifts(list(stats), stats)
     return {"hidden_rows": rec_feedback.hidden_rows(db, user["id"]),
             "rows": [{"key": k, **v, "shift": move.get(k, 0)} for k, v in sorted(stats.items())]}
+
+class ImpressionItem(BaseModel):
+    surface: str = Field(max_length=100)
+    kind: str                                  # "row" or "card"
+    movie_id: int | None = None                # cards only
+    position: int | None = None                # the row's place on the page, or the card's place in its row
+    visible_ms: int | None = None
+
+
+class ImpressionsBody(BaseModel):
+    page_id: str = Field(max_length=40)
+    items: list[ImpressionItem] = Field(max_length=imp.MAX_BATCH)
+
+
+@router.post("/impressions")
+def impressions(body: ImpressionsBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Rows and cards that were visible on screen (see services/impressions.py). Used only as the denominator for row
+    statistics; a missing action is never read as a no."""
+    if not EVENTS.allow(f"imp:{user['id']}"):
+        return {"stored": 0, "dropped": len(body.items), "limited": True}
+    out = imp.record(db, user["id"], body.page_id, [i.model_dump() for i in body.items])
+    db.commit()
+    return out
+
 
 DISLIKE_REASONS = {"genre", "long", "slow", "predictable", "language", "seen", "similar", "unexpected", "none"}
 
