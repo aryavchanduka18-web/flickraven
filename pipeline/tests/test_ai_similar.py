@@ -47,3 +47,19 @@ def test_a_quota_that_never_clears_stops_the_run(monkeypatch):
     monkeypatch.setattr(A.urllib.request, "urlopen", lambda req, timeout=0: (_ for _ in ()).throw(http_error(429)))
     with pytest.raises(RuntimeError, match="quota"):
         A.ask({"contents": []}, "key", 0)
+
+
+def test_film_traits_keep_only_words_from_the_fixed_lists():
+    from pipeline import ai_similar_films as F
+    got = F.clean_traits({"mood": ["Dark", "made-up", "tense", "gritty", "eerie"], "tone": "serious", "pacing": ["slow-burn"],
+                          "themes": ["revenge", "aliens"]})
+    assert got == {"mood": ["dark", "tense", "gritty"], "tone": "serious", "pacing": "slow-burn", "themes": ["revenge"]}
+    assert F.clean_traits({"mood": ["nonsense"], "tone": 5}) is None and F.clean_traits("x") is None
+
+
+def test_film_file_is_separate_and_resumes(tmp_path, monkeypatch):
+    from pipeline import ai_similar_films as F
+    monkeypatch.setattr(F, "OUT", tmp_path / "ai_similar_films.json")
+    assert F.load() == {"titles": {}, "traits": {}}
+    F.save({"titles": {"1": ["Café (2001)"]}, "traits": {"1": {"tone": "light"}}})
+    assert F.load()["titles"]["1"] == ["Café (2001)"]

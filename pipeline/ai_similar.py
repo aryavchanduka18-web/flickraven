@@ -82,23 +82,31 @@ def ask(body: dict, key: str, start: int) -> tuple[int, dict]:
     raise RuntimeError("no model answered")
 
 
-def load() -> dict:
+def read_json(path, default: dict) -> dict:
     """The saved progress. An earlier run on Windows may have written it in cp1252, so fall back to that."""
-    if not OUT.exists():
-        return {"titles": {}}
-    raw = OUT.read_bytes()
+    if not path.exists():
+        return default
+    raw = path.read_bytes()
     try:
         return json.loads(raw.decode("utf-8"))
     except UnicodeDecodeError:
         return json.loads(raw.decode("cp1252"))
 
 
-def save(done: dict) -> None:
+def write_json(path, data: dict) -> None:
     """UTF-8 always (Windows defaults to cp1252 and chokes on names like 'ğ'); written to a temp file first so a crash
     cannot damage the saved progress."""
-    tmp = OUT.with_suffix(".tmp")
-    tmp.write_text(json.dumps(done, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(OUT)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def load() -> dict:
+    return read_json(OUT, {"titles": {}})
+
+
+def save(done: dict) -> None:
+    write_json(OUT, done)
 
 
 def clean(names) -> list[str]:

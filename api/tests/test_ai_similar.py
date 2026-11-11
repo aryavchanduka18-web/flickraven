@@ -211,3 +211,52 @@ def test_shipped_files_are_read_as_utf8_whatever_the_machine_default_is(tmp_path
     except AttributeError:
         pass
     assert ai_mod._file == {"1": ["Naruto Shippūden (2007)", "Ōoku (2003)"]}
+
+
+def test_film_pages_use_only_the_offline_film_file_and_never_call_gemini(test_engine, titles, monkeypatch):
+    from app.db import SessionLocal
+    with SessionLocal() as db:
+        tmdb = db.execute(text("SELECT tmdb_id FROM movies WHERE id = :i"), {"i": titles["AIS Film"]}).scalar()
+    monkeypatch.setattr(ai, "_file", {})
+    monkeypatch.setattr(ai, "_films", {str(tmdb): ["AIS Film (2019)", "Unknown Film (2020)"]})
+    ai._file_ids.clear(); ai._cache.clear()
+    def boom(*a, **k): raise AssertionError("Gemini must not be called for a film")
+    monkeypatch.setattr(ai.assistant, "ask_gemini", boom)
+    monkeypatch.setattr(ai.get_settings(), "gemini_api_key", "k")
+    with SessionLocal() as db:
+        # a film not in the file gets nothing and no live call, even with a key
+        assert ai.suggest(db, titles["AIS Anchor"], "AIS Anchor", 2020, [], "movie") == []
+        # the film in the file resolves only to films (its own name is the anchor, so nothing else matches here)
+        assert ai.suggest(db, titles["AIS Film"], "AIS Film", 2019, [], "movie") == []
+    ai._file_ids.clear()
+
+
+def test_film_page_drops_disliked_and_watched_gemini_picks(test_engine, titles, monkeypatch):
+    a, f, o, fi = titles["AIS Anchor"], titles["AIS Friend"], titles["AIS Other"], titles["AIS Film"]
+
+    class Cat:
+        row_of = {a: 0, f: 1, o: 2, fi: 3}
+        kind = ["movie"] * 4; titles = ["a", "f", "o", "fi"]; year = np.array([2020.0] * 4); genres = [["Drama"]] * 4
+        universe_of_row = [-1] * 4
+
+    class State:
+        watched = {2}                         # the user already watched o
+
+    class Engine:
+        cat = Cat()
+        def personal_fit(self, st, rows):
+            # the user disliked f; fi and o fit equally
+            return np.array([r != 1 for r in rows]), np.array([0.5 for _ in rows]), True
+
+    monkeypatch.setattr(catalog_router.rec, "artifacts_ready", lambda: True)
+    monkeypatch.setattr(catalog_router.rec, "load_engine", lambda db: Engine())
+    monkeypatch.setattr(catalog_router.rec, "user_state", lambda db, uid, e: State())
+    monkeypatch.setattr(catalog_router.rec, "match_for", lambda db, uid, ids: {})
+    monkeypatch.setattr(catalog_router, "user_id_from", lambda request, db: 1)
+    monkeypatch.setattr(catalog_router.similar_svc, "similar_page", lambda db, e, mid, off, lim: ([], {}, 0))
+    monkeypatch.setattr(catalog_router.ai_similar, "suggest", lambda *a_, **k: [f, o, fi])
+    with TestClient(app) as c:
+        items = c.get(f"/api/movies/{a}/similar").json()["items"]
+    got = [i["movie"]["id"] for i in items]
+    assert got == [fi]                        # disliked f and watched o are gone; Gemini naming them changes nothing
+    assert items[0]["reasons"][0]["text"] == "Similar film, picked with Google Gemini"

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/layout/AppShell";
 import Account from "./pages/Account";
 import Activity from "./pages/Activity";
+import Anime from "./pages/Anime";
 import { AuthPage } from "./pages/Auth";
 import Discover from "./pages/Discover";
 import { Genre, Genres } from "./pages/Genres";
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/discover" element={<Discover />} />
         <Route path="/movies" element={<Discover fixed="movie" />} />
         <Route path="/shows" element={<Shows />} />
+        <Route path="/anime" element={<Anime />} />
         <Route path="/genres" element={<Genres />} />
         <Route path="/genres/:slug" element={<Genre />} />
         <Route path="/movie/:id" element={<Movie />} />
