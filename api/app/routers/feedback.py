@@ -186,6 +186,35 @@ def rows_feedback(user=Depends(current_user), db: Session = Depends(get_db)) -> 
     return {"hidden_rows": rec_feedback.hidden_rows(db, user["id"]),
             "rows": [{"key": k, **v, "shift": move.get(k, 0)} for k, v in sorted(stats.items())]}
 
+class PickRejectBody(BaseModel):
+    kind: str = "perfect_pick_reject"          # perfect_pick_reject (one title) or perfect_pick_reroll ("Not these")
+    movie_ids: list[int] = Field(min_length=1, max_length=12)
+    reasons: list[str] = []                    # optional, chosen by the person (rec_feedback.PP_REASONS)
+    request: dict = {}                         # the Perfect Pick answers that produced the result
+    alt: bool = False                          # the title came from the "broader alternatives" section
+
+
+@router.post("/feedback/perfect-pick-reject")
+def perfect_pick_reject(body: PickRejectBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """A Perfect Pick title the person turned down, with the request that produced it and optional reasons. Stored only
+    (`rec_feedback`); it is not a dislike and not Not interested, and nothing changes the taste profile yet."""
+    if body.kind not in rec_feedback.PP_KINDS:
+        raise HTTPException(422, "kind must be perfect_pick_reject or perfect_pick_reroll")
+    if any(r not in rec_feedback.PP_REASONS for r in body.reasons):
+        raise HTTPException(422, "Unknown reason")
+    if not EVENTS.allow(f"pick:{user['id']}"):
+        return {"ok": True, "stored": 0, "limited": True}
+    n = rec_feedback.store_pick_feedback(db, user["id"], body.kind, body.movie_ids, body.reasons, body.request,
+                                         "perfect_pick_alt" if body.alt else "perfect_pick")
+    db.commit()
+    return {"ok": True, "stored": n}
+
+
+@router.get("/feedback/perfect-pick-reasons")
+def perfect_pick_reasons() -> dict:
+    return {"reasons": [{"key": k, "label": v} for k, v in rec_feedback.PP_REASONS.items()]}
+
+
 class ImpressionItem(BaseModel):
     surface: str = Field(max_length=100)
     kind: str                                  # "row" or "card"

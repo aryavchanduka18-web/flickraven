@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import REAL, BigInteger, DateTime, ForeignKey, Index, Integer, SmallInteger, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -45,6 +45,25 @@ class Impression(Base):
     movie_id: Mapped[int | None] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"))
     position: Mapped[int | None] = mapped_column(SmallInteger)
     visible_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RecFeedback(Base):
+    """A person's feedback on a recommendation, with the reasons they gave and the request that produced it.
+    `kind`: "perfect_pick_reject" (a title they turned down, reasons optional) or "perfect_pick_reroll" ("Not these":
+    the titles shown were not it, no reason). Not interested is NOT stored here: it is an event and never taste."""
+    __tablename__ = "rec_feedback"
+    __table_args__ = (Index("ix_rec_feedback_user_id_created_at", "user_id", text("created_at DESC")),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    reasons: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
+    context: Mapped[dict | None] = mapped_column(JSONB)
+    surface: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

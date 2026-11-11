@@ -34,6 +34,12 @@ type Result = {
   items: PickItem[]; alternatives?: PickItem[]; message: string | null; relaxed?: string[]; offer?: "other_languages" | null;
   remaining?: { exact: number; alternatives: number };
 };
+// why a person turned a title down (optional): sent with the answers that produced it, so "wrong mood" is judged for that mood only
+const REJECT_REASONS: [string, string][] = [["mood", "Wrong mood"], ["genre", "Wrong genre"], ["language", "Wrong language"], ["time", "Wrong length"], ["seen", "Already seen it"], ["taste", "Not my taste"]];
+const requestOf = (v: Answers, other: boolean) => ({
+  kind: v.kind, mood: v.mood || null, genres: v.genres, languages: v.languages, time: v.time,
+  status: v.kind === "movie" ? "any" : v.status, adventure: v.adventure, other_languages: other,
+});
 const MISS: Record<string, string> = { mood: "your mood", genres: "your genres", tone: "the tone you asked for" };
 const missText = (m: string[]) => "Misses " + m.map((x) => MISS[x] ?? x).join(" and ");
 const STEPS = ["kind", "mood", "genres", "languages", "time", "adventure"] as const;
@@ -49,14 +55,13 @@ export default function PerfectPick() {
   const [shown, setShown] = useState<number[]>([]);
   // every title on the page: "Show more" adds batches below, a new run (answers, Not these, languages) replaces them
   const [list, setList] = useState<{ exact: PickItem[]; alts: PickItem[] }>({ exact: [], alts: [] });
+  // titles the person turned down on this page: "ask" = reason chips open, "done" = noted
+  const [turned, setTurned] = useState<Record<number, "ask" | "done">>({});
   const run = useMutation({
     mutationFn: (v: { answers: Answers; exclude: number[]; other: boolean; more?: boolean }) =>
-      send<Result>("POST", "/recs/perfect-pick", {
-        kind: v.answers.kind, mood: v.answers.mood || null, genres: v.answers.genres, languages: v.answers.languages,
-        time: v.answers.time, status: v.answers.kind === "movie" ? "any" : v.answers.status, adventure: v.answers.adventure,
-        other_languages: v.other, exclude: v.exclude, more: !!v.more,
-      }),
+      send<Result>("POST", "/recs/perfect-pick", { ...requestOf(v.answers, v.other), exclude: v.exclude, more: !!v.more }),
     onSuccess: (r, v) => {
+      if (!v.more) setTurned({});
       const alts = r.alternatives ?? [];
       setShown((s) => [...s, ...r.items.map((i) => i.movie.id), ...alts.map((i) => i.movie.id)]);
       setList((l) => (v.more ? { exact: [...l.exact, ...r.items], alts: [...l.alts, ...alts] } : { exact: r.items, alts }));
@@ -86,9 +91,22 @@ export default function PerfectPick() {
   const canMore = !!left && left.exact + left.alternatives > 0;
   const heading = !run.data || exact.length === 3 ? "Your three picks" : exact.length > 3 ? `Your ${exact.length} picks`
     : exact.length ? `${exact.length === 1 ? "One title fits" : "Two titles fit"} every answer` : "No title fits every answer";
+  // best effort: a failed note never gets in the way of the person
+  const note = (kind: "perfect_pick_reject" | "perfect_pick_reroll", ids: number[], reasons: string[], alt: boolean) =>
+    send("POST", "/feedback/perfect-pick-reject", { kind, movie_ids: ids, reasons, request: requestOf(a, other), alt }).catch(() => undefined);
+  const turnDown = (id: number, reasons: string[], alt: boolean) => {
+    setTurned((t) => ({ ...t, [id]: "done" }));
+    void note("perfect_pick_reject", [id], reasons, alt);
+  };
+  // "Not these" is not a verdict on each title, so it is stored as context only (no reasons)
+  const notThese = () => {
+    const ids = [...exact, ...alts].map((i) => i.movie.id).filter((id) => !turned[id]);
+    if (ids.length) void note("perfect_pick_reroll", ids, [], false);
+    run.mutate({ answers: a, exclude: shown, other });
+  };
   const showMore = () => run.mutate({ answers: a, exclude: shown, other, more: true });
   const pickCard = (it: PickItem, i: number, alt: boolean) => (
-    <article key={it.movie.id} className={`glass hero-fade-in flex flex-col overflow-hidden rounded-3xl ${alt ? "opacity-90" : ""}`} style={{ animationDelay: `${i * 90}ms` }}>
+    <article key={it.movie.id} className={`glass hero-fade-in flex flex-col overflow-hidden rounded-3xl ${alt || turned[it.movie.id] === "done" ? "opacity-90" : ""}`} style={{ animationDelay: `${i * 90}ms` }}>
       <Link to={`/movie/${it.movie.id}`} state={{ source: alt ? "perfect_pick_alt" : "perfect_pick", position: i }} className="relative block aspect-[2/3]">
         {it.movie.poster && <img src={tmdbImage(it.movie.poster, "w342")} alt="" className="h-full w-full object-cover" />}
         <span className="glass absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full text-sm font-bold">{i + 1}</span>
@@ -101,10 +119,21 @@ export default function PerfectPick() {
           <ImdbScore rating={it.movie.imdb_rating} votes={it.movie.imdb_votes} />
         </div>
         <ul className="mt-3 space-y-1 text-sm text-white/80">{it.reasons.map((r) => <li key={r.code}>{r.text}</li>)}</ul>
-        <div className="mt-auto flex gap-2 pt-4">
+        <div className="mt-auto flex flex-wrap gap-2 pt-4">
           <Link to={`/movie/${it.movie.id}`} className="glass-btn solid rounded-xl px-4 py-2 text-sm font-semibold">Details</Link>
-          <button onClick={() => run.mutate({ answers: a, exclude: shown, other })} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Get new picks">Not these</button>
+          {!turned[it.movie.id] && <button onClick={() => setTurned((t) => ({ ...t, [it.movie.id]: "ask" }))} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Tell us this one is not right">Not this one</button>}
+          <button onClick={notThese} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Get new picks">Not these</button>
         </div>
+        {turned[it.movie.id] === "ask" && (
+          <div className="mt-3" role="group" aria-label="Why not this one?">
+            <p className="text-xs text-white/60">Why? Optional, it only helps us pick better next time.</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {REJECT_REASONS.map(([k, label]) => <button key={k} onClick={() => turnDown(it.movie.id, [k], alt)} className="glass-btn rounded-full px-3 py-1 text-xs font-semibold">{label}</button>)}
+              <button onClick={() => turnDown(it.movie.id, [], alt)} className="rounded-full px-3 py-1 text-xs text-white/60 underline">Skip</button>
+            </div>
+          </div>
+        )}
+        {turned[it.movie.id] === "done" && <p className="mt-3 text-xs text-white/60" role="status">Noted. This is not counted as a dislike.</p>}
       </div>
     </article>
   );
