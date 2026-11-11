@@ -2,8 +2,10 @@
 
 Privacy: the model gets the conversation, the catalog's own synopsis for titles the user names and, when the message asks
 for suggestions, a shortlist of catalog titles that FlickRaven's engine picked (assistant_context.py). It never gets a
-name, an email, an id, or anything from the person's ratings, likes, dislikes, Taste DNA or history. Free-tier prompts may
-be used by Google to improve its products; the privacy page says so.
+name, an email, an id, or anything from the person's ratings, likes, dislikes, Taste DNA or history. The one exception is
+opt-in and off by default: a person who turns on taste sharing also sends, with suggestion requests, one coarse line of
+genres, languages and Taste DNA trait phrases with no titles or numbers (assistant_taste.py). Free-tier prompts may be used
+by Google to improve its products; the privacy page says so.
 """
 import logging
 import re

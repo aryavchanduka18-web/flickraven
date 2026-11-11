@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.services import assistant as ai
 from app.services import assistant_context as ctx
+from app.services import assistant_taste as taste
 from app.services import recommender as rec
 from app.services.movies import cards
 
@@ -29,8 +30,34 @@ class ChatBody(BaseModel):
 
 
 @router.get("/status")
-def status(user=Depends(current_user)) -> dict:
-    return {"enabled": available(), "remaining": ai.remaining(user["id"], user["is_guest"]), "cap": ai.cap_for(user["is_guest"])}
+def status(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    return {"enabled": available(), "remaining": ai.remaining(user["id"], user["is_guest"]), "cap": ai.cap_for(user["is_guest"]),
+            "taste_sharing": taste.enabled(db, user["id"])}
+
+
+class SharingBody(BaseModel):
+    enabled: bool
+
+
+@router.get("/taste-sharing")
+def get_sharing(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """The opt-in setting and the exact taste line Google would receive (None when there is too little taste yet)."""
+    return {"enabled": taste.enabled(db, user["id"]), "summary": shared_line(db, user["id"]), "min_liked": taste.MIN_LIKED}
+
+
+@router.put("/taste-sharing")
+def put_sharing(body: SharingBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    taste.set_enabled(db, user["id"], body.enabled)
+    return get_sharing(user, db)
+
+
+def shared_line(db: Session, user_id: int) -> str | None:
+    try:
+        return taste.summary(db, user_id)
+    except Exception:
+        db.rollback()
+        ai.log.exception("taste summary for the assistant failed; sending none")
+        return None
 
 
 def picks(db: Session, user_id: int, message: str, blocked: set[int], want: dict, prof=None) -> str:
@@ -82,7 +109,10 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
         asked = msgs[-1]["text"]
         want = ctx.request_plan(db, asked) if ctx.wants_suggestions(asked) else None
         prof = taste_profile(db, user["id"]) if want else None
+        # Opt-in only (off by default): one coarse taste line, only with suggestion requests (assistant_taste.py).
+        line = shared_line(db, user["id"]) if want and taste.enabled(db, user["id"]) else None
         system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], asked, blocked, want, prof) if want else "",
+                                           taste.prompt(line) if line else "",
                                            ai.named_titles(db, msgs[-1]["text"])) if x)
         reply = ai.ask_gemini(msgs, system)
         # Hard exclusions win over Gemini, in the written reply as well as the cards (assistant_context.scrub_reply).
@@ -103,4 +133,5 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
         db.rollback()
         ai.log.exception("taste labels for the assistant failed")
         why = {}
-    return {"reply": reply, "items": cards(db, ids, user["id"], why) if ids else [], "remaining": ai.remaining(user["id"], user["is_guest"])}
+    return {"reply": reply, "items": cards(db, ids, user["id"], why) if ids else [], "remaining": ai.remaining(user["id"], user["is_guest"]),
+            "taste_shared": bool(line)}

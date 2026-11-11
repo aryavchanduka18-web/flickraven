@@ -47,10 +47,18 @@ export function Privacy() {
         <p>
           That list is built from your ratings, likes, dislikes and taste, so it can reveal something about your taste, for example
           if it is full of thrillers. What Google does not receive: your ratings, likes, dislikes, My List, viewing history, taste
-          profile or any score, and not your name, email address or account number. Titles you disliked or rated low are
+          profile (unless you share the short summary below) or any score, and not your name, email address or account number. Titles you disliked or rated low are
           never suggested, and sentences in the assistant's reply that name them are removed (this check can miss a very short title written as an ordinary word). Chats are not stored by
           FlickRaven. On Google's free tier, prompts may be used by Google to improve its products and may be read by reviewers, so
           do not type anything private. The assistant can be wrong, and the number of messages per day is limited.
+        </p>
+        <p>
+          <b>Optional taste summary (off unless you turn it on).</b> In Account, under "AI assistant", you can choose to share a
+          short taste summary. When it is on, and only when you ask the assistant for suggestions, Google also receives one line
+          such as "enjoys Crime and Thriller; mostly in Korean; mostly TV series; drawn to slow-burn storytelling; does not want
+          Horror". It holds only genre names, language names, the kinds of title you like and Taste DNA trait words. It never holds
+          titles, ratings, scores, dates, your name or your email. The Account page shows the exact line before you turn it on, and
+          you can turn it off at any time.
         </p>
         <p>
           The "More like this" list on a TV series page also asks Gemini which series are similar. Only the series title, year and

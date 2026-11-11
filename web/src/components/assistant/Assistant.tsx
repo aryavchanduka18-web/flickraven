@@ -10,7 +10,7 @@ import { SparkIcon } from "../layout/icons";
 // `local`: an add-to-list exchange handled in the browser. It is never sent to the chat endpoint or to Gemini,
 // so what someone saves does not reach Google.
 type Msg = { role: "user" | "assistant"; text: string; items?: RecItem[]; local?: boolean };
-type Status = { enabled: boolean; remaining: number; cap: number };
+type Status = { enabled: boolean; remaining: number; cap: number; taste_sharing?: boolean };
 const CHIPS = ["Something like Prisoners, with a bigger twist", "A light comedy under two hours", "What is Inception about?", "Something outside my usual genres"];
 
 function Spoiler({ text }: { text: string }) {
@@ -192,7 +192,12 @@ function AssistantInner() {
               className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.07] px-3 py-2 text-sm placeholder:text-white/45 focus:border-white/30 focus:outline-none" />
             <button type="submit" disabled={chat.isPending} className="glass-btn solid rounded-xl px-4 text-sm font-semibold disabled:opacity-60">Send</button>
           </form>
-          <p className="px-4 pb-3 text-[11px] text-white/40">AI can be wrong. Answers come from Google Gemini; see the privacy page for what is sent.</p>
+          <p className="px-4 pb-3 text-[11px] text-white/40">
+            AI can be wrong. Answers come from Google Gemini; see the <Link to="/privacy" className="underline">privacy page</Link> for what is sent.{" "}
+            {status.data.taste_sharing
+              ? <>Your short taste summary is shared with suggestion requests (<Link to="/account#ai" className="underline">change</Link>).</>
+              : <>For picks that fit you better, you can <Link to="/account#ai" className="underline">share a short taste summary</Link>.</>}
+          </p>
         </section>
       )}
     </>
