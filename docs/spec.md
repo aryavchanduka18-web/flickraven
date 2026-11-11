@@ -936,3 +936,10 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - Feel-good: a light genre (Comedy, Romance, Family, Animation, Music), none of Horror, Crime, War, Thriller, Mystery, rated 6.5 or more.
 - Romantic: the Romance or Soap genre, or a "romance" / "love" keyword (TV has no Romance genre).
 - Ranking stays personal; the chip only narrows the list. A mood with no matches in a genre (for example Horror + Romantic) shows an empty list.
+
+### 14.2k Gemini-assisted More Like This for series (2026-11-11)
+- Why: there is no viewing data for most series, so the stored similarity gave weak lists (for example Never Have I Ever showed Russian Doll and Space Force).
+- On a series or anime page, `/movies/{id}/similar` asks Gemini for 24 similar series by name. Only title, year and genres are sent. Names are matched to the catalog (same kind of title, year within one) and anything not found is dropped, so a made-up title can never show.
+- Gemini picks come first (reason "Similar series, picked with Google Gemini"), then the stored list fills the rest. Films keep the stored list only.
+- Safety: 8 second limit, cached per title for a week (in memory, so a restart clears it), `AI_SIMILAR_DAILY_CAP` calls per day (default 300). If Gemini is off, slow, over quota or wrong, the page shows the stored list as before.
+- Not measured: how much better the lists are. The first visit to a series page can take a few seconds longer.

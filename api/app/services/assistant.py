@@ -120,12 +120,12 @@ def _gemini_error_details(response) -> tuple[str, str]:
 _working_model: str | None = None   # the last model id that answered; tried first next time
 
 
-def _post(model: str, body: dict, key: str):
+def _post(model: str, body: dict, key: str, timeout: float = 25.0):
     """One request to one model, with a single retry after a network error or a Google 5xx."""
     for attempt in range(2):
         try:
             r = httpx.post(URL.format(model=model), json=body, headers={"x-goog-api-key": key},
-                           timeout=httpx.Timeout(25.0, connect=5.0))
+                           timeout=httpx.Timeout(timeout, connect=5.0))
         except httpx.HTTPError as e:
             if attempt == 0:
                 log.info("gemini request failed (%s); retrying once", type(e).__name__)
@@ -140,7 +140,7 @@ def _post(model: str, body: dict, key: str):
         return r
 
 
-def ask_gemini(history: list[dict], system: str) -> str:
+def ask_gemini(history: list[dict], system: str, timeout: float = 25.0) -> str:
     """Asks Gemini. If a model id is unknown (HTTP 404) the next one in GEMINI_FALLBACK_MODELS is tried, and the one
     that works is remembered and logged, so a retired model name does not switch the assistant off."""
     global _working_model
@@ -150,7 +150,7 @@ def ask_gemini(history: list[dict], system: str) -> str:
             "generationConfig": {"maxOutputTokens": 1500, "temperature": 0.7}}
     models = [m for m in dict.fromkeys([_working_model, s.gemini_model, *[x.strip() for x in s.gemini_fallback_models.split(",")]]) if m]
     for model in models:
-        r = _post(model, body, s.gemini_api_key)
+        r = _post(model, body, s.gemini_api_key, timeout)
         if r.status_code != 404:
             break
         log.warning("gemini model %s not found (HTTP 404); trying the next one", model)
