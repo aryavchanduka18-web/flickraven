@@ -950,3 +950,6 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - The assistant no longer tells people a title is "not in my catalog". Titles it names show as links when FlickRaven has them. If it does not know a story it says it is not sure.
 - Suggestions follow the current request: series for a series request, films for a film request, same language or country (a K-drama request gets K-dramas), same mood. The taste summary is only a hint.
 - A title spelled loosely ("its ok to not be o k drama") is matched with pg_trgm word similarity (0.6, title of 6+ letters) so its synopsis, kind and language reach the model. Skipped silently if pg_trgm is missing.
+
+### 14.2m Assistant answers freely (2026-11-11)
+- The assistant is not limited to the catalog: it answers from Gemini's own knowledge about any film, series or anime (story, cast, endings, comparisons, trivia, recommendations), and stays on that topic. Titles are linked only when FlickRaven has them; others show as plain bold text. Spoilers stay hidden behind a tap, Google's safety filters and the daily limits apply, and the panel says AI can be wrong. Catalog synopses are still added for titles the person names, to reduce mistakes.
