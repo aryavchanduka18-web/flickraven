@@ -22,6 +22,9 @@ def engine(c, content_scores=None):
     e.scores = lambda st: {"content": np.array(content_scores if content_scores is not None else [-np.inf] * c.n, dtype=np.float32)}
     e.excluded = lambda st: OnlineEngine.excluded(e, st)
     e.learned_series = lambda st, rows, sim="learned": OnlineEngine.learned_series(e, st, rows, sim)
+    e.engaged_rows = lambda st: OnlineEngine.engaged_rows(e, st)
+    e.language_floor = lambda st, rows, base: OnlineEngine.language_floor(e, st, rows, base)
+    e.anime_interest = lambda st: OnlineEngine.anime_interest(e, st)
     return e
 
 
@@ -105,3 +108,54 @@ def test_without_a_gemini_graph_the_learned_ranking_is_unchanged():
     assert none[0].tolist() == empty[0].tolist() and np.allclose(none[1], empty[1])
     # and the learned part is not counted twice when only the learned lists exist
     assert none[0].tolist()[0] == 3 and none[1][0] <= 1.0
+
+
+def test_chosen_language_ranks_its_best_titles_alongside_the_top_without_removing_others():
+    n = 12
+    kinds = ["movie"] + ["series"] * (n - 1)
+    c = cat(kinds, [9.0] + [float(i) for i in range(1, n)])        # series rows 1..11, popularity 1..11
+    c.language = ["en"] * n
+    for r in (1, 2, 3):                                             # three weak Hindi series, the best is row 3
+        c.language[r] = "hi"
+    e = engine(c)
+    plain, ps = OnlineEngine.kind_rank(e, UserState(), "series")
+    assert plain.tolist() == list(range(11, 0, -1))
+    hindi, hs = OnlineEngine.kind_rank(e, UserState(languages=["hi"]), "series")
+    assert set(hindi.tolist()) == set(plain.tolist())              # nothing removed
+    assert hindi.tolist().index(3) < plain.tolist().index(3)       # the best Hindi series moves up
+    assert hindi.tolist()[:3] == [11, 10, 3] or hindi.tolist().index(3) <= 3
+    rest = [r for r in plain.tolist() if r not in (1, 2, 3)]
+    assert [r for r in hindi.tolist() if r not in (1, 2, 3)] == rest         # other languages keep their order
+    assert np.all(np.diff(hs) <= 0)
+    assert OnlineEngine.kind_rank(e, UserState(languages=["fr"]), "series")[0].tolist() == plain.tolist()   # no title in it: no change
+
+
+def test_language_in_the_persons_history_counts_in_proportion():
+    n = 12
+    c = cat(["movie"] * 4 + ["series"] * (n - 4), [9.0] * 4 + [float(i) for i in range(1, n - 3)])
+    c.language = ["hi", "hi", "hi", "en"] + ["hi"] * 4 + ["en"] * 4      # the Hindi series are the least popular
+    e = engine(c)
+    plain, _ = OnlineEngine.kind_rank(e, UserState(), "series")
+    hist, _ = OnlineEngine.kind_rank(e, UserState(likes={0, 1, 2}), "series")     # three liked Hindi films
+    top_hi = lambda rows: next(i for i, r in enumerate(rows.tolist()) if c.language[r] == "hi")
+    assert top_hi(hist) < top_hi(plain)
+    one, _ = OnlineEngine.kind_rank(e, UserState(likes={0, 1}), "series")          # fewer than 3: no inference
+    assert one.tolist() == plain.tolist()
+
+
+def test_anime_interest_counts_only_engaged_anime():
+    c = cat(["movie", "anime", "anime", "series", "anime"], [9.0, 5.0, 8.0, 6.0, 7.0])
+    e = engine(c)
+    e.engaged_rows = lambda st: OnlineEngine.engaged_rows(e, st)
+    assert OnlineEngine.anime_interest(e, UserState(likes={1, 3}, ratings={2: 9.0, 4: 3.0})) == 2
+
+
+def test_japanese_language_choice_is_not_anime_interest_and_does_not_reorder_anime():
+    c = cat(["movie", "anime", "anime", "series", "series"], [9.0, 5.0, 8.0, 6.0, 7.0])
+    c.language = ["en", "ja", "ja", "ja", "en"]
+    e = engine(c)
+    st = UserState(languages=["ja"])
+    assert OnlineEngine.anime_interest(e, st) == 0
+    assert OnlineEngine.kind_rank(e, st, "anime")[0].tolist() == OnlineEngine.kind_rank(e, UserState(), "anime")[0].tolist()
+    assert OnlineEngine.anime_interest(e, UserState(likes={3})) == 0       # a liked Japanese live-action series
+    assert OnlineEngine.anime_interest(e, UserState(likes={1})) == 1
