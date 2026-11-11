@@ -272,7 +272,13 @@ class OnlineEngine:
         rows = np.asarray(rows, dtype=int)
         bad = set(st.disliked_genres)
         low = {r for r, v in st.ratings.items() if v <= 4}
-        keep = np.array([int(r) not in st.dislikes and int(r) not in low and not (bad & set(self.cat.genres[r])) for r in rows], dtype=bool)
+        keep = np.array([int(r) not in st.dislikes and int(r) not in low for r in rows], dtype=bool)
+        # A disliked genre drops titles only while it leaves most of the list. If it would remove more than half of
+        # what is otherwise eligible, the page itself is probably in that genre (anime pages and "Animation"), and
+        # an empty More Like This is worse than a genre they said they dislike.
+        by_genre = np.array([not (bad & set(self.cat.genres[r])) for r in rows], dtype=bool)
+        if (keep & by_genre).sum() >= (keep.sum() + 1) // 2:
+            keep &= by_genre
         content = self.scores(st)["content"][rows] if len(rows) else np.array([])
         finite = np.isfinite(content)
         if len(rows) == 0 or not finite.any():
