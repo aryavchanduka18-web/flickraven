@@ -310,7 +310,8 @@ class PerfectPickBody(BaseModel):
     status: str = "any"                  # any | completed | airing (series only)
     adventure: str = "balanced"          # familiar | balanced | adventurous
     other_languages: bool = False        # drop the language limit ("Include other languages")
-    exclude: list[int] = []              # titles already shown (Not these)
+    exclude: list[int] = []              # titles already shown (Not these, Show more)
+    more: bool = False                   # a "Show more" batch: the next titles in the same order, added below the earlier ones
 
 
 @router.post("/perfect-pick")
@@ -342,7 +343,8 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
                 continue
             mins = None if np.isnan(cat.runtime[r]) else float(cat.runtime[r])
             items.append(pp.Item(i, "movie", list(cat.genres[r]), list(cat.keywords[r]), cat.language[r], mins, None, None,
-                                 float(rail[r]), float(cat.novelty[r])))
+                                 float(rail[r]), float(cat.novelty[r]),
+                                 anime=pp.is_anime_film(list(cat.genres[r]), cat.language[r])))
     if pf.kind in ("series", "either"):
         scored = {}
         for kind in ("series", "anime"):
@@ -358,7 +360,8 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
             h = fit.hours(d["episodes"], d["runtime"])
             genres, added = pp.series_genres(list(cat.genres[r]), list(cat.keywords[r]))
             items.append(pp.Item(i, "series", genres, list(cat.keywords[r]), cat.language[r], None if h is None else h * 60,
-                                 d["seasons"], d["status"], sc, float(cat.novelty[r]), d["episodes"], added))
+                                 d["seasons"], d["status"], sc, float(cat.novelty[r]), d["episodes"], added,
+                                 anime=cat.kind[r] == "anime"))
     rule = kb.get(pf.mood) if pf.mood else None
     sel = pp.select(items, pf, rule, matches_mood)
     by_id = {i.id: i for i in sel.exact + [i for i, _ in sel.near]}
@@ -383,11 +386,13 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
     items_out = out([(c, []) for c in picks], "perfect_pick")
     alt_out = out(alts, "perfect_pick_alt")
     db.commit()
-    message = pp.message(len(items_out), len(alt_out), pf, sel.other_languages, sel.exact_elsewhere)
-    if not items_out and not alt_out and not sel.other_languages:
-        message = "Nothing fits your type, length and languages. Try a longer time, another kind, or more languages."
+    message = pp.message(len(items_out), len(alt_out), pf, sel.other_languages, sel.exact_elsewhere, more=body.more)
+    if not items_out and not alt_out and not sel.other_languages and not body.more:
+        message = f"Nothing fits your {pp.kept(pf)}. Try a longer time, another kind, or more languages."
     relaxed = [m for m in ("mood", "genres") if any(m in a.get("misses", []) for a in alt_out)]
-    return {"items": items_out, "alternatives": alt_out, "message": message, "relaxed": relaxed,
+    # what a "Show more" would still find: exact matches first, then broader alternatives (the same order as here)
+    remaining = {"exact": len(sel.exact) - len(items_out), "alternatives": len(sel.near) - len(alt_out)}
+    return {"items": items_out, "alternatives": alt_out, "message": message, "relaxed": relaxed, "remaining": remaining,
             "offer": "other_languages" if (sel.other_languages or sel.exact_elsewhere) and len(items_out) < 3 else None}
 
 

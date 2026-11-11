@@ -159,3 +159,26 @@ def test_three_picks_are_not_three_clones():
     genres = {1: {"Action", "Thriller"}, 2: {"Action", "Thriller"}, 3: {"Action", "Thriller"}, 4: {"Comedy"}}
     ids = [c.id for c in pp.choose(pool, "familiar", genres=genres)]
     assert 4 in ids and ids[0] == 1
+
+
+def test_anime_is_a_hard_limit_and_other_genres_stay_soft():
+    items = [pp.Item(1, "series", ["Animation", "Action"], [], "ja", 300.0, 1, None, 0.9, 0.3, anime=True),
+             pp.Item(2, "series", ["Animation", "Drama"], [], "ja", 300.0, 1, None, 0.8, 0.3, anime=True),
+             pp.Item(3, "series", ["Action"], [], "en", 300.0, 1, None, 0.95, 0.3),
+             pp.Item(4, "movie", ["Animation", "Fantasy"], [], "ja", 120.0, None, None, 0.7, 0.3, anime=pp.is_anime_film(["Animation"], "ja"))]
+    sel = pp.select(items, pp.Prefs(kind="series", genres=["Anime", "Action"]), None, mood_match)
+    # live-action Action is never offered, not even as a broader alternative; anime without Action misses "genres"
+    assert [i.id for i in sel.exact] == [1] and [(i.id, m) for i, m in sel.near] == [(2, ["genres"])]
+    either = pp.select(items, pp.Prefs(kind="either", genres=["Anime"]), None, mood_match)
+    assert {i.id for i in either.exact} == {1, 2, 4} and not either.near
+    assert any(r["text"] == "Anime, which you picked" for r in pp.reasons_v2(items[0], "close", pp.Prefs(genres=["Anime"]), [], mood_match, None, None))
+    assert not pp.is_anime_film(["Animation"], "en")
+
+
+def test_show_more_messages_are_honest():
+    pf = pp.Prefs(kind="series", genres=["Anime"])
+    assert pp.message(3, 0, pf, 0, more=True) is None
+    assert pp.message(1, 0, pf, 0, more=True) == "That is the last of the titles that meet every answer."
+    assert pp.message(1, 2, pf, 0, more=True).startswith("Only 1 more title meets every answer")
+    assert "type, length and anime" in pp.message(0, 3, pf, 0, more=True)
+    assert pp.message(0, 0, pf, 0, more=True).startswith("That is everything")
