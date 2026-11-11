@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-const UPDATED = "4 November 2026";
+const UPDATED = "11 November 2026";
 const ISSUES = "https://github.com/aryavchanduka18-web/flickraven/issues";
 
 function Page({ title, children }: { title: string; children: ReactNode }) {
@@ -21,7 +21,7 @@ export function Privacy() {
     <Page title="Privacy policy">
       <p>
         FlickRaven is a free movie recommendation website run by one person as a personal project. It does not stream
-        films, show ads, or sell your data. The only thing sent to another company is what you type into the AI assistant (see below).
+        films, show ads, or sell your data. The only things sent to another company (Google) are listed in the section "The AI assistant" below.
       </p>
       <section>
         <h2>What we store</h2>
@@ -40,14 +40,17 @@ export function Privacy() {
       <section>
         <h2>The AI assistant</h2>
         <p>
-          The "Ask FlickRaven" assistant uses Google's Gemini model. When you send it a message, Google receives your recent messages
-          in that chat and the catalog's own synopsis of titles you name. When you ask for suggestions, FlickRaven also picks a
-          short list of titles for you on its own servers, using your ratings, likes, dislikes and taste, and sends Google only that
-          list as plain catalog facts (title, year, type, language, genres). Google does not receive your ratings, likes, dislikes,
-          taste profile or viewing history, and not your name, email address or account number. Titles you disliked or rated low are
-          never suggested or linked. Chats are not stored by FlickRaven. On Google's free tier, prompts may be used by Google to
-          improve its products and may be read by reviewers, so do not type anything private.
-          The assistant can be wrong, and the number of messages per day is limited.
+          The "Ask FlickRaven" assistant uses Google's Gemini model. Google receives: (1) your recent messages in that chat; (2) the
+          catalog's own synopsis of titles you name; and (3) when you ask for suggestions, a short list of titles (title, year,
+          type, language and genres) that FlickRaven chose for you on its own servers.
+        </p>
+        <p>
+          That list is built from your ratings, likes, dislikes and taste, so it can reveal something about your taste, for example
+          if it is full of thrillers. What Google does not receive: your ratings, likes, dislikes, My List, viewing history, taste
+          profile or any score, and not your name, email address or account number. Titles you disliked or rated low are
+          never suggested, and sentences in the assistant's reply that name them are removed (this check can miss a very short title written as an ordinary word). Chats are not stored by
+          FlickRaven. On Google's free tier, prompts may be used by Google to improve its products and may be read by reviewers, so
+          do not type anything private. The assistant can be wrong, and the number of messages per day is limited.
         </p>
         <p>
           The "More like this" list on a TV series page also asks Gemini which series are similar. Only the series title, year and

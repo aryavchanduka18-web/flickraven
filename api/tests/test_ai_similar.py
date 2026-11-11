@@ -157,3 +157,37 @@ def test_anime_page_keeps_anime_in_the_main_list_and_labels_live_action_separate
     assert [i["movie"]["id"] for i in body["cross_kind"]["items"]] == [f]
     with TestClient(app) as c:
         assert "cross_kind" not in c.get(f"/api/movies/{a}/similar?offset=1").json()
+
+
+@pytest.mark.parametrize("field,value", [("likes", "liked"), ("picks", "picked"), ("in_list", "saved"), ("watched", "watched"),
+                                         ("ratings", "rated"), ("dislikes", "disliked")])
+def test_cross_kind_row_never_repeats_titles_the_person_already_acted_on(test_engine, titles, monkeypatch, field, value):
+    a, f, o = titles["AIS Anchor"], titles["AIS Friend"], titles["AIS Other"]
+
+    class Cat:
+        row_of = {a: 0, f: 1, o: 2}
+        kind = ["anime", "series", "series"]; titles = ["AIS Anchor", "f", "o"]; year = np.array([2020.0] * 3); genres = [["Drama"]] * 3
+        universe_of_row = [-1, -1, -1]
+
+    class State:
+        ratings, likes, picks, in_list, watched, dislikes = {}, set(), set(), set(), set(), set()
+
+    st = State()
+    setattr(st, field, {1: 8.0} if field == "ratings" else {1})            # row 1 is f, the first live-action suggestion
+
+    class Engine:
+        cat = Cat()
+        def personal_fit(self, st_, rows):
+            return np.ones(len(rows), dtype=bool), np.full(len(rows), 0.5), True
+
+    monkeypatch.setattr(catalog_router.rec, "artifacts_ready", lambda: True)
+    monkeypatch.setattr(catalog_router.rec, "load_engine", lambda db: Engine())
+    monkeypatch.setattr(catalog_router.rec, "user_state", lambda db, uid, e: st)
+    monkeypatch.setattr(catalog_router.rec, "match_for", lambda db, uid, ids: {})
+    monkeypatch.setattr(catalog_router, "user_id_from", lambda request, db: 1)
+    monkeypatch.setattr(catalog_router.similar_svc, "similar_page", lambda db, e, mid, off, lim: ([], {}, 0))
+    monkeypatch.setattr(catalog_router.ai_similar, "suggest", lambda *a_, **k: [f, o])        # both are live-action, a is anime
+    with TestClient(app) as c:
+        body = c.get(f"/api/movies/{a}/similar").json()
+    shown = [i["movie"]["id"] for i in body["cross_kind"]["items"]]
+    assert f not in shown and o in shown, value
