@@ -125,3 +125,34 @@ def test_romantic_korean_series_match_through_keywords(client, monkeypatch):
 def test_bad_values_are_refused(client):
     assert client.post("/api/recs/perfect-pick", json={"kind": "movie", "time": "h10"}).status_code == 422
     assert client.post("/api/recs/perfect-pick", json={"kind": "movie", "mood": "Sleepy"}).status_code == 422
+
+
+def test_show_more_continues_in_order_then_ends(client):
+    first = pick(client, kind="movie", time="any", adventure="familiar")
+    assert len(first["items"]) == 3 and first["remaining"] == {"exact": 1, "alternatives": 0}
+    shown = [i["movie"]["id"] for i in first["items"]]
+    more = pick(client, kind="movie", time="any", adventure="familiar", exclude=shown, more=True)
+    assert len(more["items"]) == 1 and not set(shown) & {i["movie"]["id"] for i in more["items"]}
+    assert more["message"] == "That is the last of the titles that meet every answer."
+    assert more["remaining"] == {"exact": 0, "alternatives": 0}
+    shown += [i["movie"]["id"] for i in more["items"]]
+    end = pick(client, kind="movie", time="any", adventure="familiar", exclude=shown, more=True)
+    assert end["items"] == [] and end["alternatives"] == [] and end["message"].startswith("That is everything")
+
+
+def test_anime_genre_returns_anime_only(client, test_engine):
+    with test_engine.begin() as conn:
+        aid = conn.execute(text("""INSERT INTO movies (tmdb_id, title, year, original_language, countries, backdrop_path, poster_path,
+            popularity_score, tmdb_vote_count, title_type, runtime_min, episodes, seasons, series_status)
+            VALUES (991009, 'pp-a1', 2015, 'ja', ARRAY['JP'], '/b.jpg', '/p.jpg', 7, 5000, 'anime', 24, 12, 1, 'Ended') RETURNING id""")).scalar()
+    cat = recs_router.engine_or_503(None).cat
+    cat.movie_ids = np.append(cat.movie_ids, aid)
+    cat.kind = cat.kind + ["anime"]
+    cat.genres = cat.genres + [["Animation", "Action"]]
+    cat.keywords = cat.keywords + [[]]
+    cat.language = cat.language + ["ja"]
+    cat.runtime = np.append(cat.runtime, 24.0)
+    cat.novelty = np.append(cat.novelty, 0.3)
+    got = pick(client, kind="series", genres=["Anime"], time="any", adventure="familiar")
+    assert [i["movie"]["title"] for i in got["items"]] == ["pp-a1"] and got["alternatives"] == []
+    assert any(r["text"] == "Anime, which you picked" for r in got["items"][0]["reasons"])
