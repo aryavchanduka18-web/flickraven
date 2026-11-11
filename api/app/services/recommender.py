@@ -6,6 +6,7 @@ Per request, it reads the user's current state from Postgres (ratings, reactions
 onboarding, events) and asks the engine. Nothing personal is cached (spec 6.12 freshness).
 """
 import json
+import logging
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -18,12 +19,15 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from cinematch_engine import ai_graph
 from cinematch_engine.availability import AvailabilityMap
 from cinematch_engine.online import Catalog, OnlineEngine, Tuning, UserState
 from cinematch_engine.profile import BEHAVIORAL_EVENTS
 from cinematch_engine.sources import SourceModels
 
 from app.services import artifact_store
+
+log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
 MODELS = ROOT / "artifacts" / "models"
@@ -66,6 +70,21 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
     n = len(tmdb_ids)
     sim = sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32)
     return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
+
+
+def _gemini_similarities(movies: pd.DataFrame) -> sp.csr_matrix | None:
+    """Series and anime that Gemini names as similar (artifacts/models/ai_similar.json, pipeline/ai_similar.py) as a
+    catalog-row matrix (engine ai_graph.py), or None when the file is missing or unreadable."""
+    path = MODELS / "ai_similar.json"
+    if not path.exists():
+        return None
+    try:
+        named = json.loads(path.read_text()).get("titles", {})
+    except (OSError, ValueError):
+        log.warning("ai_similar.json could not be read; series ranking runs without it")
+        return None
+    return ai_graph.build(movies["tmdb_id"].tolist(), movies["title"].tolist(), movies["year"].astype(float).tolist(),
+                          movies["title_type"].tolist(), named)
 
 
 def _similar_table(tmdb_ids: list[int]) -> dict | None:
@@ -122,6 +141,7 @@ def load_engine(db: Session) -> OnlineEngine:
         tmdb_to_row = {t: i for i, t in enumerate(movies["tmdb_id"])}
         universe_rows = np.array([tmdb_to_row[t] for t in f["item_tmdb"]])
         series_sim = _series_similarities(movies["tmdb_id"].tolist())
+        gemini_sim = _gemini_similarities(movies)
         catalog = Catalog(
             movie_ids=movies["id"].to_numpy(), titles=movies["title"].tolist(),
             genres=[list(g) for g in movies["genres"]], keywords=[list(k) for k in movies["keywords"]],
@@ -130,7 +150,7 @@ def load_engine(db: Session) -> OnlineEngine:
             part=movies["catalog_part"].to_numpy(), popularity=movies["popularity"].astype(float).to_numpy(),
             votes=movies["votes"].astype(float).to_numpy(), has_award=movies["has_award"].fillna(False).to_numpy(),
             content=content, universe_rows=universe_rows, recent=(movies["catalog_part"] == "C").to_numpy(),
-            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim)
+            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim, gemini_sim=gemini_sim)
         train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
         uc, ic, sv, al = _settings("user_cf"), _settings("item_cf"), _settings("svd"), _settings("als")
         sources = SourceModels(
