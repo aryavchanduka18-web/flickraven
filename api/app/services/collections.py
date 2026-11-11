@@ -16,6 +16,10 @@ COLLECTIONS = [
     {"key": "rom-com", "title": "Rom-Com", "all_genres": ["Romance", "Comedy"],
      "pinned": [("Leap Year", 2010), ("The Proposal", 2009), ("How to Lose a Guy in 10 Days", 2003),
                 ("Notting Hill", 1999), ("Crazy Rich Asians", 2018), ("27 Dresses", 2008)]},
+    {"key": "feel-good", "title": "Feel-Good Films", "any_genres": ["Comedy", "Family", "Romance", "Music"],
+     "none_genres": ["Horror", "Crime", "War", "Thriller"], "min_popularity": 6.8},
+    {"key": "romance-films", "title": "Romance", "all_genres": ["Romance"], "min_popularity": 6.5},
+    {"key": "romantic-drama", "title": "Romantic Drama", "all_genres": ["Romance", "Drama"], "min_popularity": 6.5},
     {"key": "crime-thriller", "title": "Crime Thriller", "all_genres": ["Crime", "Thriller"]},
     {"key": "sci-fi-adventure", "title": "Sci-Fi Adventure", "all_genres": ["Science Fiction", "Adventure"]},
     {"key": "family-animation", "title": "Family Animation", "all_genres": ["Family", "Animation"]},
@@ -59,6 +63,13 @@ def member_ids(db: Session, c: dict) -> list[int]:
         where.append("EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
                      "WHERE mg.movie_id = m.id AND g.name = ANY(:anyg))")
         p["anyg"] = c["any_genres"]
+    if c.get("none_genres"):
+        where.append("NOT EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
+                     "WHERE mg.movie_id = m.id AND g.name = ANY(:nong))")
+        p["nong"] = c["none_genres"]
+    if c.get("min_popularity"):
+        where.append("m.popularity_score >= :minpop")
+        p["minpop"] = c["min_popularity"]
     if c.get("language"):
         where.append("m.original_language = :lang")
         p["lang"] = c["language"]

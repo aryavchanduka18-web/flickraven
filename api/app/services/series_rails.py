@@ -7,6 +7,8 @@ There is no "most rewatched" data, so the rewatch row says what it is: finished 
 """
 from dataclasses import dataclass
 
+from cinematch_engine.rerank import refresh
+
 INDIAN_LANGUAGES = {"hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "gu", "ur"}
 ANGLO_COUNTRIES = {"US", "GB"}
 # Language groups behind the "... for you" rows, used to put the rows a user has shown interest in first.
@@ -37,6 +39,8 @@ THEMES = {
     "completed": Theme("completed", "Completed Series Worth Bingeing", "Finished series that viewers rate very highly, so there is no wait for the next season."),
     "hidden_gems": Theme("hidden_gems", "Hidden Gems You Might Have Missed", "Well-rated series that fewer people have seen."),
     "returning": Theme("returning", "New Episodes & Returning Shows", "Series that are still airing and well rated. TMDB's status, not an episode calendar."),
+    "feelgood": Theme("feelgood", "Feel-good series", "Warm, easy comedies and light dramas to put on after a long day."),
+    "romance": Theme("romance", "Romantic series", "Love stories, from slow burns to rom-coms."),
     "rewatch": Theme("rewatch", "Great to rewatch", "Finished series with several seasons that hold up a second time."),
 }
 
@@ -77,6 +81,13 @@ def in_theme(key: str, s: dict) -> bool:
         return live_action and pop >= 7.8 and 100 <= votes < 1500
     if key == "returning":
         return s.get("status") == "Returning Series" and pop >= 7.2 and votes >= 300
+    genres = set(s.get("genres") or [])
+    if key == "feelgood":
+        return (live_action and bool(genres & {"Comedy", "Family"}) and not genres & {"Crime", "War & Politics", "Mystery"}
+                and pop >= 7.2 and (s.get("votes") or 0) >= 300)
+    if key == "romance":
+        kws = " ".join(s.get("keywords") or []).lower()
+        return live_action and ("romance" in kws or "love" in kws or "Soap" in genres) and pop >= 7.0 and (s.get("votes") or 0) >= 300
     if key == "rewatch":
         return s.get("status") == "Ended" and seasons >= 4 and pop >= 7.5
     return False
@@ -95,7 +106,7 @@ def affinity(liked_languages: list[str], chosen_languages: list[str]) -> dict[st
 
 
 def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | None = None,
-          exclude_ids: set[int] | None = None) -> list[dict]:
+          exclude_ids: set[int] | None = None, rng=None) -> list[dict]:
     """[{key, title, subtitle, ids}] for every theme with at least MIN_ROW series, each ordered like `ranked_ids`
     (the user's series ranking, best first); series missing from the ranking (already seen) are left out.
     `exclude_ids` are titles already shown in Home's main Series row or an earlier series shelf. With `interest`
@@ -103,12 +114,15 @@ def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | 
     so nobody is shut out of a language."""
     by_id = {s["id"]: s for s in series}
     themes = list(THEMES.values())
+    if rng is not None:
+        rng.shuffle(themes)                  # ties between themes then rotate from day to day
     if interest:
         themes.sort(key=lambda t: -interest.get(t.key, 0))
     out = []
     used = set(exclude_ids or ())
     for theme in themes:
-        ids = [i for i in ranked_ids if i not in used and i in by_id and by_id[i].get("has_art") and in_theme(theme.key, by_id[i])][:ROW_SIZE]
+        ids = [i for i in ranked_ids if i not in used and i in by_id and by_id[i].get("has_art") and in_theme(theme.key, by_id[i])]
+        ids = refresh(ids, ROW_SIZE, rng) if rng is not None else ids[:ROW_SIZE]
         if len(ids) >= MIN_ROW:
             out.append({"key": theme.key, "title": theme.title, "subtitle": theme.subtitle, "ids": ids})
             used.update(ids)

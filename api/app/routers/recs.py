@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
+from app.services import daily
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
 from app.services import series_rails as series_rails_service
@@ -52,6 +53,14 @@ def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_
     st = rec.user_state(db, user["id"], engine)
     rows, scores = engine.kind_rank(st, kind)
     page = slice(max(offset, 0), max(offset, 0) + min(limit, 60))
+    rows, scores = list(rows), list(scores)
+    if offset <= 0 and len(rows) > limit:
+        # The first page changes a little every day (a strong core stays) and no language fills the first twelve places.
+        from cinematch_engine.rerank import refresh, spread_languages
+        keep = refresh(list(zip(rows, scores)), min(limit, 60), daily.rng(user["id"], f"kind:{kind}"))
+        keep = spread_languages(keep, [engine.cat.language[r] for r, _ in keep])
+        picked = {r for r, _ in keep}
+        rows, scores = [r for r, _ in keep] + [r for r in rows if r not in picked], [s for _, s in keep] + [s for r, s in zip(rows, scores) if r not in picked]
     extra = {int(engine.cat.movie_ids[r]): {"score": float(s)} for r, s in zip(rows[page], scores[page])}
     items = cards(db, list(extra), user["id"], extra)
     log_shown(db, user["id"], str(uuid.uuid4()), None, f"kind_{kind}", None, items)   # so the report counts series too
@@ -72,13 +81,15 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     ranked = [int(cat.movie_ids[r]) for r in rows]
     ranked_series_rows = set(rows.tolist())
     series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
+               "keywords": list(r["keywords"] or []),
                "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
                "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
                "has_art": r["backdrop_path"] is not None}
               for r in db.execute(text("""
                 SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
                        m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
-                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres
+                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres,
+                       ARRAY(SELECT k.name FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = m.id) AS keywords
                 FROM movies m WHERE m.title_type = 'series'""")).mappings()]
     engaged = {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
     interest = series_rails_service.affinity([cat.language[r] for r in engaged], list(st.languages))
@@ -98,9 +109,35 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
                           "subtitle": "Series with a similar feel.", "ids": similar})
             shown_series.update(similar)
 
-    for theme in series_rails_service.build(series, ranked, interest, exclude_ids=shown_series):
+    day_rng = daily.rng(uid, "series-rails")
+    for theme in series_rails_service.build(series, ranked, interest, exclude_ids=shown_series, rng=day_rng):
         rails.append({"key": theme["key"], "title": theme["title"], "subtitle": theme["subtitle"], "ids": theme["ids"]})
         shown_series.update(theme["ids"])
+
+    # Anime series: the big names first (Attack on Titan, Demon Slayer, Solo Leveling...), then romance and feel-good anime.
+    anime_rows, _ = engine.kind_rank(st, "anime")
+    anime_ids = {int(cat.movie_ids[r]): int(r) for r in anime_rows}
+    art = set(db.execute(text("SELECT id FROM movies WHERE title_type = 'anime' AND backdrop_path IS NOT NULL")).scalars())
+    anime_list = [(i, r) for i, r in anime_ids.items() if i in art]               # already in the user's anime ranking order
+    anime_rails = []
+    hits = [i for i, r in sorted(anime_list, key=lambda t: -cat.fame_pct[t[1]]) if cat.popularity[anime_ids[i]] >= 7.3][:60]
+    anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
+    anime_rails.append(("anime_romance", "Romantic anime", "Love stories and romantic comedies in anime form.",
+                        [i for i, r in anime_list if "Romance" in cat.genres[r] or any("romance" in k or "love" in k for k in cat.keywords[r])]))
+    anime_rails.append(("anime_feelgood", "Feel-good anime", "Light, funny and warm anime.",
+                        [i for i, r in anime_list if {"Comedy", "Family"} & set(cat.genres[r]) and not {"Horror", "Crime"} & set(cat.genres[r])
+                         and cat.popularity[r] >= 7.0]))
+    from cinematch_engine.rerank import refresh
+    lead = []
+    for key, title, sub, ids in anime_rails:
+        ids = [i for i in ids if i not in shown_series]
+        ids = refresh(ids, series_rails_service.ROW_SIZE, day_rng) if key != "anime_hits" else refresh(ids, series_rails_service.ROW_SIZE, day_rng, pool_mult=2, keep=6)
+        if len(ids) >= series_rails_service.MIN_ROW:
+            lead.append({"key": key, "title": title, "subtitle": sub, "ids": ids})
+            shown_series.update(ids)
+    # The anime hits row comes first among the themed rows; the other anime rows follow the other themes.
+    rails = [r for r in rails if r["key"] == "because"] + [r for r in lead if r["key"] == "anime_hits"] + \
+            [r for r in rails if r["key"] != "because"] + [r for r in lead if r["key"] != "anime_hits"]
 
     # Films and series, alternating.
     film_scores = engine.rail_scores(st)
@@ -177,7 +214,7 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     st = rec.user_state(db, uid, engine)
     scores = engine.scores(st)            # scored once: Home and the agreement numbers share it
     plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
-                       scores=scores)
+                       scores=scores, seed=daily.seed(uid, f"home:{mode}"))
     cat = engine.cat
     agree = agreement_all(engine, st, scores)
     request_id, page_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -215,7 +252,7 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
         log_shown(db, uid, request_id, page_id, r["key"], mode, items)
     log_shown(db, uid, request_id, page_id, "hero", mode, hero)
     db.commit()
-    return {"stage": plan["stage"], "mode": mode, "hero": hero, "rails": rails, "page_id": page_id}
+    return {"stage": plan["stage"], "mode": mode, "hero": hero, "rails": rails, "page_id": page_id, "day": daily.today().isoformat()}
 
 
 class TonightBody(BaseModel):

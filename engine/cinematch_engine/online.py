@@ -17,12 +17,13 @@ from cinematch_engine.blend import candidate_pool, contributions
 from cinematch_engine.config import event_weights
 from cinematch_engine.explain import explain
 from cinematch_engine.profile import WEAK_EVENTS, stage_of
-from cinematch_engine.rerank import MODES, TAIL_PCT, TOP_N, mmr, spread, tail_slots
+from cinematch_engine.rerank import refresh, MODES, TAIL_PCT, TOP_N, mmr, spread, tail_slots
 from cinematch_engine.sources import SOURCES, Profiles, SourceModels
 from cinematch_engine.surprise import REASON as SURPRISE_REASON
 from cinematch_engine.tonight import Request, recommend as tonight_recommend
 
 POPCORN_GENRES = {"Action", "Adventure", "Comedy", "Animation", "Science Fiction"}
+FEEL_GOOD_GENRES = {"Comedy", "Romance", "Family", "Animation", "Music"}      # the For Tonight "Feel-good" rule
 # "Indian and English" end of the International tuning slider.
 LOCAL_LANGUAGES = {"en", "hi", "ta", "te", "ml", "kn", "bn", "mr"}
 # Popularity points (1-10 scale) added to films in the user's onboarding languages, by stage (language_lift).
@@ -197,10 +198,15 @@ class OnlineEngine:
         rows = rows[~np.isin(rows, list(gone))] if gone else rows
         pct = lambda v: (np.argsort(np.argsort(v)) + 1) / max(len(v), 1)
         score = pct(cat.popularity[rows])
+        # Anime is lifted by fame: the big names (Attack on Titan, Demon Slayer, Solo Leveling) are what most people want
+        # to see first. Fame is the TMDB vote-count percentile; the quality score alone favoured obscure titles.
+        fame = pct(cat.fame_pct[rows]) if kind == "anime" and len(rows) else None
+        if fame is not None:
+            score = 0.5 * score + 0.5 * fame
         content = self.scores(st)["content"][rows]
         if len(rows) and np.isfinite(content).any():
             c = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]))
-            score = 0.65 * pct(c) + 0.35 * score
+            score = (0.5 if fame is not None else 0.65) * pct(c) + (0.5 if fame is not None else 0.35) * score
             learned = self.learned_series(st, rows)
             if learned is not None:
                 covered = learned > 0
@@ -530,18 +536,26 @@ class OnlineEngine:
 
     # ------------------------------------------------------------------ home page plan (spec 7)
     def home(self, st: UserState, mode: str = "balanced", rail_size: int = 20, min_rail: int = 8,
-             tuning: Tuning | None = None, recent_rows: list[int] | None = None, scores: dict | None = None) -> dict:
+             tuning: Tuning | None = None, recent_rows: list[int] | None = None, scores: dict | None = None,
+             seed: int | None = None) -> dict:
+        """The Home plan. With a `seed` (the API passes one that changes every day per person) the page is refreshed:
+        hero and rows are drawn from a wider top of the same ranking, and the order of the themed rows is shuffled.
+        Without a seed the plan is fully deterministic (tests, evaluation)."""
         cat = self.cat
         scores = scores or self.scores(st)           # callers that already scored this user pass them in
         rail = self.rail_scores(st, scores)
+        rng = np.random.default_rng(seed) if seed is not None else None
         used: set[int] = set()
-        picks = self.top_picks(st, mode, k=5 + rail_size, scores=scores, tuning=tuning)
-        hero = picks[:5]
+        picks = self.top_picks(st, mode, k=5 + rail_size * (3 if rng is not None else 1), scores=scores, tuning=tuning)
+        hero = refresh(picks[:12], 5, rng, pool_mult=2, keep=2) if rng is not None else picks[:5]
+        picks = [p for p in picks if p not in hero]
+        picks = hero + picks
         used |= {p["row"] for p in hero}
         rails = []
 
         def take(key, title, rows, source, reason=None, scored=None):
-            rows = [int(r) for r in rows if int(r) not in used and np.isfinite(rail[int(r)])][:rail_size]
+            rows = [int(r) for r in rows if int(r) not in used and np.isfinite(rail[int(r)])]
+            rows = refresh(rows, rail_size, rng) if rng is not None else rows[:rail_size]
             if len(rows) < min_rail:
                 return
             used.update(rows)
@@ -601,17 +615,30 @@ class OnlineEngine:
         langs = st.languages or ["en"]
         in_lang = np.array([l in langs for l in cat.language])
         take("your_languages", "Movies In Your Languages", ranked(in_lang), "hybrid")
-        take("new_notable", "New & Notable", self._new_notable(st, scores), "content")
         gems = (cat.popularity >= 7.5) & (cat.fame_pct < 50)
-        take("hidden_gems", "Hidden Gems", ranked(gems), "hybrid")
-        take("awards", "Award Winners & Nominees", ranked(cat.has_award), "hybrid")
         rt = np.nan_to_num(cat.runtime, nan=0)
         popcorn = np.array([bool(set(g) & POPCORN_GENRES) for g in cat.genres]) & (rt >= 90) & (rt <= 130) & (cat.popularity >= 6.5)
-        take("popcorn", "Perfect Popcorn Films", ranked(popcorn), "tonight_preset")
-        take("international", "International Cinema", ranked(~in_lang), "hybrid")
+        # Feel-good and Romance get their own rows next to the others (the For Tonight mood rules, with a quality floor and no
+        # horror, war or crime).
+        dark = {"Horror", "War", "Crime", "Thriller"}
+        light = np.array([bool(set(g) & FEEL_GOOD_GENRES) and not (set(g) & dark) for g in cat.genres]) & (cat.popularity >= 6.5)
+        romance = np.array(["Romance" in g for g in cat.genres]) & (cat.popularity >= 6.5)
         loved = np.nonzero(in_lang)[0] if in_lang.any() else np.arange(cat.n)
         loved = loved[np.argsort(-cat.popularity[loved])]
-        take("most_loved", "Most Loved", [r for r in loved if np.isfinite(rail[r])], "popularity")
+        themed = [
+            lambda: take("feel_good", "Feel-Good Films For You", ranked(light & (np.asarray(cat.kind) == "movie")), "hybrid"),
+            lambda: take("romance", "Romance For You", ranked(romance & (np.asarray(cat.kind) == "movie")), "hybrid"),
+            lambda: take("new_notable", "New & Notable", self._new_notable(st, scores), "content"),
+            lambda: take("hidden_gems", "Hidden Gems", ranked(gems), "hybrid"),
+            lambda: take("awards", "Award Winners & Nominees", ranked(cat.has_award), "hybrid"),
+            lambda: take("popcorn", "Perfect Popcorn Films", ranked(popcorn), "tonight_preset"),
+            lambda: take("international", "International Cinema", ranked(~in_lang), "hybrid"),
+            lambda: take("most_loved", "Most Loved", [r for r in loved if np.isfinite(rail[r])], "popularity"),
+        ]
+        if rng is not None:
+            rng.shuffle(themed)             # the themed rows come in a different order each day
+        for add in themed:
+            add()
         disc = self.top_picks(st, "discover", k=rail_size + len(used), scores=scores, extra_exclude=used, tuning=tuning)
         take("different", "Discover Something Different", [p["row"] for p in disc], "discover_mmr",
              scored={p["row"]: p for p in disc})
