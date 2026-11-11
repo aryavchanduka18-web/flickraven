@@ -22,8 +22,11 @@ export default function WhereToWatch({ watch, title = "" }: { watch: Watch | nul
       {watch.region !== "IN" && <p className="mt-1 text-xs text-muted">Not listed on any service in India, so this shows {where}.</p>}
       <div className="mt-3 space-y-3">
         {KINDS.filter(([k]) => watch.providers[k]?.length).map(([k, label]) => (
-          <div key={k} className="flex flex-wrap items-center gap-3">
-            <span className="w-24 text-sm text-white/70">{label}</span>
+          // Label in a fixed left column, pills in their own wrapping column, so a second line of pills
+          // lines up under the first pill instead of sliding back under the label. On phones the label sits above.
+          <div key={k} className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+            <span className="text-sm leading-5 text-white/70 sm:w-28 sm:shrink-0 sm:pt-2">{label}</span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2 sm:gap-3">
             {watch.providers[k]!.map((p) => (
               <a key={p.name} href={title ? providerSearchUrl(p.name, title) : watch.link ?? undefined} target="_blank" rel="noopener noreferrer"
                  title={`${label} on ${p.name}: opens ${p.name}'s search for this title`}
@@ -32,6 +35,7 @@ export default function WhereToWatch({ watch, title = "" }: { watch: Watch | nul
                 {p.name}
               </a>
             ))}
+            </div>
           </div>
         ))}
       </div>
