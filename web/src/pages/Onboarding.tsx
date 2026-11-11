@@ -21,7 +21,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [kind, setKind] = useState<"movies" | "series">("movies");
   const [picks, setPicks] = useState<number[]>([]);
-  const [langs, setLangs] = useState<string[]>(["en"]);
+  const [langs, setLangs] = useState<string[]>([]);
   const [liked, setLiked] = useState<number[]>([]);
   const [disliked, setDisliked] = useState<number[]>([]);
   const qc = useQueryClient();
@@ -75,8 +75,11 @@ export default function Onboarding() {
           </div>
         )}
         {step === 1 && data.data && (
-          <Chips items={data.data.languages.map((l) => ({ key: l.code, label: `${languageName(l.code)}`, sub: `${l.films} films` }))}
-            selected={langs} onToggle={(k) => toggle(langs, setLangs, k)} />
+          <>
+            <p className="mb-4 text-sm text-muted">Choose every language you want recommendations in. Nothing is selected for you.</p>
+            <Chips items={data.data.languages.map((l) => ({ key: l.code, label: `${languageName(l.code)}`, sub: `${l.films} films` }))}
+              selected={langs} onToggle={(k) => toggle(langs, setLangs, k)} />
+          </>
         )}
         {step === 2 && data.data && (
           <>
