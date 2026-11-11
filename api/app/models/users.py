@@ -59,6 +59,8 @@ class UserPreferences(Base):
     # Refine My Taste: {trait: "more" | "less"} (app/services/taste_dna.py); a missing trait = learned from activity.
     taste_overrides: Mapped[dict | None] = mapped_column(JSONB)
     discovery_mode: Mapped[str] = mapped_column(Text, server_default="balanced", nullable=False)
+    # Opt-in: a coarse taste summary goes to the AI assistant (app/services/assistant_taste.py). Off by default.
+    ai_taste_sharing: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { send } from "../api/client";
+import { api, send } from "../api/client";
 import { useMe } from "../api/hooks";
 import { ImportRatings } from "../components/account/ImportRatings";
 import { PasswordChecklist } from "../components/account/PasswordChecklist";
@@ -24,6 +24,50 @@ function Problem({ error }: { error: unknown }) {
 
 const button = "rounded-md bg-white px-4 py-2 text-sm font-semibold text-black disabled:opacity-60";
 
+type Sharing = { enabled: boolean; summary: string | null; min_liked: number };
+
+/** Opt-in, off by default: a short taste line for the AI assistant. Shows the exact words Google would receive. */
+export function AiTasteSharing() {
+  const qc = useQueryClient();
+  const { notify } = useUI();
+  const { data } = useQuery({ queryKey: ["taste-sharing"], queryFn: () => api<Sharing>("/assistant/taste-sharing") });
+  const save = useMutation({
+    mutationFn: (enabled: boolean) => send<Sharing>("PUT", "/assistant/taste-sharing", { enabled }),
+    onSuccess: (r) => {
+      qc.setQueryData(["taste-sharing"], r);
+      qc.invalidateQueries({ queryKey: ["assistant-status"] });
+      notify(r.enabled ? "The assistant can now use your taste summary" : "Your taste summary is no longer shared");
+    },
+  });
+  if (!data) return null;
+  return (
+    <>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" className="mt-1" checked={data.enabled} disabled={save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)} />
+        <span>
+          <b>Share a short taste summary with the AI assistant</b>
+          <span className="mt-1 block text-white/70">
+            Better-fitting suggestions and a short reason why each one suits you. Off unless you turn it on. Only sent when you ask the
+            assistant for suggestions, and it never includes titles, ratings, your name or your email.
+          </span>
+        </span>
+      </label>
+      <div className="rounded-md bg-white/[0.04] px-3 py-2 text-sm">
+        <p className="text-xs text-muted">Exactly what Google would receive:</p>
+        <p className="mt-1 text-white/85">
+          {data.summary ?? `Nothing yet. Like or rate at least ${data.min_liked} titles first.`}
+        </p>
+      </div>
+      <Problem error={save.error} />
+      <p className="text-xs text-muted">
+        The assistant uses Google Gemini's free tier, where Google may use prompts to improve its products. See the{" "}
+        <Link to="/privacy" className="underline">Privacy policy</Link>.
+      </p>
+    </>
+  );
+}
+
 export default function Account() {
   const { data: me, isLoading } = useMe();
   const qc = useQueryClient();
@@ -39,7 +83,7 @@ export default function Account() {
   useEffect(() => setName(me?.display_name ?? ""), [me?.display_name]);
   const { hash } = useLocation();
   useEffect(() => {
-    if (me && hash === "#import") document.getElementById("import")?.scrollIntoView({ block: "start" });
+    if (me && (hash === "#import" || hash === "#ai")) document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
   }, [me, hash]);
 
   const rename = useMutation({
@@ -93,6 +137,12 @@ export default function Account() {
           <button className={button} disabled={rename.isPending || !name.trim() || name.trim() === me.display_name}>Save name</button>
         </form>
       </Section>
+
+      <div id="ai" className="scroll-mt-24">
+        <Section title="AI assistant">
+          <AiTasteSharing />
+        </Section>
+      </div>
 
       <div id="import" className="scroll-mt-24">
         <Section title="Import your ratings">
