@@ -33,7 +33,7 @@ def status(user=Depends(current_user)) -> dict:
     return {"enabled": available(), "remaining": ai.remaining(user["id"], user["is_guest"]), "cap": ai.cap_for(user["is_guest"])}
 
 
-def picks(db: Session, user_id: int, message: str, blocked: set[int], want: dict) -> str:
+def picks(db: Session, user_id: int, message: str, blocked: set[int], want: dict, prof=None) -> str:
     """The engine's shortlist for a suggestion request, as catalog facts (assistant_context.py); empty for other
     messages, before the models are built, or on any engine problem (the chat must not break). `want` is the
     request plan, the same one that checks Gemini's answer."""
@@ -46,12 +46,26 @@ def picks(db: Session, user_id: int, message: str, blocked: set[int], want: dict
         named = ctx.named_row(engine, message)
         if named is not None:       # "something like X": X leads the taste signal
             st = ctx.like_state(st, named)
-        rows = ctx.shortlist(engine, st, want, {row_of[i] for i in blocked if i in row_of})
+        scorer = ctx.dna_scorer(db, engine, prof) if prof is not None else None
+        rows = ctx.shortlist(engine, st, want, {row_of[i] for i in blocked if i in row_of}, dna=scorer)
         return ctx.shortlist_prompt(engine, rows, want)
     except Exception:
         db.rollback()
         ai.log.exception("assistant shortlist failed; answering without it")
         return ""
+
+
+def taste_profile(db: Session, user_id: int):
+    """The person's Taste DNA profile, or None when they have too little for it to count (or on any problem). Stays on our
+    server: it reorders the shortlist and labels the cards, and is never part of a Gemini prompt."""
+    try:
+        from app.routers.taste import profile_for
+        prof, _ = profile_for(db, user_id)
+        return prof if prof.titles >= ctx.DNA_MIN_TITLES else None
+    except Exception:
+        db.rollback()
+        ai.log.exception("taste profile for the assistant failed; continuing without it")
+        return None
 
 
 @router.post("/chat")
@@ -67,7 +81,8 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
         blocked = ctx.blocked_ids(db, user["id"])
         asked = msgs[-1]["text"]
         want = ctx.request_plan(db, asked) if ctx.wants_suggestions(asked) else None
-        system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], asked, blocked, want) if want else "",
+        prof = taste_profile(db, user["id"]) if want else None
+        system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], asked, blocked, want, prof) if want else "",
                                            ai.named_titles(db, msgs[-1]["text"])) if x)
         reply = ai.ask_gemini(msgs, system)
         # Hard exclusions win over Gemini, in the written reply as well as the cards (assistant_context.scrub_reply).
@@ -82,4 +97,10 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
         ai.refund(user["id"], user["is_guest"])
         ai.log.exception("assistant failed")
         raise HTTPException(502, "The assistant hit a problem. Try again in a moment.")
-    return {"reply": reply, "items": cards(db, ids, user["id"]) if ids else [], "remaining": ai.remaining(user["id"], user["is_guest"])}
+    try:
+        why = ctx.dna_reasons(db, prof, ids) if ids else {}
+    except Exception:
+        db.rollback()
+        ai.log.exception("taste labels for the assistant failed")
+        why = {}
+    return {"reply": reply, "items": cards(db, ids, user["id"], why) if ids else [], "remaining": ai.remaining(user["id"], user["is_guest"])}

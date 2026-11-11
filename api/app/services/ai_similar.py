@@ -80,7 +80,7 @@ def precomputed(db: Session, movie_id: int, kind: str) -> list[int] | None:
     if _file is None:
         path = MODELS / "ai_similar.json"
         try:
-            _file = json.loads(path.read_text()).get("titles", {}) if path.exists() else {}
+            _file = json.loads(path.read_text(encoding="utf-8")).get("titles", {}) if path.exists() else {}
         except (OSError, ValueError):
             log.warning("ai_similar.json could not be read")
             _file = {}

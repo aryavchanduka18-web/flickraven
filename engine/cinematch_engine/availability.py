@@ -39,7 +39,7 @@ class AvailabilityMap:
         path = Path(path)
         if not path.exists():
             return None
-        return cls(json.loads(path.read_text())["stages"])
+        return cls(json.loads(path.read_text(encoding="utf-8"))["stages"])
 
     def map_unavailable(self, stage: str, renorm: np.ndarray) -> np.ndarray:
         """Scores (on the MovieLens films' scale) for films scored only by the sources that can score them."""

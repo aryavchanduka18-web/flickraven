@@ -8,6 +8,7 @@ reasons) goes to Gemini, and only when the message asks for suggestions. Gemini 
 Hard exclusions stay here too: titles the person disliked or rated 4 or lower are never shortlisted and never linked,
 whatever Gemini writes. A future paid tier could send more; that would be a new, explicit setting and a privacy-page change.
 """
+import bisect
 import re
 
 import numpy as np
@@ -170,7 +171,61 @@ def like_state(st, row: int):
                    ratings={r: v for r, v in st.ratings.items() if v <= 4})
 
 
-def shortlist(engine, st, want: dict, blocked_rows: set[int], n: int = SHORTLIST) -> list[int]:
+DNA_POOL = 60          # series/anime candidates the Taste DNA may reorder before the short list is cut
+DNA_MIN_TITLES = 3     # liked titles with known traits needed before a Taste DNA counts as a signal
+DNA_SHARE = 0.5        # judgement, not tuned: half engine rank (kind_rank), half Taste DNA fit. No held-out TV ratings exist
+
+
+def dna_blend(pool: list[int], dna: dict[int, float]) -> list[int]:
+    """Reorder `pool` (best first by the engine) by half engine rank, half Taste DNA fit, both as percentiles. Titles whose
+    traits are unknown keep a neutral 0.5 for the DNA half. Fewer than 5 scored titles: the engine order stands."""
+    if len(pool) < 2 or len(dna) < 5:
+        return pool
+    vals = sorted(dna.values())
+    # tie-aware percentile: titles with equal fit get equal credit
+    pct = {r: (bisect.bisect_left(vals, v) + bisect.bisect_right(vals, v)) / (2 * len(vals)) for r, v in dna.items()}
+    n = len(pool)
+    score = {r: (1 - DNA_SHARE) * (1 - i / n) + DNA_SHARE * pct.get(r, 0.5) for i, r in enumerate(pool)}
+    return sorted(pool, key=lambda r: -score[r])
+
+
+def dna_scorer(db, engine, prof):
+    """rows -> {row: Taste DNA score} for the titles whose traits are known. Computed here on our server; nothing of the
+    profile leaves it."""
+    from app.services import taste_dna as dna
+
+    def score(rows: list[int]) -> dict[int, float]:
+        ids = [int(engine.cat.movie_ids[r]) for r in rows]
+        vec = dna.title_vectors(db, ids)
+        out = {}
+        for r, i in zip(rows, ids):
+            s, _ = dna.fit(prof, vec.get(i))
+            if s is not None:
+                out[r] = s
+        return out
+    return score
+
+
+def dna_reasons(db, prof, ids: list[int]) -> dict[int, dict]:
+    """{movie id: {"reasons": [...]}} naming the person's preferred traits that a title really shows (trait value 0.5+,
+    from its keywords and genres). Added to the cards on our side only: never sent to Gemini, never put in the reply
+    text (the chat history is sent back to Gemini on the next turn)."""
+    from app.services import taste_dna as dna
+    if prof is None or not ids:
+        return {}
+    vec = dna.title_vectors(db, ids)
+    out = {}
+    for i in ids:
+        _, because = dna.fit(prof, vec.get(i))
+        if because:
+            phrases = [dna.TRAIT[k].phrase for k in because]
+            joined = phrases[0] if len(phrases) == 1 else ", ".join(phrases[:-1]) + " and " + phrases[-1]
+            out[i] = {"reasons": [{"code": "taste_dna", "text": f"Fits your Taste DNA: {joined}.", "source": "taste_dna",
+                                   "share": 0.0, "anchor_movie_id": None}]}
+    return out
+
+
+def shortlist(engine, st, want: dict, blocked_rows: set[int], n: int = SHORTLIST, dna=None) -> list[int]:
     """Catalog rows, best first, for this person and this request: films from the hybrid rail score, series and anime
     from kind_rank (which already drops what they rated, watched, liked, disliked or whose genre they dislike).
     Hard rules, never relaxed: the kind, a language they asked for, a language or genre they ruled out. Soft: the genre
@@ -190,7 +245,12 @@ def shortlist(engine, st, want: dict, blocked_rows: set[int], n: int = SHORTLIST
                 and (not want["languages"] or cat.language[r] in want["languages"])
                 and cat.language[r] not in no_lang and not (no_genre & set(cat.genres[r]))]
         fit = [r for r in hard if not want["genres"] or set(want["genres"]) & set(cat.genres[r])]
-        out += (fit if len(fit) >= 5 else hard)[:per_kind]
+        pool = fit if len(fit) >= 5 else hard
+        if dna is not None and kind != "movie":
+            # Series and shows: the person's Taste DNA reorders the engine's top candidates (scored on our server).
+            pool = pool[:DNA_POOL]
+            pool = dna_blend(pool, dna(pool))
+        out += pool[:per_kind]
     return out[:n]
 
 

@@ -70,7 +70,8 @@ describe("Assistant: add to My List", () => {
       }
       chatBodies.push(JSON.parse(String(init?.body)));
       return new Response(JSON.stringify({ reply: "Try [[Heat (2001)]] or [[Ronin (2002)]]. Want something darker?",
-        items: [card(1, "Heat"), card(2, "Ronin"), card(3, "Saved Film", true)], remaining: 19 }), { status: 200 });
+        items: [{ ...card(1, "Heat"), reasons: [{ code: "taste_dna", text: "Fits your Taste DNA: dark, atmospheric tone.", source: "taste_dna", share: 0, anchor_movie_id: null }] },
+          card(2, "Ronin"), card(3, "Saved Film", true)], remaining: 19 }), { status: 200 });
     });
   });
 
@@ -83,6 +84,12 @@ describe("Assistant: add to My List", () => {
     await screen.findByRole("button", { name: "Add Heat to My List" });
     return box;
   }
+
+  it("a card shows the Taste DNA line our server attached, and only that", async () => {
+    await askOnce();
+    expect(screen.getByText("Fits your Taste DNA: dark, atmospheric tone.")).toBeTruthy();
+    expect(screen.getAllByText(/Fits your Taste DNA/)).toHaveLength(1);
+  });
 
   it("each card offers + My List; a double click adds once and the card then says In your list", async () => {
     await askOnce();
