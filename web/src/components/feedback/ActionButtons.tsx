@@ -6,7 +6,7 @@ import { canHideFrom } from "../../lib/notInterested";
 import type { UserState } from "../../api/types";
 import { useUI } from "../layout/ui";
 
-type Props = { movieId: number; state: UserState; source?: string; size?: "sm" | "md"; showWatched?: boolean };
+type Props = { movieId: number; state: UserState; source?: string; origin?: string; size?: "sm" | "md"; showWatched?: boolean };
 
 const Icon = {
   like: (on: boolean) => (
@@ -84,8 +84,8 @@ function ActionButton({ on, label, title, onClick, burst, size, children }: {
   );
 }
 
-export default function ActionButtons({ movieId, state: server, source, size = "sm", showWatched = false }: Props) {
-  const fb = useFeedback(movieId, source);
+export default function ActionButtons({ movieId, state: server, source, origin, size = "sm", showWatched = false }: Props) {
+  const fb = useFeedback(movieId, source, origin);
   const hide = useNotInterested(movieId, source);
   const qc = useQueryClient();
   // "Not interested" is for recommendation rows only (lib/notInterested.ts), not More Like This, search or My List.

@@ -4,6 +4,7 @@
   with them through ON DELETE CASCADE). Guests who signed up are no longer guests, so they are never touched.
 - recommendation_logs (one row per film shown, used only for offline analysis) older than LOG_KEEP_DAYS
   are deleted.
+- impressions (rows and cards that were visible): cards after 30 days, rows after 60.
 
 It runs once shortly after start-up and then every CLEANUP_EVERY_HOURS while the server is awake.
 """
@@ -29,8 +30,12 @@ def run(db) -> dict:
                         {"d": GUEST_IDLE_DAYS}).rowcount
     logs = db.execute(text("DELETE FROM recommendation_logs WHERE created_at < now() - make_interval(days => :d)"),
                       {"d": LOG_KEEP_DAYS}).rowcount
+    from app.services import impressions
+    imps = db.execute(text("""DELETE FROM impressions WHERE (kind = 'card' AND created_at < now() - make_interval(days => :c))
+                                 OR created_at < now() - make_interval(days => :r)"""),
+                      {"c": impressions.CARD_KEEP_DAYS, "r": impressions.ROW_KEEP_DAYS}).rowcount
     db.commit()
-    return {"guests_deleted": guests, "logs_deleted": logs}
+    return {"guests_deleted": guests, "logs_deleted": logs, "impressions_deleted": imps}
 
 
 def _loop(stop: threading.Event) -> None:

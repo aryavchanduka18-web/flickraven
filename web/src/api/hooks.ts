@@ -65,21 +65,23 @@ export function patchFilm(data: unknown, id: number, change: Partial<State>, dro
 /** Like / dislike / list / watched / rate with an immediate refresh of everything personal (spec 6.12).
  *  Every cached list is updated at once (optimistic), and a disliked or watched film leaves Home and the
  *  collection rows straight away, before the server's fresh lists arrive. */
-export function useFeedback(movieId: number, source?: string) {
+export function useFeedback(movieId: number, source?: string, origin?: string) {
   const qc = useQueryClient();
-  // Every action, including the undoing ones, says which row or page it came from (row learning reads it).
-  const q = source ? `?source=${encodeURIComponent(source)}` : "";
+  // Every action, including the undoing ones, says where it happened (`source`) and which row led there (`origin`).
+  // Row learning credits the action to the origin when there is one.
+  const parts = [source && `source=${encodeURIComponent(source)}`, origin && `origin=${encodeURIComponent(origin)}`].filter(Boolean);
+  const q = parts.length ? `?${parts.join("&")}` : "";
   return useMutation({
     mutationFn: (a: FeedbackAction) => {
       switch (a.kind) {
         case "rate":
-          return a.rating ? send("PUT", `/ratings/${movieId}`, { rating: a.rating, source }) : send("DELETE", `/ratings/${movieId}${q}`);
+          return a.rating ? send("PUT", `/ratings/${movieId}`, { rating: a.rating, source, origin }) : send("DELETE", `/ratings/${movieId}${q}`);
         case "react":
-          return a.value ? send("PUT", `/reactions/${movieId}`, { value: a.value, source }) : send("DELETE", `/reactions/${movieId}${q}`);
+          return a.value ? send("PUT", `/reactions/${movieId}`, { value: a.value, source, origin }) : send("DELETE", `/reactions/${movieId}${q}`);
         case "list":
-          return a.on ? send("PUT", `/list/${movieId}`, { source }) : send("DELETE", `/list/${movieId}${q}`);
+          return a.on ? send("PUT", `/list/${movieId}`, { source, origin }) : send("DELETE", `/list/${movieId}${q}`);
         case "watched":
-          return a.on ? send("PUT", `/watched/${movieId}`, { source }) : send("DELETE", `/watched/${movieId}${q}`);
+          return a.on ? send("PUT", `/watched/${movieId}`, { source, origin }) : send("DELETE", `/watched/${movieId}${q}`);
       }
     },
     onMutate: (a: FeedbackAction) => {

@@ -29,6 +29,7 @@ export function Privacy() {
           <li>Your email address, the name you choose, and your password stored as a one-way hash (we cannot read it).</li>
           <li>What you tell us about your taste: onboarding picks, languages and genres, ratings, likes and dislikes (with the reason, if you give one), My List and films marked as watched.</li>
           <li>Films you open or click in search, and the recommendations shown to you, so the site can learn your taste. Records of recommendations shown are deleted after 60 days.</li>
+          <li>Which recommendation rows and titles were on your screen for at least a second (a row or title you never scrolled to is not recorded). It is used only to learn which rows work for you; it is never read as a dislike, is never sent to another company, and is deleted after 30 days for titles and 60 days for rows.</li>
           <li>If you import a Letterboxd or IMDb file, only the ratings that match our catalog are kept. The file itself is not stored.</li>
         </ul>
         <p className="mt-2">We do not collect your location, contacts, or payment details.</p>

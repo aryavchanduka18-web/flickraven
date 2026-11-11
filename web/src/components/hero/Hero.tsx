@@ -1,9 +1,10 @@
 import ImdbScore from "../../components/movie/ImdbScore";
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RecItem } from "../../api/types";
 import { useFeedback, useLogEvent } from "../../api/hooks";
+import { ROW_VISIBLE, record, useDwell } from "../../lib/impressions";
 import { languageName, runtime } from "../../lib/format";
 import { tmdbImage } from "../../lib/tmdb";
 import { agreementLabel } from "../../lib/confidence";
@@ -60,6 +61,10 @@ export default function Hero({ items }: { items: RecItem[] }) {
   const artScale = useTransform(scrollY, [0, 600], [1, 1.06]);
   const fade = useTransform(scrollY, [0, 500], [1, 0.35]);
   const item = items[i];
+  const sectionRef = useRef<HTMLElement>(null);
+  // A hero slide counts once the hero is half on screen and the slide has been shown for a second.
+  useDwell(sectionRef, () => item && record({ surface: "hero", kind: "card", movie_id: item.movie.id, position: i, visible_ms: 1000 }),
+    { threshold: ROW_VISIBLE, key: item?.movie.id });
   useEffect(() => setI(0), [items.length]);
   useEffect(() => {
     const t = window.setTimeout(() => setI((x) => (x + 1) % Math.max(items.length, 1)), 9000);
@@ -75,7 +80,7 @@ export default function Hero({ items }: { items: RecItem[] }) {
   const m = item.movie;
   const go = (n: number) => setI((n + items.length) % items.length);
   return (
-    <section data-sb-bleed className="hero-bleed relative h-[82vh] min-h-[560px] overflow-hidden isolate" aria-roledescription="carousel" aria-label="Top picks">
+    <section ref={sectionRef} data-sb-bleed className="hero-bleed relative h-[82vh] min-h-[560px] overflow-hidden isolate" aria-roledescription="carousel" aria-label="Top picks">
       <AnimatePresence initial={false}>
         <motion.div key={m.id} className="absolute inset-0" style={{ y: artY, scale: artScale }} initial={{ opacity: 0, scale: reduce ? 1 : 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}>

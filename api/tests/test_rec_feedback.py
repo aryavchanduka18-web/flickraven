@@ -39,7 +39,7 @@ def test_silence_never_moves_a_row_down():
 
 
 def test_few_showings_do_not_move_a_row():
-    stats = {"rail:a": S(10, 3), "rail:d": S(2, 5)}
+    stats = {"rail:a": S(10, 3), "rail:d": S(7, 5)}
     assert "rail:d" not in rf.shifts(KEYS, stats)
 
 
@@ -114,7 +114,8 @@ def test_row_stats_count_showings_and_actions(film, test_engine):
         with test_engine.connect() as conn:
             from sqlalchemy.orm import Session
             stats = rf.row_stats(Session(bind=conn), uid)
-        assert stats["rail:because"] == {"shows": 3, "good": 1.0, "bad": 0.0}
+        # no impressions yet: the 3 page loads that returned the row count at half weight
+        assert stats["rail:because"] == {"shows": 1.5, "served": 3, "visible": 0, "good": 1.0, "bad": 0.0}
 
 
 # ---- the fixes from the #113 review ----------------------------------------------------------
@@ -132,16 +133,16 @@ def test_every_action_carries_its_source(film, test_engine):
         for method, path, body in ACTIONS:
             url = "/api" + path.format(m=film)
             if method == "put":
-                r = c.put(url, json={**(body or {}), "source": "rail:because"})
+                r = c.put(url, json={**(body or {}), "source": "movie_page", "origin": "rail:because"})
             else:
-                r = c.delete(url + "?source=rail:because")
+                r = c.delete(url + "?source=movie_page&origin=rail:because")
             assert r.status_code == 200, (method, path)
         with test_engine.connect() as conn:
-            sources = conn.execute(text("SELECT event_type, source FROM interactions WHERE user_id = :u AND movie_id = :m"),
+            sources = conn.execute(text("SELECT event_type, source, origin FROM interactions WHERE user_id = :u AND movie_id = :m"),
                                    {"u": uid, "m": film}).all()
-    missing = [e for e, s in sources if s != "rail:because"]
-    assert not missing, f"events without a source: {missing}"
-    assert {"watched", "unwatched", "list_remove", "unrate", "clear_reaction"} <= {e for e, _ in sources}
+    missing = [e for e, s, o in sources if s != "movie_page" or o != "rail:because"]
+    assert not missing, f"events without a source or origin: {missing}"
+    assert {"watched", "unwatched", "list_remove", "unrate", "clear_reaction"} <= {e for e, _, _ in sources}
 
 
 def test_hero_never_falls_back_to_hidden_titles():
@@ -157,3 +158,76 @@ def test_hero_never_falls_back_to_hidden_titles():
     # everything hidden: the hero is empty, the hidden titles do not return
     rows, _ = rf.hero_without_hidden(plan, {1, 2, 3, 10, 11, 12})
     assert rows == []
+
+
+# ---- impressions -------------------------------------------------------------------------------
+PAGE = "11111111-2222-3333-4444-555555555555"
+
+
+def _post(c, items, page=PAGE):
+    return c.post("/api/impressions", json={"page_id": page, "items": items}).json()
+
+
+def test_impressions_are_stored_once_per_page_and_validated(film, test_engine):
+    with TestClient(app) as c:
+        c.post("/api/auth/guest")
+        uid = c.get("/api/me").json()["id"]
+        items = [{"surface": "rail:because", "kind": "row", "position": 2},
+                 {"surface": "rail:because", "kind": "card", "movie_id": film, "position": 0, "visible_ms": 1200},
+                 {"surface": "rail:because", "kind": "card", "movie_id": 99999999, "position": 1},      # unknown title
+                 {"surface": "rail:because", "kind": "card"},                                           # no title
+                 {"surface": "search", "kind": "card", "movie_id": film},                               # not a rec surface
+                 {"surface": "rail:x", "kind": "weird"}]
+        assert _post(c, items)["stored"] == 2
+        assert _post(c, items)["stored"] == 0                                    # same page load: counted once
+        assert _post(c, items[:1], page="66666666-2222-3333-4444-555555555555")["stored"] == 1   # a new page load counts
+        assert _post(c, items, page="not-a-uuid")["stored"] == 0
+        with test_engine.connect() as conn:
+            n = conn.execute(text("SELECT count(*) FROM impressions WHERE user_id = :u"), {"u": uid}).scalar()
+        assert n == 3
+
+
+def test_impressions_daily_cap(film, test_engine, monkeypatch):
+    from app.services import impressions
+    monkeypatch.setattr(impressions, "DAILY_CAP", 3)
+    with TestClient(app) as c:
+        c.post("/api/auth/guest")
+        rows = [{"surface": f"rail:r{i}", "kind": "row"} for i in range(6)]
+        assert _post(c, rows)["stored"] == 3
+        assert _post(c, rows, page="77777777-2222-3333-4444-555555555555")["stored"] == 0
+
+
+def test_row_stats_use_visible_pages_and_credit_the_origin(film, test_engine):
+    from sqlalchemy.orm import Session
+    with TestClient(app) as c:
+        c.post("/api/auth/guest")
+        uid = c.get("/api/me").json()["id"]
+        with test_engine.begin() as conn:                    # the row was returned on 6 page loads...
+            for _ in range(6):
+                conn.execute(text("INSERT INTO recommendation_logs (request_id, user_id, surface, movie_id) VALUES (gen_random_uuid(), :u, 'because:1', :m)"), {"u": uid, "m": film})
+        for i in range(3):                                   # ...but was visible on only 3
+            _post(c, [{"surface": "rail:because", "kind": "row"}], page=f"0000000{i}-2222-3333-4444-555555555555")
+        # a like made on the film's own page still credits the row that led there
+        c.put(f"/api/reactions/{film}", json={"value": 1, "source": "movie_page", "origin": "rail:because"})
+        with test_engine.connect() as conn:
+            stats = rf.row_stats(Session(bind=conn), uid)
+    s = stats["rail:because"]
+    assert (s["shows"], s["served"], s["visible"], s["good"]) == (3.0, 6, 3, 1.0)
+
+
+def test_cleanup_removes_old_impressions(film, test_engine):
+    from app.db import SessionLocal
+    from app.services import cleanup
+    with TestClient(app) as c:
+        c.post("/api/auth/guest")
+        uid = c.get("/api/me").json()["id"]
+    with test_engine.begin() as conn:
+        for kind, mid, days in (("card", film, 40), ("card", film, 5), ("row", None, 40), ("row", None, 70)):
+            conn.execute(text("""INSERT INTO impressions (user_id, page_id, surface, kind, movie_id, created_at)
+                VALUES (:u, gen_random_uuid(), 'rail:t', :k, :m, now() - make_interval(days => :d))"""),
+                         {"u": uid, "k": kind, "m": mid, "d": days})
+    with SessionLocal() as db:
+        cleanup.run(db)
+    with test_engine.connect() as conn:
+        left = sorted(r for r in conn.execute(text("SELECT kind, (now() - created_at) > interval '30 days' FROM impressions WHERE user_id = :u"), {"u": uid}))
+    assert left == [("card", False), ("row", True)]

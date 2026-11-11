@@ -97,7 +97,7 @@ export default function Home() {
           {home.data?.rails.map((r, i) => (
             <Fragment key={r.key}>
               <Rail title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
-                personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} learned={r.learned}
+                personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} learned={r.learned} slot={i}
                 onHide={r.key === "top_picks" ? undefined : () => hideRow.mutate(`rail:${r.key.split(":")[0]}`)} />
               {/* Series and anime come right after the first two film rails, so they are seen without long scrolling. */}
               {i === 1 && series.data && series.data.items.length > 0 && (
