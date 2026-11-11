@@ -136,6 +136,32 @@ def kinds_for_named(want: dict, named_kind: str) -> list[str]:
     return [named_kind]
 
 
+def named_kind(db: Session, message: str) -> str | None:
+    """Kind (movie, series or anime) of the best-known catalog title the message names, or None. Runs of 1 to 6 words;
+    one-word runs need 5+ letters, like the assistant's catalog-facts lookup."""
+    words = re.findall(r"[\w'&.:-]+", message.lower())
+    runs = {" ".join(words[i:i + n]).strip(".:-") for n in range(1, 7) for i in range(len(words) - n + 1)}
+    runs = [r for r in runs if len(r) >= 5 or (" " in r and len(r) >= 3)][:200]
+    if not runs:
+        return None
+    row = db.execute(text("SELECT title_type FROM movies WHERE lower(title) = ANY(:t) ORDER BY tmdb_vote_count DESC NULLS LAST LIMIT 1"),
+                     {"t": runs}).first()
+    return row[0] if row else None
+
+
+def request_plan(db: Session, message: str) -> dict:
+    """What the message asks for, read locally, with the kind a named title implies ("something like Death Note" means
+    anime) unless the person gave a kind or ruled that kind out. One plan serves both the shortlist and the check on
+    Gemini's answer, so the two cannot disagree. `kind_inferred` marks a kind that came from the title."""
+    want = intent(message)
+    kind = named_kind(db, message)
+    want["kind_inferred"] = False
+    if kind and not want["kind_asked"] and kind not in want["exclude_kinds"]:
+        want["kinds"] = [kind]
+        want["kind_inferred"] = True
+    return want
+
+
 def like_state(st, row: int):
     """For "like X" requests: the person's state with X as the only taste signal, keeping every exclusion (watched,
     rated, disliked, disliked genres), so the request leads and their own no-gos still hold."""
@@ -252,7 +278,7 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "", bad
 
     # A full stop inside a blocked title ("Mr. Robot") must not end a sentence: hide those dots while splitting.
     masked = reply
-    for low in titles:
+    for low in set(titles) | bad_marks:
         if "." in low:
             masked = re.sub(re.escape(low), lambda m_: m_.group(0).replace(".", "\u2024"), masked, flags=re.I)
     parts = [x.replace("\u2024", ".") for x in re.findall(r".*?(?:[.!?](?=\s|$)|\n+|$)\s*", masked, flags=re.S) if x]
@@ -270,7 +296,7 @@ def off_request_marks(db: Session, reply: str, want: dict) -> set[str]:
     """Lowercase names of [[marked]] titles in the reply that FlickRaven has and that break what the person asked for:
     a kind they named (or ruled out), a language they named, a language they ruled out. A prompt cannot guarantee
     this, so it is checked after Gemini answers. Titles FlickRaven does not have cannot be checked and are left."""
-    allowed_kinds = set(want["kinds"]) if want.get("kind_asked") else {"movie", "series", "anime"} - set(want.get("exclude_kinds") or [])
+    allowed_kinds = set(want["kinds"]) if (want.get("kind_asked") or want.get("kind_inferred")) else {"movie", "series", "anime"} - set(want.get("exclude_kinds") or [])
     bad: set[str] = set()
     for raw in dict.fromkeys(TITLE_RE.findall(reply)):
         m = re.match(r"(.+?)\s*\((\d{4})\)\s*$", raw)

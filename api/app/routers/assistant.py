@@ -33,20 +33,19 @@ def status(user=Depends(current_user)) -> dict:
     return {"enabled": available(), "remaining": ai.remaining(user["id"], user["is_guest"]), "cap": ai.cap_for(user["is_guest"])}
 
 
-def picks(db: Session, user_id: int, message: str, blocked: set[int]) -> str:
+def picks(db: Session, user_id: int, message: str, blocked: set[int], want: dict) -> str:
     """The engine's shortlist for a suggestion request, as catalog facts (assistant_context.py); empty for other
-    messages, before the models are built, or on any engine problem (the chat must not break)."""
+    messages, before the models are built, or on any engine problem (the chat must not break). `want` is the
+    request plan, the same one that checks Gemini's answer."""
     if not ctx.wants_suggestions(message) or not rec.artifacts_ready():
         return ""
     try:
         engine = rec.load_engine(db)
         st = rec.user_state(db, user_id, engine)
         row_of = engine.cat.row_of
-        want = ctx.intent(message)
         named = ctx.named_row(engine, message)
-        if named is not None:       # "something like X": X leads, in X's own kind unless the message names one
+        if named is not None:       # "something like X": X leads the taste signal
             st = ctx.like_state(st, named)
-            want["kinds"] = ctx.kinds_for_named(want, engine.cat.kind[named])        # "like X, but not anime" stays movie+series
         rows = ctx.shortlist(engine, st, want, {row_of[i] for i in blocked if i in row_of})
         return ctx.shortlist_prompt(engine, rows, want)
     except Exception:
@@ -66,13 +65,14 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
     ai.spend(user["id"], user["is_guest"])
     try:
         blocked = ctx.blocked_ids(db, user["id"])
-        system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], msgs[-1]["text"], blocked),
+        asked = msgs[-1]["text"]
+        want = ctx.request_plan(db, asked) if ctx.wants_suggestions(asked) else None
+        system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], asked, blocked, want) if want else "",
                                            ai.named_titles(db, msgs[-1]["text"])) if x)
         reply = ai.ask_gemini(msgs, system)
         # Hard exclusions win over Gemini, in the written reply as well as the cards (assistant_context.scrub_reply).
         # Language and kind the person asked for are checked on Gemini's answer too: a prompt is not a guarantee.
-        asked = msgs[-1]["text"]
-        off = ctx.off_request_marks(db, reply, ctx.intent(asked)) if ctx.wants_suggestions(asked) else set()
+        off = ctx.off_request_marks(db, reply, want) if want else set()
         reply, _ = ctx.scrub_reply(reply, ctx.blocked_titles(db, blocked), asked, off)
         ids = [i for i in ai.resolve_titles(db, reply) if i not in blocked]
     except HTTPException:

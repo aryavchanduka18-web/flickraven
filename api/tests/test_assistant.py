@@ -464,3 +464,33 @@ def test_a_title_in_a_ruled_out_language_is_dropped_and_questions_of_fact_are_no
         assert len(q["items"]) == 2                         # a question of fact is not a suggestion request: no filtering
     finally:
         _remove_titles(test_engine)
+
+
+# ---- review round 4 on #102 -----------------------------------------------------------------------------------
+def test_a_kind_inferred_from_a_named_title_is_enforced_on_geminis_answer(client, test_engine, monkeypatch):
+    _add_titles(test_engine, [("Zed Note", 2006, "ja", "anime"), ("Zed Anime Two", 2010, "ja", "anime"), ("Zed Thriller Film", 2012, "en", "movie")])
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: FakeResp("Try [[Zed Anime Two (2010)]]. Or maybe [[Zed Thriller Film (2012)]] for suspense. Enjoy."))
+    try:
+        r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend something like Zed Note"}]}).json()
+        assert [i["movie"]["title"] for i in r["items"]] == ["Zed Anime Two"]
+        assert "Zed Thriller Film" not in r["reply"] and "Enjoy." in r["reply"]
+        # said outright "not anime": the title does not pull the request into anime
+        r2 = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend something like Zed Note, but not anime"}]}).json()
+        assert [i["movie"]["title"] for i in r2["items"]] == ["Zed Thriller Film"]
+        # a kind the person asked for wins over the title's kind
+        r3 = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend a movie like Zed Note"}]}).json()
+        assert [i["movie"]["title"] for i in r3["items"]] == ["Zed Thriller Film"]
+    finally:
+        _remove_titles(test_engine)
+
+
+def test_a_dotted_title_rejected_for_language_cannot_slip_through_the_sentence_splitter(client, test_engine, monkeypatch):
+    _add_titles(test_engine, [("Mr. Zed Robot", 2015, "en", "series"), ("Hindi Show Zed", 2020, "hi", "series")])
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: FakeResp("Start with [[Hindi Show Zed (2020)]]. Also [[Mr. Zed Robot (2015)]] is tense. Enjoy."))
+    try:
+        r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend Hindi series"}]}).json()
+        assert [i["movie"]["title"] for i in r["items"]] == ["Hindi Show Zed"]
+        assert "Robot" not in r["reply"] and "Enjoy." in r["reply"]
+    finally:
+        _remove_titles(test_engine)
+    assert ctx2.scrub_reply("Also [[Mr. Robot (2015)]] is tense. Enjoy.", {}, "", {"mr. robot"}) == ("Enjoy.", 1)
