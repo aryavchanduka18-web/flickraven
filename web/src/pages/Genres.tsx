@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import PagedGrid from "../components/card/PagedGrid";
+import VibeChips from "../components/discovery/VibeChips";
 import { tmdbImage } from "../lib/tmdb";
 
 export function Genres() {
@@ -31,6 +32,7 @@ const KINDS: [string, string][] = [["all", "Movies and shows"], ["movie", "Movie
 export function Genre() {
   const slug = useParams().slug!;
   const [kind, setKind] = useState("all");
+  const [vibe, setVibe] = useState("");
   const [total, setTotal] = useState<number | null>(null);
   const name = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { name: string; slug: string }[] }>("/genres") })
     .data?.genres.find((x) => x.slug === slug)?.name;
@@ -48,8 +50,9 @@ export function Genre() {
             className={`glass-btn rounded-full px-5 py-2 text-sm font-semibold ${kind === v ? "on" : ""}`}>{l}</button>
         ))}
       </div>
+      <div className="mt-3"><VibeChips value={vibe} onChange={setVibe} /></div>
       <div className="mt-6">
-        <PagedGrid queryKey={["genre", slug, kind]} path={(p) => `/genres/${slug}/movies?type=${kind}&page=${p}`} source={`genre:${slug}`} onTotal={setTotal} />
+        <PagedGrid queryKey={["genre", slug, kind, vibe]} path={(p) => `/genres/${slug}/movies?type=${kind}${vibe ? `&vibe=${vibe}` : ""}&page=${p}`} source={`genre:${slug}`} onTotal={setTotal} />
       </div>
     </div>
   );
