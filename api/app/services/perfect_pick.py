@@ -111,6 +111,34 @@ class Item:
     rec: float                # the recommender's raw score (hybrid for films, series ranking for series)
     novelty: float
     episodes: int | None = None
+    inferred: frozenset = frozenset()     # genres a series got from TMDB keywords (see series_genres)
+
+
+# TMDB's TV genre list has no Romance, Horror, Thriller, Music or History (pipeline/series.py maps the rest), so no
+# series could ever match those genres or the moods built on them (Romantic, Scary, Intense, Suspenseful). Perfect
+# Pick adds them from TMDB's own keywords, by exact keyword, and says so on the card. ("bromance" and "slight romance"
+# are deliberately not romance; "supernatural" and "ghost" alone are not horror.)
+SERIES_KEYWORD_GENRES = {
+    "Romance": {"romance", "romantic", "love", "first love", "love triangle", "romantic comedy", "romantic drama",
+                "slow burn romance", "enemies to lovers", "friends to lovers", "high school romance", "teenage romance",
+                "workplace romance", "office romance", "second chance romance", "unrequited love", "forbidden love",
+                "love at first sight", "star crossed lovers", "love polygon", "interspecies romance", "contract relationship",
+                "fake marriage", "marriage of convenience", "pretend relationship", "love affair", "dating",
+                "lovers reunited", "friends in love", "love-hate relationship"},
+    "Horror": {"horror", "slasher", "zombie", "zombie apocalypse", "haunted house", "survival horror", "psychological horror",
+               "supernatural horror", "body horror", "folk horror", "exorcism", "demonic possession"},
+    "Thriller": {"thriller", "psychological thriller", "crime thriller", "political thriller", "suspense", "serial killer",
+                 "conspiracy thriller", "legal thriller", "mystery thriller", "spy thriller"},
+    "Music": {"music", "musical", "musician", "singer", "band", "idol", "k-pop", "rock band", "pop star", "singing"},
+    "History": {"historical", "history", "period drama", "historical drama", "historical fiction", "costume drama"},
+}
+
+
+def series_genres(genres: list[str], keywords: list[str]) -> tuple[list[str], frozenset]:
+    """A series' genres plus the ones its TMDB keywords show (only genres TMDB TV lacks). Returns (all, added)."""
+    kws = {k.lower() for k in keywords}
+    added = frozenset(g for g, words in SERIES_KEYWORD_GENRES.items() if g not in genres and kws & words)
+    return list(genres) + sorted(added), added
 
 
 @dataclass
@@ -144,27 +172,37 @@ def status_ok(it: Item, pf: Prefs) -> bool:
     return it.kind != "series" or pf.status == "any" or it.status in STATUS.get(pf.status, set())
 
 
-def select(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> tuple[list[Item], list[str]]:
-    """Hard limits first (kind, time, finished or airing), then the soft ones, relaxed in a fixed order until at
-    least three titles remain: mood, then the picked genres, then language. Returns the titles and what was relaxed."""
+@dataclass
+class Selection:
+    exact: list[Item]                                  # every answer met
+    near: list[tuple[Item, list[str]]]                 # hard limits and languages met; misses "mood" and/or "genres"
+    other_languages: int = 0                           # when nothing in the chosen languages fits: how many would elsewhere
+    exact_elsewhere: int = 0                           # when under three exact: exact matches in other languages
+
+
+def fits_mood(it: Item, pf: Prefs, mood_rule: dict | None, matches) -> bool:
+    return not (pf.mood and mood_rule) or bool(matches({"genres": it.genres, "keywords": it.keywords}, mood_rule))
+
+
+def fits_genres(it: Item, pf: Prefs) -> bool:
+    return not pf.genres or bool(set(pf.genres) & set(it.genres))
+
+
+def select(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> Selection:
+    """Hard limits are never relaxed: kind, time, finished or airing, and the chosen languages (the person widens
+    languages themselves with "Include other languages"). Inside them, titles that meet mood and genres are exact
+    matches; the rest are kept apart as broader alternatives, each with the answers it misses."""
     base = [i for i in items if (pf.kind == "either" or i.kind == pf.kind) and time_ok(i, pf) and status_ok(i, pf)]
-    gset = set(pf.genres)
-    tiers = [(True, True, True), (False, True, True), (False, False, True), (False, False, False)]
-    for use_mood, use_genre, use_lang in tiers:
-        got = [i for i in base
-               if (not use_mood or not mood_rule or matches({"genres": i.genres, "keywords": i.keywords}, mood_rule))
-               and (not use_genre or not gset or gset & set(i.genres))
-               and (not use_lang or lang_ok(i, pf.languages))]
-        if len(got) >= 3 or (use_mood, use_genre, use_lang) == tiers[-1]:
-            relaxed = []
-            if not use_mood and pf.mood:
-                relaxed.append("mood")
-            if not use_genre and gset:
-                relaxed.append("genres")
-            if not use_lang and pf.languages:
-                relaxed.append("languages")
-            return got, relaxed
-    return [], []
+    in_lang = [i for i in base if lang_ok(i, pf.languages)]
+    exact, near = [], []
+    for i in in_lang:
+        misses = [m for m, ok in (("mood", fits_mood(i, pf, mood_rule, matches)), ("genres", fits_genres(i, pf))) if not ok]
+        (near.append((i, misses)) if misses else exact.append(i))
+    outside = len(base) if not in_lang and pf.languages else 0
+    elsewhere = 0
+    if pf.languages and in_lang and len(exact) < 3:
+        elsewhere = sum(1 for i in base if not lang_ok(i, pf.languages) and fits_mood(i, pf, mood_rule, matches) and fits_genres(i, pf))
+    return Selection(exact, near, outside, elsewhere)
 
 
 def rank(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> list[Cand]:
@@ -182,26 +220,65 @@ def rank(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> list[
     return [Cand(i.id, p, i.novelty) for i, p in zip(items, pct_of(raw))]
 
 
-RELAX_TEXT = {"mood": "the mood", "genres": "your picked genres", "languages": "your language choice"}
+MISS_TEXT = {"mood": "your mood", "genres": "your picked genres"}
 
 
-def relax_note(relaxed: list[str]) -> str | None:
-    if not relaxed:
+def pick_alternatives(near: list[tuple[Item, list[str]]], pf: Prefs, mood_rule: dict | None, matches, k: int) -> list[tuple[Cand, list[str]]]:
+    """Up to k broader alternatives. Titles that miss one answer come before titles that miss both; inside each group
+    the usual score decides (relevance, genre fit, mood fit, then the familiar/new answer for a full set of three)."""
+    out: list[tuple[Cand, list[str]]] = []
+    misses = {i.id: m for i, m in near}
+    for n_missed in (1, 2):
+        need = k - len(out)
+        group = [i for i, m in near if len(m) == n_missed]
+        if need <= 0 or not group:
+            continue
+        cands = rank(group, pf, mood_rule, matches)
+        style = pf.adventure if need >= 3 else "familiar"
+        out += [(c, misses[c.id]) for c in choose(cands, style, k=need, genres={i.id: set(i.genres) for i in group})]
+    return out
+
+
+def message(n_exact: int, n_alt: int, pf: Prefs, other_languages: int, exact_elsewhere: int = 0) -> str | None:
+    """What the page says above the picks: how many met every answer, and what the alternatives are. Languages are only
+    ever widened by the person, so the text says what turning them on would add."""
+    text = _message(n_exact, n_alt, pf, other_languages)
+    if exact_elsewhere and n_exact < 3:
+        text = ((text + " ") if text else "") + (f"{exact_elsewhere} title{'s' if exact_elsewhere != 1 else ''} in other languages "
+                                                f"meet{'s' if exact_elsewhere == 1 else ''} every other answer: turn on \"Include other languages\" to see them.")
+    return text
+
+
+def _message(n_exact: int, n_alt: int, pf: Prefs, other_languages: int) -> str | None:
+    if other_languages:
+        names = ", ".join(LANG_NAMES.get(c, "other languages") for c in pf.languages)
+        return (f"Nothing in {names} fits your type and length. Turn on \"Include other languages\" to see "
+                f"{other_languages} title{'s' if other_languages != 1 else ''} that do.")
+    if n_exact >= 3 or not n_alt:
         return None
-    return "Not enough exact matches, so I relaxed " + ", then ".join(RELAX_TEXT[r] for r in relaxed) + "."
+    kept = "type, length" + (" and languages" if pf.languages else "")
+    if n_exact == 0:
+        return f"Nothing meets every answer. Below are broader alternatives: they keep your {kept}, and each says which answer it misses."
+    return (f"Only {n_exact} title{'s' if n_exact != 1 else ''} meet{'s' if n_exact == 1 else ''} every answer. "
+            f"The broader alternatives below keep your {kept}, and each says which answer it misses.")
 
 
-def reasons_v2(it: Item, role: str, pf: Prefs, relaxed: list[str], matches, mood_rule: dict | None, match_pct: int | None) -> list[dict]:
-    """Only things that were actually checked for this title."""
+def reasons_v2(it: Item, role: str, pf: Prefs, misses: list[str], matches, mood_rule: dict | None, match_pct: int | None) -> list[dict]:
+    """Only things that were actually checked for this title. `misses` are the answers a broader alternative does not meet."""
     def r(code: str, text: str) -> dict:
         return {"code": code, "source": "perfect_pick", "text": text, "share": 0.0, "anchor_movie_id": None}
     out = []
     if pf.mood and mood_rule:
-        fits_mood = matches({"genres": it.genres, "keywords": it.keywords}, mood_rule)
-        out.append(r("pp_mood", f'Fits "{pf.mood.lower()}"' if fits_mood else f'Not a perfect fit for "{pf.mood.lower()}": the closest we found'))
+        out.append(r("pp_mood", f'Does not match the "{pf.mood.lower()}" mood' if "mood" in misses
+                     else f'Fits "{pf.mood.lower()}"'))
     hit = [g for g in pf.genres if g in it.genres]
     if pf.genres:
-        out.append(r("pp_genre", f"Has {', '.join(hit)}, which you picked" if hit else "Outside the genres you picked: the closest we found"))
+        if "genres" in misses or not hit:
+            out.append(r("pp_genre", f"Not {', '.join(pf.genres)}: outside the genres you picked"))
+        else:
+            tagged = [g for g in hit if g in it.inferred]
+            out.append(r("pp_genre", f"Has {', '.join(hit)}, which you picked"
+                         + (f" ({', '.join(tagged)} from TMDB keywords)" if tagged else "")))
     if pf.languages and lang_ok(it, pf.languages):
         out.append(r("pp_lang", f"In {LANG_NAMES.get(it.lang, 'a language you chose')}" if it.lang in LANG_NAMES else "In one of the languages you chose"))
     if it.kind == "series":

@@ -302,8 +302,10 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
     """Three picks from up to six answers. Order of work: (1) hard limits (movie or series, length, finished or airing),
     (2) candidates from the film or series ranking, (3) score = 0.55 relevance to this person + 0.25 picked-genre fit +
     0.20 mood fit, (4) novelty by the familiar/balanced/adventurous answer, (5) a genre-diversity pass so the three are not
-    clones, (6) a reason per title for each thing that was checked. When fewer than three fit, mood, then genres, then
-    language are relaxed, in that order, and the reply says which."""
+    clones, (6) a reason per title for each thing that was checked. Kind, time, finished/airing and languages are never
+    relaxed. When fewer than three meet mood and genres too, the rest come back separately as `alternatives`, each with
+    the answers it misses (one miss before two); when nothing exists in the chosen languages, `offer` asks the person
+    to include other languages instead of doing it for them."""
     from cinematch_engine.tonight import matches_mood, moods
     kb = moods()
     tables = {"movie": pp.MOVIE_TIMES, "series": pp.SERIES_TIMES, "either": pp.EITHER_TIMES}
@@ -338,29 +340,39 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
             if d is None or i in skip:
                 continue
             h = fit.hours(d["episodes"], d["runtime"])
-            items.append(pp.Item(i, "series", list(cat.genres[r]), list(cat.keywords[r]), cat.language[r], None if h is None else h * 60,
-                                 d["seasons"], d["status"], sc, float(cat.novelty[r]), d["episodes"]))
+            genres, added = pp.series_genres(list(cat.genres[r]), list(cat.keywords[r]))
+            items.append(pp.Item(i, "series", genres, list(cat.keywords[r]), cat.language[r], None if h is None else h * 60,
+                                 d["seasons"], d["status"], sc, float(cat.novelty[r]), d["episodes"], added))
     rule = kb.get(pf.mood) if pf.mood else None
-    chosen, relaxed = pp.select(items, pf, rule, matches_mood)
-    cands = pp.rank(chosen, pf, rule, matches_mood)
-    by_id = {i.id: i for i in chosen}
-    picks = pp.choose(cands, pf.adventure, genres={i.id: set(i.genres) for i in chosen})
-    extra = {}
-    for c in picks:
-        it = by_id[c.id]
-        mp = engine.match(st.stage, it.rec) if it.kind == "movie" else None
-        extra[c.id] = {"score": it.rec, **({"match_pct": mp} if mp is not None else {}),
-                       "reasons": pp.reasons_v2(it, c.role, pf, relaxed, matches_mood, rule, mp)}
-    items_out = cards(db, [c.id for c in picks], user["id"], extra)
-    if items_out:
-        log_shown(db, user["id"], str(uuid.uuid4()), None, "perfect_pick", None, items_out)
-        db.commit()
-    message = pp.relax_note(relaxed)
-    if pf.languages and "languages" in relaxed:
-        message = (message or "") + " Turn on \"Include other languages\" to keep this."
-    if not items_out:
-        message = "Nothing fits those answers, even after relaxing them. Try a longer time or another kind."
-    return {"items": items_out, "message": message, "relaxed": relaxed}
+    sel = pp.select(items, pf, rule, matches_mood)
+    by_id = {i.id: i for i in sel.exact + [i for i, _ in sel.near]}
+    picks = pp.choose(pp.rank(sel.exact, pf, rule, matches_mood), pf.adventure, genres={i.id: set(i.genres) for i in sel.exact})
+    alts = pp.pick_alternatives(sel.near, pf, rule, matches_mood, 3 - len(picks))
+
+    def out(chosen: list[tuple[pp.Cand, list[str]]], surface: str) -> list[dict]:
+        extra = {}
+        for c, misses in chosen:
+            it = by_id[c.id]
+            mp = engine.match(st.stage, it.rec) if it.kind == "movie" else None
+            extra[c.id] = {"score": it.rec, **({"match_pct": mp} if mp is not None else {}),
+                           "reasons": pp.reasons_v2(it, c.role, pf, misses, matches_mood, rule, mp)}
+        cards_out = cards(db, [c.id for c, _ in chosen], user["id"], extra)
+        misses_by_id = {c.id: m for c, m in chosen}
+        for card in cards_out:
+            card["misses"] = misses_by_id.get(card["movie"]["id"], [])
+        if cards_out:
+            log_shown(db, user["id"], str(uuid.uuid4()), None, surface, None, cards_out)
+        return cards_out
+
+    items_out = out([(c, []) for c in picks], "perfect_pick")
+    alt_out = out(alts, "perfect_pick_alt")
+    db.commit()
+    message = pp.message(len(items_out), len(alt_out), pf, sel.other_languages, sel.exact_elsewhere)
+    if not items_out and not alt_out and not sel.other_languages:
+        message = "Nothing fits your type, length and languages. Try a longer time, another kind, or more languages."
+    relaxed = [m for m in ("mood", "genres") if any(m in a.get("misses", []) for a in alt_out)]
+    return {"items": items_out, "alternatives": alt_out, "message": message, "relaxed": relaxed,
+            "offer": "other_languages" if (sel.other_languages or sel.exact_elsewhere) and len(items_out) < 3 else None}
 
 
 @router.get("/surprise")

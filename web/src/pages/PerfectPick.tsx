@@ -29,7 +29,10 @@ const ADVENTURE: Option[] = [
 ];
 type Answers = { kind: string; mood: string; genres: string[]; languages: string[]; time: string; status: string; adventure: string };
 const EMPTY: Answers = { kind: "", mood: "", genres: [], languages: [], time: "", status: "any", adventure: "" };
-type Result = { items: RecItem[]; message: string | null; relaxed?: string[] };
+type PickItem = RecItem & { misses?: string[] };
+type Result = { items: PickItem[]; alternatives?: PickItem[]; message: string | null; relaxed?: string[]; offer?: "other_languages" | null };
+const MISS: Record<string, string> = { mood: "your mood", genres: "your genres" };
+const missText = (m: string[]) => "Misses " + m.map((x) => MISS[x] ?? x).join(" and ");
 const STEPS = ["kind", "mood", "genres", "languages", "time", "adventure"] as const;
 const TITLES: Record<(typeof STEPS)[number], string> = {
   kind: "What are you looking for?", mood: "What mood are you in?", genres: "Which genres interest you?",
@@ -48,7 +51,7 @@ export default function PerfectPick() {
         time: v.answers.time, status: v.answers.kind === "movie" ? "any" : v.answers.status, adventure: v.answers.adventure,
         other_languages: v.other, exclude: v.exclude,
       }),
-    onSuccess: (r) => setShown((s) => [...s, ...r.items.map((i) => i.movie.id)]),
+    onSuccess: (r) => setShown((s) => [...s, ...r.items.map((i) => i.movie.id), ...(r.alternatives ?? []).map((i) => i.movie.id)]),
   });
   const done = step >= STEPS.length;
   const go = (next: Answers) => {
@@ -67,6 +70,31 @@ export default function PerfectPick() {
   const toggle = (key: "genres" | "languages", v: string) => set({ [key]: a[key].includes(v) ? a[key].filter((x) => x !== v) : [...a[key], v] });
   const current = STEPS[Math.min(step, STEPS.length - 1)];
   const timeText = TIMES[a.kind]?.find((t) => t[0] === a.time)?.[1];
+  const setOtherLanguages = (on: boolean) => { setOther(on); setShown([]); run.mutate({ answers: a, exclude: [], other: on }); };
+  const exact = run.data?.items ?? [];
+  const alts = run.data?.alternatives ?? [];
+  const heading = !run.data || exact.length >= 3 ? "Your three picks" : exact.length ? `${exact.length === 1 ? "One title fits" : "Two titles fit"} every answer` : "No title fits every answer";
+  const pickCard = (it: PickItem, i: number, alt: boolean) => (
+    <article key={it.movie.id} className={`glass hero-fade-in flex flex-col overflow-hidden rounded-3xl ${alt ? "opacity-90" : ""}`} style={{ animationDelay: `${i * 90}ms` }}>
+      <Link to={`/movie/${it.movie.id}`} state={{ source: alt ? "perfect_pick_alt" : "perfect_pick", position: i }} className="relative block aspect-[2/3]">
+        {it.movie.poster && <img src={tmdbImage(it.movie.poster, "w342")} alt="" className="h-full w-full object-cover" />}
+        <span className="glass absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full text-sm font-bold">{i + 1}</span>
+        {alt && !!it.misses?.length && <span className="absolute bottom-3 left-3 rounded-full bg-amber-400/90 px-3 py-1 text-xs font-semibold text-black">{missText(it.misses)}</span>}
+      </Link>
+      <div className="flex flex-1 flex-col p-4">
+        <h2 className="font-display text-xl font-bold">{it.movie.title}</h2>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+          {it.movie.year && <span>{it.movie.year}</span>}<TypeBadge type={it.movie.title_type} />
+          <ImdbScore rating={it.movie.imdb_rating} votes={it.movie.imdb_votes} />
+        </div>
+        <ul className="mt-3 space-y-1 text-sm text-white/80">{it.reasons.map((r) => <li key={r.code}>{r.text}</li>)}</ul>
+        <div className="mt-auto flex gap-2 pt-4">
+          <Link to={`/movie/${it.movie.id}`} className="glass-btn solid rounded-xl px-4 py-2 text-sm font-semibold">Details</Link>
+          <button onClick={() => run.mutate({ answers: a, exclude: shown, other })} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Get new picks">Not these</button>
+        </div>
+      </div>
+    </article>
+  );
   const card = (on: boolean) => `glass-btn hero-fade-in flex-col items-start rounded-3xl p-5 text-left ${on ? "on" : ""}`;
   const pill = (on: boolean) => `glass-btn rounded-full px-4 py-2 text-sm font-semibold ${on ? "on" : ""}`;
   return (
@@ -133,38 +161,29 @@ export default function PerfectPick() {
         </div>
       ) : (
         <div className="mt-8">
-          <h1 className="font-display text-3xl font-extrabold md:text-5xl">Your three picks</h1>
+          <h1 className="font-display text-3xl font-extrabold md:text-5xl">{heading}</h1>
           <p className="mt-2 text-muted">{[KINDS.find((k) => k[0] === a.kind)?.[1], a.mood, a.genres.join(", "), a.languages.length ? LANGS.filter(([c]) => a.languages.includes(c)).map(([, n]) => n).join(", ") : "", timeText, ADVENTURE.find((t) => t[0] === a.adventure)?.[1].toLowerCase()].filter(Boolean).join(" · ")}</p>
           {run.isPending && <div className="mt-8 h-72 animate-pulse rounded-3xl bg-surface" />}
           {run.isError && <p className="mt-6 text-sm text-red-300">{(run.error as Error).message}</p>}
-          {run.data?.message && <p className="glass mt-6 rounded-2xl px-4 py-3 text-sm">{run.data.message}</p>}
-          {run.data && (
-            <div className="mt-8 grid gap-5 md:grid-cols-3">
-              {run.data.items.map((it, i) => (
-                <article key={it.movie.id} className="glass hero-fade-in flex flex-col overflow-hidden rounded-3xl" style={{ animationDelay: `${i * 90}ms` }}>
-                  <Link to={`/movie/${it.movie.id}`} state={{ source: "perfect_pick", position: i }} className="relative block aspect-[2/3]">
-                    {it.movie.poster && <img src={tmdbImage(it.movie.poster, "w342")} alt="" className="h-full w-full object-cover" />}
-                    <span className="glass absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full text-sm font-bold">{i + 1}</span>
-                  </Link>
-                  <div className="flex flex-1 flex-col p-4">
-                    <h2 className="font-display text-xl font-bold">{it.movie.title}</h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted">
-                      {it.movie.year && <span>{it.movie.year}</span>}<TypeBadge type={it.movie.title_type} />
-                      <ImdbScore rating={it.movie.imdb_rating} votes={it.movie.imdb_votes} />
-                    </div>
-                    <ul className="mt-3 space-y-1 text-sm text-white/80">{it.reasons.map((r) => <li key={r.code}>{r.text}</li>)}</ul>
-                    <div className="mt-auto flex gap-2 pt-4">
-                      <Link to={`/movie/${it.movie.id}`} className="glass-btn solid rounded-xl px-4 py-2 text-sm font-semibold">Details</Link>
-                      <button onClick={() => run.mutate({ answers: a, exclude: shown, other })} className="glass-btn rounded-xl px-4 py-2 text-sm font-semibold" title="Get three new picks">Not these</button>
-                    </div>
-                  </div>
-                </article>
-              ))}
+          {run.data?.message && (
+            <div className="glass mt-6 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-sm">
+              <p className="flex-1">{run.data.message}</p>
+              {run.data.offer === "other_languages" && !other && (
+                <button onClick={() => setOtherLanguages(true)} className="glass-btn solid rounded-xl px-4 py-2 text-sm font-semibold">Include other languages</button>
+              )}
             </div>
+          )}
+          {exact.length > 0 && <div className="mt-8 grid gap-5 md:grid-cols-3">{exact.map((it, i) => pickCard(it, i, false))}</div>}
+          {alts.length > 0 && (
+            <section className="mt-10" aria-label="Broader alternatives">
+              <h2 className="font-display text-2xl font-bold">Broader alternatives</h2>
+              <p className="mt-1 text-sm text-muted">Same type, length{a.languages.length && !other ? " and languages" : ""}, but each one misses at least one of your answers, named on the card.</p>
+              <div className="mt-5 grid gap-5 md:grid-cols-3">{alts.map((it, i) => pickCard(it, exact.length + i, true))}</div>
+            </section>
           )}
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={other} onChange={(e) => { setOther(e.target.checked); setShown([]); run.mutate({ answers: a, exclude: [], other: e.target.checked }); }} />
+              <input type="checkbox" checked={other} onChange={(e) => setOtherLanguages(e.target.checked)} />
               Include other languages
             </label>
             <button onClick={() => setStep(0)} className="glass-btn ml-auto rounded-2xl px-5 py-2.5 text-sm font-semibold">Change answers</button>
