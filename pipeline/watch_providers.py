@@ -25,7 +25,7 @@ from pipeline.series import tv_id
 from pipeline.tmdb import TMDB
 
 log = get_logger("watch_providers")
-CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text())["watch_providers"]
+CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text(encoding="utf-8"))["watch_providers"]
 CACHE = RAW / "tmdb_providers"
 OUT = PROCESSED / "watch_providers.parquet"
 KINDS = ("flatrate", "free", "ads", "rent", "buy")

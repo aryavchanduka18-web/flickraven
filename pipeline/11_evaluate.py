@@ -35,7 +35,7 @@ N_TEST_USERS = 5000
 
 
 def weights() -> dict:
-    return json.loads((MODELS / "hybrid_weights.json").read_text())
+    return json.loads((MODELS / "hybrid_weights.json").read_text(encoding="utf-8"))
 
 
 def known(data, u) -> np.ndarray:

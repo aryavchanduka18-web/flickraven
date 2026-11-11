@@ -119,7 +119,7 @@ def main() -> None:
         save_models(data)
     content_sim = universe_content_sim(data)
     sources = load_sources(data, content_sim)
-    eval_users = np.array(json.loads((METRICS / "eval_users_val.json").read_text())["users"])
+    eval_users = np.array(json.loads((METRICS / "eval_users_val.json").read_text(encoding="utf-8"))["users"])
     counts8 = np.asarray((data.train >= 8).sum(axis=1)).ravel()
     users = eval_users[counts8[eval_users] >= ONBOARD]
     rel = relevant_sets(data, users)

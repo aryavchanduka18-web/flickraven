@@ -24,7 +24,7 @@ STORED_ITEM_NEIGHBORS = 50          # spec: top-50 neighbors per film stored off
 
 
 def settings(name: str) -> dict:
-    return json.loads((MODELS / f"{name}.json").read_text())["settings"]
+    return json.loads((MODELS / f"{name}.json").read_text(encoding="utf-8"))["settings"]
 
 
 def content_features() -> tuple[sp.csr_matrix, np.ndarray, np.ndarray]:

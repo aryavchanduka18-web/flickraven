@@ -18,7 +18,7 @@ from pipeline.common import PROCESSED, get_logger, write_json
 from pipeline.tmdb import TMDB
 
 log = get_logger("widen_catalog")
-CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text())["widen"]
+CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text(encoding="utf-8"))["widen"]
 CANDIDATES = PROCESSED / "widen_candidates.csv"
 COLUMNS = ["tmdb_id", "tmdb_vote_count", "group", "found_on", "part"]
 

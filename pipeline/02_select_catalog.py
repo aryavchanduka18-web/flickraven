@@ -18,8 +18,8 @@ from pipeline.common import DISCOVER_DIR, ML_DIR, PROCESSED, build_date, get_log
 from pipeline.tmdb import TMDB
 
 log = get_logger("02_select")
-QUOTAS = yaml.safe_load((__import__("pathlib").Path(__file__).parent / "curated" / "language_quotas.yaml").read_text())
-HOLLYWOOD = yaml.safe_load((__import__("pathlib").Path(__file__).parent / "catalog_config.yaml").read_text())["hollywood"]
+QUOTAS = yaml.safe_load((__import__("pathlib").Path(__file__).parent / "curated" / "language_quotas.yaml").read_text(encoding="utf-8"))
+HOLLYWOOD = yaml.safe_load((__import__("pathlib").Path(__file__).parent / "catalog_config.yaml").read_text(encoding="utf-8"))["hollywood"]
 
 
 def months_before(d: date, months: int) -> date:
