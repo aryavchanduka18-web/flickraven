@@ -74,6 +74,7 @@ class Catalog:
     recent: np.ndarray               # part C (released in the 18 months before the build date)
     kind: np.ndarray | None = None   # 'movie', 'series' or 'anime' per film (all 'movie' when not given)
     series_sim: sp.csr_matrix | None = None   # learned series-to-series similarity (n x n, mostly empty), see kind_rank
+    gemini_sim: sp.csr_matrix | None = None   # series and anime that Google Gemini names as similar (n x n), see ai_graph.py
 
     def __post_init__(self):
         if self.kind is None:
@@ -187,7 +188,9 @@ class OnlineEngine:
         the score is content similarity to what the user rated, liked or picked (0.65) plus TMDB popularity (0.35);
         popularity alone when the user has no taste signal yet. For series with learned similarities (real
         MyDramaList lists, see pipeline/drama_cf.py) the score is 0.45 learned + 0.30 content + 0.25 popularity,
-        the learned part coming from the series the user rated 7+, liked or picked. Titles the user already acted
+        the learned part coming from the series the user rated 7+, liked or picked. Titles that Google Gemini names as
+        similar to those (ai_graph.py) get 0.40 Gemini + 0.30 content + 0.30 popularity (or a four-way blend when the
+        learned lists know them too). Titles the user already acted
         on are left out."""
         cat = self.cat
         rows = np.nonzero(np.asarray(cat.kind) == kind)[0]
@@ -208,10 +211,20 @@ class OnlineEngine:
             c = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]))
             score = (0.5 if fame is not None else 0.65) * pct(c) + (0.5 if fame is not None else 0.35) * score
             learned = self.learned_series(st, rows)
-            if learned is not None:
-                covered = learned > 0
-                blended = 0.45 * pct(np.where(covered, learned, 0.0)) + 0.30 * pct(c) + 0.25 * pct(cat.popularity[rows])
-                score = np.where(covered, blended, score)
+            gem = self.learned_series(st, rows, cat.gemini_sim)
+            pop, ct = pct(cat.popularity[rows]), pct(c)
+            lc = learned > 0 if learned is not None else np.zeros(len(rows), dtype=bool)
+            gc = gem > 0 if gem is not None else np.zeros(len(rows), dtype=bool)
+            # Weights are judgement, not tuned: there are no held-out TV ratings to tune them on.
+            lb = 0.45 * pct(np.where(lc, learned, 0.0)) + 0.30 * ct + 0.25 * pop if lc.any() else None
+            if gc.any():
+                g = 0.5 + 0.5 * gem / gem.max()      # being named at all counts for half; being named first or by several seeds for the rest
+                gb = 0.40 * g + 0.30 * ct + 0.30 * pop
+                if lb is not None:     # named by both sources: at least as high as either alone, plus a small agreement bonus
+                    score = np.where(gc & lc, np.minimum(np.maximum(lb, gb) + 0.08, 1.0), score)
+                score = np.where(gc & ~lc, gb, score)
+            if lb is not None:
+                score = np.where(lc & ~gc, lb, score)
         order = np.argsort(-score, kind="stable")
         return rows[order], score[order].astype(float)
 
@@ -235,10 +248,11 @@ class OnlineEngine:
         keep &= ~((c < 0) & (fit < 0.34))
         return keep, fit, True
 
-    def learned_series(self, st: UserState, rows: np.ndarray) -> np.ndarray | None:
+    def learned_series(self, st: UserState, rows: np.ndarray, sim="learned") -> np.ndarray | None:
         """Learned similarity of each of `rows` to the series the user rated 7+, liked or picked (weights 0.25..1),
-        or None when there is no model or no such series. Zero for series the model has no data on."""
-        sim = self.cat.series_sim
+        or None when there is no model or no such series. Zero for series the model has no data on. `sim` is the
+        learned matrix (default) or the Gemini one (None when there is none)."""
+        sim = self.cat.series_sim if isinstance(sim, str) else sim
         if sim is None:
             return None
         weight = {r: (v - 6) / 4 for r, v in st.ratings.items() if v >= 7}

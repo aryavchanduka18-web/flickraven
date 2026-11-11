@@ -21,7 +21,7 @@ def engine(c, content_scores=None):
     e = SimpleNamespace(cat=c)
     e.scores = lambda st: {"content": np.array(content_scores if content_scores is not None else [-np.inf] * c.n, dtype=np.float32)}
     e.excluded = lambda st: OnlineEngine.excluded(e, st)
-    e.learned_series = lambda st, rows: OnlineEngine.learned_series(e, st, rows)
+    e.learned_series = lambda st, rows, sim="learned": OnlineEngine.learned_series(e, st, rows, sim)
     return e
 
 
@@ -68,3 +68,40 @@ def test_learned_series_similarity_lifts_covered_series_for_a_user_who_liked_a_n
                                             content_scores=[0.0, 0.5, 0.3, 0.5, 0.2]), UserState(likes={2}), "series")
     other, _ = OnlineEngine.kind_rank(e, UserState(likes={2}), "series")
     assert other.tolist() == base.tolist()
+
+
+def test_gemini_neighbours_lift_series_for_a_user_who_liked_the_seed_and_filters_still_win():
+    c = cat(["movie", "series", "series", "series", "series"], [9.0, 5.0, 8.0, 6.0, 7.0])
+    g = sp.lil_matrix((5, 5), dtype=np.float32)
+    g[1, 3] = g[3, 1] = 1.0                                       # Gemini named 3 as similar to 1
+    c.gemini_sim = g.tocsr()
+    e = engine(c, content_scores=[0.0, 0.5, 0.3, 0.5, 0.2])
+    assert OnlineEngine.kind_rank(e, UserState(likes={1}), "series")[0].tolist()[0] == 3
+    assert 3 not in OnlineEngine.kind_rank(e, UserState(likes={1}, dislikes={3}), "series")[0].tolist()
+    assert 3 not in OnlineEngine.kind_rank(e, UserState(likes={1}, watched={3}), "series")[0].tolist()
+    # a user who liked something Gemini has no list for is ranked as without the graph
+    c0 = cat(["movie", "series", "series", "series", "series"], [9.0, 5.0, 8.0, 6.0, 7.0])
+    base = OnlineEngine.kind_rank(engine(c0, content_scores=[0.0, 0.5, 0.3, 0.5, 0.2]), UserState(likes={2}), "series")[0].tolist()
+    assert OnlineEngine.kind_rank(e, UserState(likes={2}), "series")[0].tolist() == base
+
+
+def test_gemini_and_learned_lists_together():
+    c = cat(["movie", "series", "series", "series", "series"], [9.0, 5.0, 5.5, 6.0, 7.0])
+    s = sp.lil_matrix((5, 5), dtype=np.float32); s[1, 3] = s[3, 1] = 0.9
+    g = sp.lil_matrix((5, 5), dtype=np.float32); g[1, 4] = g[4, 1] = 1.0; g[1, 3] = g[3, 1] = 0.5
+    c.series_sim, c.gemini_sim = s.tocsr(), g.tocsr()
+    rows, sc = OnlineEngine.kind_rank(engine(c, content_scores=[0.0, 0.5, 0.3, 0.5, 0.2]), UserState(likes={1}), "series")
+    assert set(rows.tolist()) == {2, 3, 4} and rows.tolist()[0] == 3 and np.all(np.diff(sc) <= 0)
+
+
+def test_without_a_gemini_graph_the_learned_ranking_is_unchanged():
+    c = cat(["movie", "series", "series", "series", "series"], [9.0, 5.0, 8.0, 6.0, 7.0])
+    s = sp.lil_matrix((5, 5), dtype=np.float32); s[1, 3] = s[3, 1] = 0.9
+    c.series_sim = s.tocsr()
+    e = engine(c, content_scores=[0.0, 0.5, 0.3, 0.5, 0.2])
+    none = OnlineEngine.kind_rank(e, UserState(likes={1}), "series")
+    c.gemini_sim = sp.csr_matrix((5, 5), dtype=np.float32)
+    empty = OnlineEngine.kind_rank(e, UserState(likes={1}), "series")
+    assert none[0].tolist() == empty[0].tolist() and np.allclose(none[1], empty[1])
+    # and the learned part is not counted twice when only the learned lists exist
+    assert none[0].tolist()[0] == 3 and none[1][0] <= 1.0
