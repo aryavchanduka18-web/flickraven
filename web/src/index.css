@@ -96,6 +96,22 @@ body {
   background: rgba(28, 28, 28, 0.9);
 }
 
+/* The hover details under a movie card: dark iOS-style glass. A capsule (title + buttons) that grows into a
+   rounded box. Nothing inside it blurs (nested backdrop filters can render black). It is a little darker than
+   .glass so the synopsis stays readable over bright artwork. Hover-only, so phones never pay for the blur. */
+.hover-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02) 40%), rgba(20, 20, 22, 0.72);
+  -webkit-backdrop-filter: blur(28px) saturate(1.7);
+  backdrop-filter: blur(28px) saturate(1.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .hover-glass {
+    background: rgba(24, 24, 26, 0.97);
+  }
+}
+
 /* The chat panel is opaque on purpose: a blurred panel with blurred buttons inside it (nested backdrop filters) can
    render as a black screen in Chrome and Safari. Nothing inside it blurs. */
 .chat-panel {
