@@ -20,6 +20,7 @@ export default function Shows() {
         </div>
         <div className="flex gap-3">
           <Link to="/discover?type=show" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Filter all shows</Link>
+          <Link to="/anime" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Anime</Link>
           <Link to="/series-fit" className="glass-btn rounded-2xl px-4 py-2.5 text-sm font-semibold">Fits your time</Link>
         </div>
       </div>

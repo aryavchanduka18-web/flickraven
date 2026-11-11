@@ -170,6 +170,55 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     return {"rails": out, "engaged_series": sum(1 for r in engaged if cat.kind[r] == "series")}
 
 
+@router.get("/anime")
+def anime_page(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """The Anime page: rows of anime series (TV anime) and anime films (Japanese animated films), and nothing else.
+    Series come in the engine's anime order (kind_rank), films in the film hybrid order (rail_scores); both already
+    leave out what this person rated, watched, liked, picked or disliked, and disliked genres. "Not interested" titles
+    are left out too. Rows are cut by app/services/anime_rows.py; no title repeats on the page. No Match %."""
+    from app.services import anime_rows as ar
+    from cinematch_engine.rerank import refresh
+    engine = engine_or_503(db)
+    uid = user["id"]
+    cat, st = engine.cat, rec.user_state(db, uid, engine)
+    skip = set(rec_feedback.hidden_titles(db, uid))
+    art = set(db.execute(text("""SELECT id FROM movies WHERE backdrop_path IS NOT NULL
+        AND (title_type = 'anime' OR (title_type = 'movie' AND original_language = 'ja'))""")).scalars())
+
+    def title(r, kind):
+        return ar.Title(id=int(cat.movie_ids[r]), kind=kind, genres=list(cat.genres[r]), keywords=list(cat.keywords[r]),
+                        quality=float(cat.popularity[r]), fame=float(cat.fame_pct[r]), has_art=int(cat.movie_ids[r]) in art)
+
+    series_rows, _ = engine.kind_rank(st, "anime")
+    series = [title(r, "series") for r in series_rows if int(cat.movie_ids[r]) not in skip]
+    rail = engine.rail_scores(st)
+    film_rows = [r for r in np.nonzero(np.isfinite(rail))[0]
+                 if cat.kind[r] == "movie" and ar.is_anime_film(list(cat.genres[r]), cat.language[r])]
+    film_rows.sort(key=lambda r: (-float(rail[r]), int(r)))
+    films = [title(r, "film") for r in film_rows if int(cat.movie_ids[r]) not in skip]
+
+    # "Because you liked X": the anime (series or film) this person liked or rated highest, and the anime most like it.
+    is_anime = lambda r: cat.kind[r] == "anime" or (cat.kind[r] == "movie" and ar.is_anime_film(list(cat.genres[r]), cat.language[r]))
+    liked = {r: 1.0 for r in st.likes | st.picks}
+    liked.update({r: (v - 6) / 4 for r, v in st.ratings.items() if v >= 7})
+    liked = {r: w for r, w in liked.items() if is_anime(r)}
+    because = None
+    if liked:
+        base = min(liked, key=lambda r: (-liked[r], r))
+        because = (cat.titles[base], [int(cat.movie_ids[r]) for r in engine.similar(base, k=120) if is_anime(r)])
+
+    rng = daily.rng(uid, "anime-page")
+    rows = ar.build(series, films, because, pick=lambda ids, k, keep=3: refresh(ids, k, rng, keep=keep))
+    out, request_id = [], str(uuid.uuid4())
+    for r in rows:
+        items = cards(db, r["ids"], uid)
+        if len(items) >= ar.MIN_ROW:
+            out.append({"key": r["key"], "title": r["title"], "subtitle": r["subtitle"], "items": items})
+            log_shown(db, uid, request_id, None, f"anime_{r['key']}", None, items)
+    db.commit()
+    return {"rails": out, "counts": {"series": len(series), "films": len(films)}}
+
+
 NEXT_BUDGET = {"3": "5", "5": "10", "10": "20", "20": "long"}
 
 

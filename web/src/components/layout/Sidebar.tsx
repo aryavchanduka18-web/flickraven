@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { NavLink } from "react-router-dom";
 import { AvatarMenu, Logo, TABS } from "./NavBar";
 import SearchBox from "./SearchBox";
-import { ActivityIcon, DiscoverIcon, GenresIcon, HomeIcon, ListIcon, MoviesIcon, ShowsIcon, SidebarIcon, SparkIcon } from "./icons";
+import { ActivityIcon, AnimeIcon, DiscoverIcon, GenresIcon, HomeIcon, ListIcon, MoviesIcon, ShowsIcon, SidebarIcon, SparkIcon } from "./icons";
 import { useUI } from "./ui";
 
 const ICONS: Record<string, (p: { className?: string }) => React.JSX.Element> = {
@@ -10,6 +10,7 @@ const ICONS: Record<string, (p: { className?: string }) => React.JSX.Element> = 
   "/discover": DiscoverIcon,
   "/movies": MoviesIcon,
   "/shows": ShowsIcon,
+  "/anime": AnimeIcon,
   "/pick": SparkIcon,
   "/genres": GenresIcon,
   "/my-list": ListIcon,

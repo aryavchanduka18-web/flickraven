@@ -902,10 +902,16 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 
 ### 14.2f Movies, Shows and media types (2026-11-11)
 
-- Nav: Home, Discover, Movies, Shows, Perfect Pick, Genres, My List, Activity (phones: six tabs). `/movies` = films only. `/shows` = TV series and anime TV only, built from the series rows (`/recs/series-rails`, `/recs/kind/*`), never the film list filtered. Discover tabs: Movies, Shows, Movies and shows; `?type=show` opens it on Shows.
+- Nav: Home, Discover, Movies, Shows, Anime, Perfect Pick, Genres, My List, Activity (phones: six tabs; Anime, Genres and Activity are left off the phone bar, and Shows links to Anime). `/movies` = films only. `/shows` = TV series and anime TV only, built from the series rows (`/recs/series-rails`, `/recs/kind/*`), never the film list filtered. Discover tabs: Movies, Shows, Movies and shows; `?type=show` opens it on Shows.
 - API: `type` on `/movies` = movie (default), show (series + anime TV), series, anime, all. Genre pages (`/genres/{slug}/movies?type=all|movie|show`) work for every genre; films are ranked by the hybrid, shows by `kind_rank`, and the two lists are woven by relative position because their scores are not on one scale. Match % is shown for films only.
 - Anime genre = Japanese-language animation with title_type movie (films) or anime (TV anime); plain `series` titles are not Anime.
 
+
+### 14.2g Anime page (2026-11-11)
+
+- `/anime` (side panel, between Shows and Perfect Pick) holds anime series (title_type `anime`) and anime films (Japanese animated films: original language `ja` with the Animation genre, the same rule as the Anime genre page and Perfect Pick). Live-action never appears on it.
+- Rows come from `GET /recs/anime` and are cut by `api/app/services/anime_rows.py`, in this order: Because you liked X (the anime series or film the person liked or rated highest, and the anime most like it), Anime series for you, Anime films for you, Anime everyone is talking about (series by fame, quality 7.3+), Anime films everyone knows (films by fame, quality 7.0+), then themes that mix series and films: Action and adventure, Fantasy and sci-fi, Dark and mind-bending, Romantic, Feel-good. Rows under 6 titles are left out; no title appears twice; titles without artwork are skipped; rows refresh daily with a strong core kept.
+- No new ranking: series keep the engine's anime order (`kind_rank("anime")`, which already uses the learned anime lists and the Gemini graph), films keep the film hybrid order (`rail_scores`). Both already leave out rated, watched, liked, picked and disliked titles and disliked genres; the route also leaves out "Not interested" titles. No Match % on this page.
 ### 14.2g Perfect Pick v2 (2026-11-11)
 
 - Six questions (shown only when relevant): movie, series or either; mood (the six For Tonight moods plus Emotional, Suspenseful, Mysterious, or none); genres (many, optional); languages (English, Hindi, Korean, Japanese, Tamil, Telugu, Malayalam, other, or any); time (films: under 90 / 90-120 / 2-3 h / any; series: one season / under 10 h / 10-20 h / 20-30 h / any; either: under 2 h / 3 h / 10 h / any) plus finished or airing for series; familiar, balanced or unexpected. Back works at every step.

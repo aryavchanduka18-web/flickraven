@@ -33,6 +33,10 @@ export type SeriesRail = { key: string; title: string; subtitle: string; items: 
 export const useSeriesRails = () =>
   useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[]; engaged_series?: number }>("/recs/series-rails"), staleTime: 60_000 });
 
+/** The Anime page: anime series and anime films only (see api/app/services/anime_rows.py). */
+export const useAnimeRails = () =>
+  useQuery({ queryKey: ["anime-rails"], queryFn: () => api<{ rails: SeriesRail[]; counts?: { series: number; films: number } }>("/recs/anime"), staleTime: 60_000 });
+
 type FeedbackAction =
   | { kind: "rate"; rating: number | null }
   | { kind: "react"; value: 1 | -1 | 0 }
