@@ -25,8 +25,14 @@ TITLE_RE = re.compile(r"\[\[(.+?)\]\]")
 SYSTEM = """You are FlickRaven's assistant: a friendly, knowledgeable guide to films, TV series and anime. You may chat about \
 anything the person wants, and you can answer questions about a title's story, characters, ending or themes.
 Rules:
-- When you recommend a title, write it as [[Title (Year)]]. FlickRaven only shows titles in its own catalog, so recommend \
-only real titles you are sure exist, and never invent one. If you are not sure about a fact, say so.
+- When you recommend a title, write it as [[Title (Year)]]. Recommend only real titles you are sure exist, never invent one. \
+FlickRaven shows a title's page when it has it, so just name the titles you think fit; do not talk about a "catalog" or \
+"database", and never tell the person that FlickRaven does not have a title. If you are not sure about a fact or a story, \
+say "I am not sure about that one", and answer from what you know if you are confident.
+- Follow what the person asks for right now. Keep suggestions in the same kind (TV series for a series request, films for a \
+film request), the same language or country (a K-drama request gets K-dramas) and the same mood. Never answer a series \
+request with a film unless they ask for films. The taste summary is only a hint for choosing between good fits; it never \
+overrides the request.
 - Put any plot spoiler (twists, endings, who dies) between || and || so the app can hide it until the person taps. Avoid \
 spoilers unless they asked for the ending.
 - FlickRaven does not stream anything. Do not claim a title is on a particular service; point people to the Where to watch \
@@ -95,10 +101,27 @@ def named_titles(db: Session, message: str) -> str:
     runs = [r for r in runs if len(r) >= 4 or (" " in r and len(r) >= 3)][:200]
     if not runs:
         return ""
-    rows = db.execute(text("""SELECT title, year, overview FROM movies WHERE lower(title) = ANY(:t)
+    rows = db.execute(text("""SELECT title, year, overview, title_type, original_language FROM movies WHERE lower(title) = ANY(:t)
         ORDER BY tmdb_vote_count DESC NULLS LAST LIMIT 3"""), {"t": runs}).mappings().all()
-    lines = [f"- {r['title']} ({r['year']}): {(r['overview'] or '')[:500]}" for r in rows]
-    return ("Catalog facts about titles mentioned (use these for story questions, say if they are not enough):\n" + "\n".join(lines)) if lines else ""
+    if not rows:
+        rows = fuzzy_titles(db, message)
+    lines = [f"- {r['title']} ({r['year']}, {r['title_type']}, language {r['original_language']}): {(r['overview'] or '')[:500]}" for r in rows]
+    return ("Catalog facts about titles mentioned (use these for story questions; if they are not enough, say you are not sure):\n" + "\n".join(lines)) if lines else ""
+
+
+def fuzzy_titles(db: Session, message: str) -> list:
+    """Titles the person spelled loosely ("its ok to not be o k drama"): pg_trgm word similarity of each title to the
+    message. Needs a title of 6+ letters and a close match, so ordinary chat does not match by accident."""
+    q = re.sub(r"[^a-z0-9 ]", "", message.lower())[:200].strip()
+    if len(q) < 6:
+        return []
+    try:
+        return db.execute(text("""SELECT title, year, overview, title_type, original_language FROM movies
+            WHERE length(title_norm) >= 6 AND word_similarity(title_norm, :q) >= 0.6
+            ORDER BY word_similarity(title_norm, :q) DESC, tmdb_vote_count DESC NULLS LAST LIMIT 2"""), {"q": q}).mappings().all()
+    except Exception:       # pg_trgm or title_norm missing: skip the nicety, never break the chat
+        db.rollback()
+        return []
 
 
 def _gemini_error_details(response) -> tuple[str, str]:
