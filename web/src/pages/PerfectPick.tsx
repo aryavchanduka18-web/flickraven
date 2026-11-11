@@ -10,7 +10,7 @@ import { tmdbImage } from "../lib/tmdb";
 type Option = [value: string, label: string, hint: string];
 const KINDS: Option[] = [["movie", "A movie", "One sitting"], ["series", "A TV series", "Something to follow"], ["either", "Either is fine", "Films and series together"]];
 const MOODS: Option[] = [
-  ["Funny", "Funny", "Make me laugh"], ["Feel-good", "Feel-good", "Warm and easy"], ["Relaxed", "Relaxed", "Gentle, nothing heavy"],
+  ["Funny", "Funny", "Make me laugh"], ["Feel-good", "Feel-good", "Warm and easy"], ["Romantic", "Romantic", "Love stories"], ["Relaxed", "Relaxed", "Gentle, nothing heavy"],
   ["Intense", "Intense", "Edge of the seat"], ["Mind-bending", "Mind-bending", "Make me think"], ["Scary", "Scary", "Keep the lights on"],
   ["Emotional", "Emotional", "Let me feel something"], ["Suspenseful", "Suspenseful", "Keep me guessing"], ["Mysterious", "Mysterious", "A puzzle to solve"],
   ["", "No mood in mind", "Surprise me"],

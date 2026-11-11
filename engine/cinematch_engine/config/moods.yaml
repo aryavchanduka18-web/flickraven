@@ -39,3 +39,6 @@ Mysterious:
     - genre: Thriller
       keywords: [detective, murder, conspiracy, secret, investigation, whodunit]
   nearest: Suspenseful
+Romantic:
+  genres: [Romance]
+  nearest: Feel-good

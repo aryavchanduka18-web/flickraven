@@ -108,3 +108,10 @@ def test_hindi_rows_appear_only_for_people_interested_in_hindi(indian):
     assert all(i["movie"]["year"] >= 2010 for i in got["modern-bollywood"]["items"])
     assert "indian-beyond" not in got            # Hindi-only profile: regional cinema row needs its own interest
     assert got["retro-hindi"]["title"] == "Bollywood Classics"
+
+
+def test_feel_good_and_romance_collections_exist(films):
+    got = {c["key"]: c for c in TestClient(app).get("/api/collections").json()["collections"]}
+    assert "feel-good" in got and "romance-films" in got
+    titles = {i["movie"]["title"] for i in got["feel-good"]["items"]}
+    assert "Big Romcom" in titles

@@ -3,9 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from cinematch_engine.rerank import refresh
+
 from app.auth import user_id_from
 from app.db import get_db
 from app.services import collections as col
+from app.services import daily
 from app.services import recommender as rec
 from app.services.movies import cards
 
@@ -35,12 +38,18 @@ def collections(request: Request, db: Session = Depends(get_db)) -> dict:
     members = {k: v for k, v in members.items() if len(v) >= col.MIN_FILMS}
     match = rec.match_for(db, uid, sorted({i for ids in members.values() for i in ids}))
     out = []
+    day = daily.rng(uid, "collections") if uid is not None else None
     for c in col.COLLECTIONS:
         if c["key"] not in members:
             continue
         ids = col.ordered(db, c, match, members[c["key"]])
+        # Each day the row shows a fresh part of the same ordering (the best few stay), and the rows change places.
+        shown = refresh(ids, RAIL, day) if day is not None else ids[:RAIL]
         out.append({"key": c["key"], "title": c["title"], "count": len(ids),
-                    "items": cards(db, ids[:RAIL], uid, match)})
+                    "items": cards(db, shown, uid, match)})
+    if day is not None:
+        order = list(day.permutation(len(out)))
+        out = [out[i] for i in order]
     return {"collections": out}
 
 

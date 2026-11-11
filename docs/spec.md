@@ -919,6 +919,13 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - Interest = languages chosen in the profile, plus the language of anything rated 7+, liked, watched or picked in onboarding. English-only people get no Hindi quota; guests get none of the gated rows. Rows are ordered by the user's own hybrid score (popularity where the engine cannot score a film), and need at least 6 films.
 - A persistent explicit-language lift for ranking itself came in #78.
 
+### 14.2i Daily Home, more diversity, anime hits, feel-good and romance (2026-11-11)
+
+- **Home changes every day.** `GET /recs/home` passes a seed (user id + date in India time + mode) to `engine.home`: the hero is drawn from the top 12 picks (the best two always stay), each row from the top 3x of its ranking (the best three stay, order kept), and the order of the themed rows is shuffled. Same person, same day: same page. Series rows, the Series and Anime rails (first page), and the film collections are refreshed the same way (`app/services/daily.py`, `rerank.refresh`). The day changes at midnight IST. Without a seed (tests, evaluation) the plan is unchanged and deterministic.
+- **More diversity.** MMR values moved from lambda 0.95/0.75/0.55 to 0.9/0.65/0.5 (familiar/balanced/discover), beta 0/0.05/0.2 to 0.02/0.08/0.25, long-tail share 0/10/20% to 5/15/25%. Hand-tuned: the NDCG@10 cost has NOT been re-measured; run `pipeline/tail_eval.py` and the segment evaluation on the laptop. The first 12 places of the Series and Anime rails hold at most 6 titles of one language.
+- **Anime hits.** `kind_rank("anime")` weighs fame (TMDB vote-count percentile) as much as quality: score = 0.5 taste + 0.25 quality + 0.25 fame (without taste: half quality, half fame). The series-rails endpoint adds "Anime everyone is talking about" (most-voted anime with quality 7.3+, the first six stay fixed) first among the themed rows, then "Romantic anime" and "Feel-good anime".
+- **Feel-good and Romance everywhere.** Home film rows "Feel-Good Films For You" and "Romance For You" (engine, ranked by the person's hybrid score, no horror/war/crime/thriller in feel-good); series themes "Feel-good series" and "Romantic series" (romance found by keyword or Soap, since TMDB TV has no Romance genre); film collections Feel-Good Films, Romance, Romantic Drama; mood "Romantic" in For Tonight and Perfect Pick (Feel-good already existed).
+
 ### 14.2e Taste Evolution (2026-11-11)
 
 - On `/taste-dna`, "How your taste changed": per month (last 6 with activity) the top 3 genres of titles liked or rated 7+, and, with 5+ titles in the latest two months and 5+ before, the genre that rose and the one that fell (change of 10 points or more). Counts only; `GET /api/me/taste-evolution`.

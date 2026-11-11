@@ -5,7 +5,7 @@ import type { RecItem } from "../../api/types";
 import { LANGUAGES } from "../../lib/format";
 import MovieGrid from "../card/MovieGrid";
 
-const MOODS = ["Funny", "Scary", "Intense", "Relaxed", "Feel-good", "Mind-bending"];
+const MOODS = ["Funny", "Scary", "Intense", "Relaxed", "Feel-good", "Romantic", "Mind-bending"];
 const RUNTIMES = [
   { v: "", l: "Any length" },
   { v: "short", l: "Under 90 min" },
