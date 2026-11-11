@@ -80,7 +80,20 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
         ai_ids = [i for i in ai_ids if i in engine.cat.row_of]     # titles the model has never seen cannot be scored or shown with it
     if ai_ids:
         _, extra_all, _ = similar_svc.similar_page(db, engine, movie_id, 0, 40)
-        order = ai_ids[:30] + [i for i in extra_all if i not in ai_ids]
+        stored = [i for i in extra_all if i not in ai_ids]
+        uid0 = user_id_from(request, db)
+        if uid0 is not None:
+            # Gemini only supplies candidates. What this person sees is filtered and ordered by their own taste:
+            # nothing they disliked or rated low, no genres they dislike, taste score blended with Gemini's order.
+            pool = ai_ids[:30] + stored
+            st = rec.user_state(db, uid0, engine)
+            keep, fit, has_taste = engine.personal_fit(st, [engine.cat.row_of[i] for i in pool])
+            kept = {i for i, k in zip(pool, keep) if k}
+            n_ai = len(ai_ids[:30])
+            score = {i: 0.4 * (1 - n / max(n_ai, 1)) + 0.6 * fit[n] for n, i in enumerate(pool[:n_ai])}
+            ai_ids = sorted((i for i in pool[:n_ai] if i in kept), key=lambda i: -score[i])
+            stored = [i for i in stored if i in kept]
+        order = ai_ids[:30] + stored
         total = len(order)
         ids = order[offset:offset + limit]
         extra = {i: extra_all.get(i, {"score": 0.0}) | ({"reasons": [{"code": "ai_similar", "text": "Similar series, picked with Google Gemini",

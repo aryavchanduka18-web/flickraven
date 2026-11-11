@@ -102,3 +102,32 @@ def test_shipped_file_answers_without_any_gemini_call(test_engine, titles, monke
     with SessionLocal() as db:
         assert ai.suggest(db, titles["AIS Anchor"], "AIS Anchor", 2020, [], "series") == [titles["AIS Friend"]]
     ai._file_ids.clear()
+
+
+def test_signed_in_user_never_gets_a_gemini_pick_they_dislike_and_taste_reorders_the_rest(test_engine, titles, monkeypatch):
+    a, f, o, fi = titles["AIS Anchor"], titles["AIS Friend"], titles["AIS Other"], titles["AIS Film"]
+
+    class Cat:
+        row_of = {a: 0, f: 1, o: 2, fi: 3}
+        kind = ["series"] * 4; titles = ["a", "f", "o", "fi"]; year = np.array([2020.0] * 4); genres = [["Drama"]] * 4
+        universe_of_row = [-1] * 4
+
+    class Engine:
+        cat = Cat()
+        def personal_fit(self, st, rows):
+            # the user disliked the first Gemini pick (f); of the others, o fits their taste better than fi
+            fit = {1: 0.9, 2: 0.9, 3: 0.2}
+            return np.array([r != 1 for r in rows]), np.array([fit[r] for r in rows]), True
+
+    monkeypatch.setattr(catalog_router.rec, "artifacts_ready", lambda: True)
+    monkeypatch.setattr(catalog_router.rec, "load_engine", lambda db: Engine())
+    monkeypatch.setattr(catalog_router.rec, "user_state", lambda db, uid, e: object())
+    monkeypatch.setattr(catalog_router.rec, "match_for", lambda db, uid, ids: {})
+    monkeypatch.setattr(catalog_router, "user_id_from", lambda request, db: 1)
+    monkeypatch.setattr(catalog_router.similar_svc, "similar_page",
+                        lambda db, e, mid, off, lim: ([], {fi: {"score": 0.5, "reasons": []}}, 1))
+    monkeypatch.setattr(catalog_router.ai_similar, "suggest", lambda *a_, **k: [f, fi, o])   # Gemini's order: f, fi, o
+    with TestClient(app) as c:
+        got = [i["movie"]["id"] for i in c.get(f"/api/movies/{a}/similar").json()["items"]]
+    assert f not in got                     # disliked: never shown just because Gemini named it
+    assert got == [o, fi]                   # o fits this person's taste better, so it moves ahead of Gemini's earlier fi
