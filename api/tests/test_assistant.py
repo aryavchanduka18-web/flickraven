@@ -170,3 +170,25 @@ def test_unknown_model_id_falls_back_to_the_next_and_is_remembered(monkeypatch):
     assert ai.ask_gemini([{"role": "user", "text": "hi"}], "s") == "ok"
     assert len(urls) == 1 and "gemini-2.5-flash:" in urls[0]          # remembered, no second 404
     monkeypatch.setattr(ai, "_working_model", None)
+
+
+def test_loosely_spelled_title_still_gets_its_catalog_facts(test_engine):
+    from sqlalchemy import text as t
+    from app.db import SessionLocal
+    with test_engine.begin() as conn:
+        mid = conn.execute(t("""INSERT INTO movies (tmdb_id, title, year, original_language, countries, backdrop_path, popularity_score,
+            tmdb_vote_count, title_type, overview) VALUES (990500, 'It''s Okay to Not Be Okay', 2020, 'ko', ARRAY['KR'], '/b.jpg', 8, 5000,
+            'series', 'A caretaker and a writer heal each other.') RETURNING id""")).scalar()
+    try:
+        with SessionLocal() as db:
+            facts = ai.named_titles(db, "what about its ok to not be o k drama")
+            assert "A caretaker and a writer heal each other." in facts and "series, language ko" in facts
+            assert ai.named_titles(db, "recommend me something warm for the weekend") == ""
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(t("DELETE FROM movies WHERE id = :i"), {"i": mid})
+
+
+def test_assistant_rules_forbid_catalog_talk_and_kind_switching():
+    assert "never tell the person that FlickRaven does not have a title" in ai.SYSTEM
+    assert "Never answer a series request with a film" in ai.SYSTEM
