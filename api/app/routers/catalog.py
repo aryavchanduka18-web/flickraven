@@ -72,8 +72,9 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
     row = engine.cat.row_of[movie_id]
     kind = engine.cat.kind[row]
     ai_ids, cross_ids = [], []
-    if kind in ("series", "anime"):
+    if kind in ("series", "anime", "movie"):
         # Stored similarity is weak for TV (no viewing data): Gemini names similar series, we keep only those in the catalog.
+        # Films (Hindi so far) come only from the offline file ai_similar_films.json: no live Gemini call per film.
         year = engine.cat.year[row]
         ai_ids = ai_similar.suggest(db, movie_id, engine.cat.titles[row], None if np.isnan(year) else int(year),
                                     list(engine.cat.genres[row]), kind)
@@ -93,6 +94,8 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
             st = rec.user_state(db, uid0, engine)
             keep, fit, has_taste = engine.personal_fit(st, [engine.cat.row_of[i] for i in pool])
             kept = {i for i, k in zip(pool, keep) if k}
+            seen = getattr(st, "watched", set())      # watched titles never show just because Gemini named them
+            kept -= {i for i in pool[:len(ai_ids[:30])] if engine.cat.row_of[i] in seen}
             n_ai = len(ai_ids[:30])
             score = {i: 0.4 * (1 - n / max(n_ai, 1)) + 0.6 * fit[n] for n, i in enumerate(pool[:n_ai])}
             ai_ids = sorted((i for i in pool[:n_ai] if i in kept), key=lambda i: -score[i])
@@ -100,7 +103,7 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
         order = ai_ids[:30] + stored
         total = len(order)
         ids = order[offset:offset + limit]
-        extra = {i: extra_all.get(i, {"score": 0.0}) | ({"reasons": [{"code": "ai_similar", "text": "Similar series, picked with Google Gemini",
+        extra = {i: extra_all.get(i, {"score": 0.0}) | ({"reasons": [{"code": "ai_similar", "text": "Similar film, picked with Google Gemini" if kind == "movie" else "Similar series, picked with Google Gemini",
                                                                        "source": "more_like_this", "share": 0.0, "anchor_movie_id": None}]} if i in ai_ids else {})
                  for i in ids}
     else:
