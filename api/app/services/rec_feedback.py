@@ -212,3 +212,48 @@ def hero_without_hidden(plan: dict, skip: set[int]) -> tuple[list[dict], set[int
         skip = skip | {e["row"] for e in spare}
     return entries, skip
 
+
+# ---- Perfect Pick rejections -------------------------------------------------------------------------------------
+# A rejection is stored with the request that produced the result (mood, genres, languages, time, ...), because
+# "not for me" means different things in different requests. Reasons are optional and chosen by the person.
+# What a later learning step may do with them (design section 6): with a reason, learn that feature as asked, but
+# "wrong mood" only inside that mood, never as a global tone penalty; with no reason, treat it as a weak negative for
+# this request and title only; a reroll ("Not these") is context only. None of this is Not interested: that is an
+# event, hides a title, and never changes taste.
+PP_REASONS = {"mood": "Wrong mood", "genre": "Wrong genre", "language": "Wrong language", "time": "Wrong length",
+              "seen": "Already seen it", "taste": "Not my taste", "other": "Something else"}
+PP_KINDS = ("perfect_pick_reject", "perfect_pick_reroll")
+_REQUEST_STR = {"kind": 10, "mood": 40, "time": 12, "status": 10, "adventure": 12}
+_REQUEST_LIST = {"genres": (8, 30), "languages": (9, 8)}
+
+
+def clean_request(raw: dict | None) -> dict:
+    """Keep only the known fields of the Perfect Pick request, with their size limits. Nothing else is stored."""
+    raw = raw if isinstance(raw, dict) else {}
+    out: dict = {}
+    for key, limit in _REQUEST_STR.items():
+        v = raw.get(key)
+        if isinstance(v, str) and v:
+            out[key] = v[:limit]
+    for key, (n, width) in _REQUEST_LIST.items():
+        v = raw.get(key)
+        if isinstance(v, list):
+            out[key] = [x[:width] for x in v[:n] if isinstance(x, str)]
+    if isinstance(raw.get("other_languages"), bool):
+        out["other_languages"] = raw["other_languages"]
+    return out
+
+
+def store_pick_feedback(db: Session, user_id: int, kind: str, movie_ids: list[int], reasons: list[str],
+                        request: dict | None, surface: str) -> int:
+    """Write one row per title; returns how many (titles that do not exist are skipped)."""
+    import json
+    ctx = json.dumps(clean_request(request))
+    reasons = [r for r in dict.fromkeys(reasons) if r in PP_REASONS] if kind == "perfect_pick_reject" else []
+    n = 0
+    for mid in dict.fromkeys(movie_ids):
+        n += db.execute(text("""INSERT INTO rec_feedback (user_id, movie_id, kind, reasons, context, surface)
+            SELECT :u, m.id, :k, CAST(:r AS text[]), CAST(:c AS jsonb), :s FROM movies m WHERE m.id = :m"""),
+                        {"u": user_id, "m": mid, "k": kind, "r": "{" + ",".join(reasons) + "}", "c": ctx, "s": surface}).rowcount
+    return n
+

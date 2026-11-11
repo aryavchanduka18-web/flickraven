@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PerfectPick from "./PerfectPick";
 
 let requests: Record<string, unknown>[];
+let urls: string[];
 let reply: unknown;
 
 const card = (id: number, title: string, misses: string[] = []) => ({
@@ -15,8 +16,10 @@ const card = (id: number, title: string, misses: string[] = []) => ({
 
 beforeEach(() => {
   requests = [];
+  urls = [];
   reply = { items: [], message: null };
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    urls.push(String(input));
     requests.push(JSON.parse(String(init?.body)));
     return new Response(JSON.stringify(reply), { status: 200 });
   });
@@ -121,5 +124,43 @@ describe("Perfect Pick", () => {
     fireEvent.click(screen.getByRole("button", { name: /A TV series/ }));
     fireEvent.click(screen.getByRole("button", { name: /Intense/ }));
     expect(screen.getByRole("button", { name: "Anime" })).toBeTruthy();
+  });
+
+  it("stores a rejection with the answers that produced it and the chosen reason", async () => {
+    reply = { items: [card(1, "A"), card(2, "B"), card(3, "C")], alternatives: [], message: null };
+    setup();
+    answerAll();
+    await screen.findByText("A");
+    const article = screen.getByText("A").closest("article") as HTMLElement;
+    fireEvent.click(article.querySelectorAll("button")[0]); // Not this one
+    expect(article.textContent).toMatch(/Why\? Optional/);
+    fireEvent.click(screen.getAllByRole("button", { name: "Wrong mood" })[0]);
+    await waitFor(() => expect(urls.some((u) => u.endsWith("/feedback/perfect-pick-reject"))).toBe(true));
+    const i = urls.findIndex((u) => u.endsWith("/feedback/perfect-pick-reject"));
+    expect(requests[i]).toEqual({
+      kind: "perfect_pick_reject", movie_ids: [1], reasons: ["mood"], alt: false,
+      request: { kind: "series", mood: "Romantic", genres: [], languages: ["ko"], time: "h20", status: "any", adventure: "familiar", other_languages: false },
+    });
+    expect(article.textContent).toMatch(/Noted/);
+    // a rejected title cannot be rejected twice, and nothing else on the page was rejected
+    expect(article.textContent).not.toMatch(/Not this one/);
+    expect(urls.filter((u) => u.endsWith("/feedback/perfect-pick-reject")).length).toBe(1);
+  });
+
+  it("Skip stores the rejection without a reason, and Not these is stored as context only", async () => {
+    reply = { items: [card(1, "A"), card(2, "B"), card(3, "C")], alternatives: [], message: null };
+    setup();
+    answerAll();
+    await screen.findByText("A");
+    const article = screen.getByText("A").closest("article") as HTMLElement;
+    fireEvent.click(article.querySelectorAll("button")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Not these" })[0]);
+    await waitFor(() => expect(urls.filter((u) => u.endsWith("/recs/perfect-pick")).length).toBe(2));
+    const sent = requests.filter((_, k) => urls[k].endsWith("/feedback/perfect-pick-reject"));
+    expect(sent.map((r) => [r.kind, r.reasons, r.movie_ids])).toEqual([
+      ["perfect_pick_reject", [], [1]],
+      ["perfect_pick_reroll", [], [2, 3]], // the one already turned down is not repeated
+    ]);
   });
 });

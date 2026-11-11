@@ -231,3 +231,39 @@ def test_cleanup_removes_old_impressions(film, test_engine):
     with test_engine.connect() as conn:
         left = sorted(r for r in conn.execute(text("SELECT kind, (now() - created_at) > interval '30 days' FROM impressions WHERE user_id = :u"), {"u": uid}))
     assert left == [("card", False), ("row", True)]
+
+
+# ---- Perfect Pick rejections ---------------------------------------------------------------------
+REQUEST = {"kind": "movie", "mood": "Funny", "genres": ["Crime", "Comedy"], "languages": ["en"], "time": "90_120",
+           "adventure": "balanced", "other_languages": False, "evil": "<script>", "genres_extra": 1}
+
+
+def test_clean_request_keeps_only_known_fields():
+    out = rf.clean_request(REQUEST)
+    assert out == {"kind": "movie", "mood": "Funny", "genres": ["Crime", "Comedy"], "languages": ["en"], "time": "90_120",
+                   "adventure": "balanced", "other_languages": False}
+    assert rf.clean_request(None) == {} and rf.clean_request({"genres": ["x"] * 20})["genres"] == ["x"] * 8
+
+
+def test_rejection_is_stored_with_its_request_and_reasons(film, test_engine):
+    with TestClient(app) as c:
+        c.post("/api/auth/guest")
+        uid = c.get("/api/me").json()["id"]
+        r = c.post("/api/feedback/perfect-pick-reject", json={"movie_ids": [film], "reasons": ["mood", "mood", "genre"], "request": REQUEST})
+        assert r.json() == {"ok": True, "stored": 1}
+        assert c.post("/api/feedback/perfect-pick-reject", json={"movie_ids": [film], "reasons": ["bogus"]}).status_code == 422
+        assert c.post("/api/feedback/perfect-pick-reject", json={"movie_ids": [film], "kind": "x"}).status_code == 422
+        assert c.post("/api/feedback/perfect-pick-reject", json={"movie_ids": []}).status_code == 422
+        # a reroll ("Not these") keeps the context but never reasons
+        c.post("/api/feedback/perfect-pick-reject", json={"kind": "perfect_pick_reroll", "movie_ids": [film, 99999999], "reasons": ["mood"], "request": REQUEST, "alt": True})
+        # none of it is a dislike, a Not interested, or an event that touches taste
+        assert c.get("/api/feedback/not-interested").json()["items"] == []
+        assert c.get("/api/me").json()["id"] == uid
+        with test_engine.connect() as conn:
+            rows = conn.execute(text("SELECT kind, reasons, context, surface FROM rec_feedback WHERE user_id = :u ORDER BY id"), {"u": uid}).all()
+            events = conn.execute(text("SELECT count(*) FROM interactions WHERE user_id = :u AND movie_id = :m"), {"u": uid, "m": film}).scalar()
+            dislikes = conn.execute(text("SELECT count(*) FROM reactions WHERE user_id = :u"), {"u": uid}).scalar()
+    assert rows[0][0] == "perfect_pick_reject" and rows[0][1] == ["mood", "genre"] and rows[0][3] == "perfect_pick"
+    assert rows[0][2]["mood"] == "Funny" and rows[0][2]["genres"] == ["Crime", "Comedy"] and "evil" not in rows[0][2]
+    assert rows[1][0] == "perfect_pick_reroll" and rows[1][1] == [] and rows[1][3] == "perfect_pick_alt"
+    assert len(rows) == 2 and events == 0 and dislikes == 0
