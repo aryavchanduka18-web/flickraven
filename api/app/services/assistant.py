@@ -104,7 +104,7 @@ def ask_gemini(history: list[dict], system: str) -> str:
     s = get_settings()
     body = {"system_instruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["text"]}]} for m in history],
-            "generationConfig": {"maxOutputTokens": 700, "temperature": 0.7}}
+            "generationConfig": {"maxOutputTokens": 1200, "temperature": 0.7, "thinkingConfig": {"thinkingBudget": 0}}}
     try:
         r = httpx.post(URL.format(model=s.gemini_model), json=body, headers={"x-goog-api-key": s.gemini_api_key}, timeout=httpx.Timeout(25.0, connect=5.0))
     except httpx.HTTPError as e:
