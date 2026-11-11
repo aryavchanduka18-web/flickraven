@@ -34,7 +34,7 @@ type Result = {
   items: PickItem[]; alternatives?: PickItem[]; message: string | null; relaxed?: string[]; offer?: "other_languages" | null;
   remaining?: { exact: number; alternatives: number };
 };
-const MISS: Record<string, string> = { mood: "your mood", genres: "your genres" };
+const MISS: Record<string, string> = { mood: "your mood", genres: "your genres", tone: "the tone you asked for" };
 const missText = (m: string[]) => "Misses " + m.map((x) => MISS[x] ?? x).join(" and ");
 const STEPS = ["kind", "mood", "genres", "languages", "time", "adventure"] as const;
 const TITLES: Record<(typeof STEPS)[number], string> = {

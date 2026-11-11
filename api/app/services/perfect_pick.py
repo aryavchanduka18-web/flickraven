@@ -147,10 +147,26 @@ SERIES_KEYWORD_GENRES = {
 }
 
 
+# A keyword shows a genre only next to a real TMDB genre that can carry it (a Romance keyword on a Drama or Comedy, a
+# Thriller keyword on a Crime, Mystery, Drama or Action series). A keyword alone never makes a genre: a reality show
+# with a "romance" keyword, or a sitcom with a "serial killer" keyword, gets nothing.
+KEYWORD_GENRE_SUPPORT = {
+    "Romance": {"Drama", "Comedy"},
+    "Horror": {"Mystery", "Drama", "Science Fiction", "Fantasy", "Crime"},
+    "Thriller": {"Crime", "Mystery", "Drama", "Action", "Science Fiction"},
+    "Music": {"Drama", "Comedy", "Documentary", "Animation", "Family"},
+    "History": {"Drama", "War", "Documentary", "Animation"},
+}
+KEYWORD_STRENGTH = 0.6      # a keyword-shown genre counts this much of a real TMDB genre when ranking
+
+
 def series_genres(genres: list[str], keywords: list[str]) -> tuple[list[str], frozenset]:
-    """A series' genres plus the ones its TMDB keywords show (only genres TMDB TV lacks). Returns (all, added)."""
+    """A series' genres plus the ones its TMDB keywords show (only genres TMDB TV lacks, and only with a supporting real
+    genre, see KEYWORD_GENRE_SUPPORT). Returns (all, added)."""
     kws = {k.lower() for k in keywords}
-    added = frozenset(g for g, words in SERIES_KEYWORD_GENRES.items() if g not in genres and kws & words)
+    have = set(genres)
+    added = frozenset(g for g, words in SERIES_KEYWORD_GENRES.items()
+                      if g not in have and kws & words and have & KEYWORD_GENRE_SUPPORT[g])
     return list(genres) + sorted(added), added
 
 
@@ -193,13 +209,83 @@ class Selection:
     exact_elsewhere: int = 0                           # when under three exact: exact matches in other languages
 
 
+# ---- tone: what a mood does NOT want. Mood-specific, never universal: Horror is a fine Intense pick, a bad Feel-good one.
+# The For Tonight rules (moods.yaml) only list what fits a mood, so a crime sitcom fits "Intense" there; Perfect Pick adds
+# the other half. A rule applies to a title unless the person picked the genre it fires on (asking for Comedy waives
+# the Comedy clash).
+LIGHT_KEYWORDS = {"sitcom", "parody", "spoof", "mockumentary", "slapstick", "sketch comedy", "stand-up comedy", "workplace comedy", "cringe comedy"}
+DARK_KEYWORDS = {"serial killer", "gore", "slasher", "torture", "massacre", "psychopath"}      # not "murder": most series have a plot murder
+SERIOUS_REAL_GENRES = {"Drama", "Thriller", "Action", "War", "Horror"}      # real genres that make a comedy a serious one too
+MOOD_EXTRA_FITS = {"Intense": {"Horror"}, "Suspenseful": {"Horror"}}        # on top of moods.yaml, Perfect Pick only
+LIGHT_MOODS = {"Intense", "Suspenseful", "Mysterious", "Emotional"}
+
+
+def _real(it: Item) -> set[str]:
+    return set(it.genres) - set(it.inferred)
+
+
+def tone_clash(it: Item, pf: Prefs) -> str | None:
+    """Why this title's tone clashes with the picked mood, or None. Uses real TMDB genres plus keywords; genres that
+    were only shown by keywords never decide a clash."""
+    mood = pf.mood
+    if not mood:
+        return None
+    real, kws, picked = _real(it), {k.lower() for k in it.keywords}, set(pf.genres)
+    light_kw = kws & LIGHT_KEYWORDS
+    if mood in LIGHT_MOODS:
+        if "Comedy" in real and "Comedy" not in picked and not real & SERIOUS_REAL_GENRES:
+            return "a comedy"
+        if light_kw and "Comedy" not in picked and "Drama" not in real:
+            return "played for laughs"
+        if mood != "Emotional" and real & {"Family"} and not real & SERIOUS_REAL_GENRES and "Family" not in picked:
+            return "a family show"
+    elif mood == "Mind-bending":
+        if light_kw and "Comedy" not in picked and not real & {"Science Fiction", "Mystery"}:
+            return "played for laughs"
+    elif mood == "Scary":
+        if "Comedy" in real and "Horror" not in real and "Comedy" not in picked:
+            return "a comedy"
+        if light_kw and "Comedy" not in picked:
+            return "played for laughs"
+    elif mood == "Feel-good":
+        if real & {"Horror", "War", "Thriller"} - picked or kws & DARK_KEYWORDS:
+            return "dark in tone"
+        if "Crime" in real and "Crime" not in picked and not real & {"Comedy", "Family"}:
+            return "a crime drama"
+    elif mood == "Romantic":
+        if real & {"Horror", "War"} - picked:
+            return "dark in tone"
+    elif mood == "Relaxed":
+        if real & {"Horror", "Thriller", "War", "Crime"} - picked:
+            return "tense, not relaxed"
+    return None
+
+
+def mood_strength(it: Item, pf: Prefs, mood_rule: dict | None, matches) -> float:
+    """1 if the mood fits (on any genre, real or keyword-shown), else 0. Keyword-shown genres count less for the PICKED
+    genres (genre_strength), not here: for a mood like Scary or Romantic, TV titles can only fit through them."""
+    if not (pf.mood and mood_rule):
+        return 1.0
+    extra = MOOD_EXTRA_FITS.get(pf.mood, set())
+    return 1.0 if matches({"genres": it.genres, "keywords": it.keywords}, mood_rule) or set(it.genres) & extra else 0.0
+
+
 def fits_mood(it: Item, pf: Prefs, mood_rule: dict | None, matches) -> bool:
-    return not (pf.mood and mood_rule) or bool(matches({"genres": it.genres, "keywords": it.keywords}, mood_rule))
+    return mood_strength(it, pf, mood_rule, matches) > 0
 
 
 def fits_genres(it: Item, pf: Prefs) -> bool:
+    """At least ONE of the picked genres (more matches only rank higher)."""
     soft = soft_genres(pf)
     return not soft or bool(set(soft) & set(it.genres))
+
+
+def genre_strength(it: Item, pf: Prefs) -> float:
+    """Share of the picked genres met; a real TMDB genre counts 1, a keyword-shown one KEYWORD_STRENGTH."""
+    soft = soft_genres(pf)
+    if not soft:
+        return 1.0
+    return sum((KEYWORD_STRENGTH if g in it.inferred else 1.0) for g in soft if g in it.genres) / len(soft)
 
 
 def select(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> Selection:
@@ -212,12 +298,16 @@ def select(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> Sel
     in_lang = [i for i in base if lang_ok(i, pf.languages)]
     exact, near = [], []
     for i in in_lang:
-        misses = [m for m, ok in (("mood", fits_mood(i, pf, mood_rule, matches)), ("genres", fits_genres(i, pf))) if not ok]
+        mood_ok = fits_mood(i, pf, mood_rule, matches)
+        # a tone clash is only named when the mood otherwise fits (a title that misses the mood already says so)
+        misses = [m for m, ok in (("mood", mood_ok), ("genres", fits_genres(i, pf)),
+                                  ("tone", not mood_ok or tone_clash(i, pf) is None)) if not ok]
         (near.append((i, misses)) if misses else exact.append(i))
     outside = len(base) if not in_lang and pf.languages else 0
     elsewhere = 0
     if pf.languages and in_lang and len(exact) < 3:
-        elsewhere = sum(1 for i in base if not lang_ok(i, pf.languages) and fits_mood(i, pf, mood_rule, matches) and fits_genres(i, pf))
+        elsewhere = sum(1 for i in base if not lang_ok(i, pf.languages) and fits_mood(i, pf, mood_rule, matches) and fits_genres(i, pf)
+                        and tone_clash(i, pf) is None)
     return Selection(exact, near, outside, elsewhere)
 
 
@@ -227,16 +317,15 @@ def rank(items: list[Item], pf: Prefs, mood_rule: dict | None, matches) -> list[
     for kind in {i.kind for i in items}:
         grp = [i for i in items if i.kind == kind]
         by_kind[kind] = dict(zip((i.id for i in grp), pct_of([i.rec for i in grp])))
-    gset = set(soft_genres(pf))
     raw = []
     for i in items:
-        g = len(gset & set(i.genres)) / len(gset) if gset else 1.0
-        m = 1.0 if not (pf.mood and mood_rule) else float(matches({"genres": i.genres, "keywords": i.keywords}, mood_rule))
+        g = genre_strength(i, pf)
+        m = mood_strength(i, pf, mood_rule, matches)
         raw.append(W_REL * by_kind[i.kind][i.id] + W_GENRE * g + W_MOOD * m)
     return [Cand(i.id, p, i.novelty) for i, p in zip(items, pct_of(raw))]
 
 
-MISS_TEXT = {"mood": "your mood", "genres": "your picked genres"}
+MISS_TEXT = {"mood": "your mood", "genres": "your picked genres", "tone": "the tone you asked for"}
 
 
 def pick_alternatives(near: list[tuple[Item, list[str]]], pf: Prefs, mood_rule: dict | None, matches, k: int) -> list[tuple[Cand, list[str]]]:
@@ -305,6 +394,8 @@ def reasons_v2(it: Item, role: str, pf: Prefs, misses: list[str], matches, mood_
     if pf.mood and mood_rule:
         out.append(r("pp_mood", f'Does not match the "{pf.mood.lower()}" mood' if "mood" in misses
                      else f'Fits "{pf.mood.lower()}"'))
+        if "tone" in misses:
+            out.append(r("pp_tone", f'Tone clashes with "{pf.mood.lower()}": {tone_clash(it, pf) or "a different tone"}'))
     soft = soft_genres(pf)
     hit = [g for g in soft if g in it.genres]
     if ANIME in pf.genres and it.anime:
