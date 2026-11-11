@@ -1,12 +1,16 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import type { RecItem } from "../../api/types";
 
+export type ToastAction = { label: string; run: () => void };
+
 type UI = {
   quickView: RecItem | null;
   openQuickView: (item: RecItem) => void;
   closeQuickView: () => void;
   toast: string | null;
-  notify: (msg: string) => void;
+  /** A short message at the bottom. With `action` it also shows one button (for example Undo) and stays longer. */
+  toastAction: ToastAction | null;
+  notify: (msg: string, action?: ToastAction) => void;
   /** Film whose "Why?" panel is open. */
   whyId: number | null;
   openWhy: (movieId: number | null) => void;
@@ -32,6 +36,7 @@ const Ctx = createContext<UI | null>(null);
 export function UIProvider({ children }: { children: ReactNode }) {
   const [quickView, setQuickView] = useState<RecItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastAction, setToastAction] = useState<ToastAction | null>(null);
   const [whyId, setWhyId] = useState<number | null>(null);
   const [dislikeId, setDislikeId] = useState<number | null>(null);
   const [sidebarOpen, setSidebar] = useState(sidebarWasOpen);
@@ -43,12 +48,18 @@ export function UIProvider({ children }: { children: ReactNode }) {
       /* private mode: it just resets next visit */
     }
   }, []);
-  const notify = useCallback((msg: string) => {
+  const notify = useCallback((msg: string, action?: ToastAction) => {
     setToast(msg);
-    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 2600);
+    setToastAction(action ?? null);
+    window.setTimeout(() => {
+      setToast((t) => {
+        if (t === msg) setToastAction(null);
+        return t === msg ? null : t;
+      });
+    }, action ? 6500 : 2600);
   }, []);
   return (
-    <Ctx.Provider value={{ quickView, openQuickView: setQuickView, closeQuickView: () => setQuickView(null), toast, notify,
+    <Ctx.Provider value={{ quickView, openQuickView: setQuickView, closeQuickView: () => setQuickView(null), toast, toastAction, notify,
       whyId, openWhy: setWhyId, dislikeId, askDislikeReason: setDislikeId, sidebarOpen, setSidebarOpen }}>
       {children}
     </Ctx.Provider>

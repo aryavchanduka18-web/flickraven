@@ -67,17 +67,19 @@ export function patchFilm(data: unknown, id: number, change: Partial<State>, dro
  *  collection rows straight away, before the server's fresh lists arrive. */
 export function useFeedback(movieId: number, source?: string) {
   const qc = useQueryClient();
+  // Every action, including the undoing ones, says which row or page it came from (row learning reads it).
+  const q = source ? `?source=${encodeURIComponent(source)}` : "";
   return useMutation({
     mutationFn: (a: FeedbackAction) => {
       switch (a.kind) {
         case "rate":
-          return a.rating ? send("PUT", `/ratings/${movieId}`, { rating: a.rating, source }) : send("DELETE", `/ratings/${movieId}`);
+          return a.rating ? send("PUT", `/ratings/${movieId}`, { rating: a.rating, source }) : send("DELETE", `/ratings/${movieId}${q}`);
         case "react":
-          return a.value ? send("PUT", `/reactions/${movieId}`, { value: a.value, source }) : send("DELETE", `/reactions/${movieId}`);
+          return a.value ? send("PUT", `/reactions/${movieId}`, { value: a.value, source }) : send("DELETE", `/reactions/${movieId}${q}`);
         case "list":
-          return a.on ? send("PUT", `/list/${movieId}`, { source }) : send("DELETE", `/list/${movieId}`);
+          return a.on ? send("PUT", `/list/${movieId}`, { source }) : send("DELETE", `/list/${movieId}${q}`);
         case "watched":
-          return a.on ? send("PUT", `/watched/${movieId}`) : send("DELETE", `/watched/${movieId}`);
+          return a.on ? send("PUT", `/watched/${movieId}`, { source }) : send("DELETE", `/watched/${movieId}${q}`);
       }
     },
     onMutate: (a: FeedbackAction) => {
@@ -96,6 +98,14 @@ export function useFeedback(movieId: number, source?: string) {
   });
 }
 
+const NOT_INTERESTED_KEYS = ["home", "collections", "kind", "series-rails", "movie", "activity", "activity-titles", "not-interested"];
+
+/** Undo a "Not interested" without needing the card that was hidden (it is gone from the page by then). */
+export async function undoNotInterested(qc: ReturnType<typeof useQueryClient>, movieId: number) {
+  await send("DELETE", `/feedback/not-interested/${movieId}`);
+  for (const key of NOT_INTERESTED_KEYS) qc.invalidateQueries({ queryKey: [key] });
+}
+
 /** "Not interested": the title leaves every recommendation row at once (before the server answers) and stays out
  *  for 90 days. It is not a dislike and does not change the taste profile. */
 export function useNotInterested(movieId: number, source?: string) {
@@ -109,7 +119,7 @@ export function useNotInterested(movieId: number, source?: string) {
       }
     },
     onSettled: () => {
-      for (const key of ["home", "collections", "kind", "series-rails", "movie", "activity", "activity-titles", "not-interested"]) qc.invalidateQueries({ queryKey: [key] });
+      for (const key of NOT_INTERESTED_KEYS) qc.invalidateQueries({ queryKey: [key] });
     },
   });
 }

@@ -1,6 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState, type ReactNode } from "react";
-import { useFeedback, useNotInterested } from "../../api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { undoNotInterested, useFeedback, useNotInterested } from "../../api/hooks";
+import { canHideFrom } from "../../lib/notInterested";
 import type { UserState } from "../../api/types";
 import { useUI } from "../layout/ui";
 
@@ -85,8 +87,9 @@ function ActionButton({ on, label, title, onClick, burst, size, children }: {
 export default function ActionButtons({ movieId, state: server, source, size = "sm", showWatched = false }: Props) {
   const fb = useFeedback(movieId, source);
   const hide = useNotInterested(movieId, source);
-  // "Not interested" is for recommendation rows only (Home, collections, More Like This), not for search or My List.
-  const canHide = !!source && /^(rail|collection|similar)/.test(source) && !server.in_list && server.reaction === 0 && server.rating == null;
+  const qc = useQueryClient();
+  // "Not interested" is for recommendation rows only (lib/notInterested.ts), not More Like This, search or My List.
+  const canHide = canHideFrom(source) && !server.in_list && server.reaction === 0 && server.rating == null;
   const { notify, askDislikeReason } = useUI();
   // Optimistic: the button changes on click; the server's answer replaces it when the lists refresh.
   const [state, setState] = useState(server);
@@ -123,7 +126,8 @@ export default function ActionButtons({ movieId, state: server, source, size = "
         <ActionButton size={size} on={false} label="Not interested" title="Not interested: hide this, small effect on your picks"
           onClick={() => {
             hide.mutate(false);
-            notify("Hidden from your picks. This is not a dislike, so your taste profile is unchanged.");
+            notify("Hidden from your picks. Not a dislike: your taste profile is unchanged.",
+              { label: "Undo", run: () => { undoNotInterested(qc, movieId); } });
           }}>
           {Icon.hide()}
         </ActionButton>
