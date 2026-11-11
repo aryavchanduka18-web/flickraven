@@ -31,6 +31,7 @@ SYSTEM = ("You recommend TV. Given one TV series, list the %d TV series (or anim
 
 MODELS = Path(__file__).resolve().parents[3] / "artifacts" / "models"
 _file: dict[str, list[str]] | None = None          # tmdb id -> names, from artifacts/models/ai_similar.json (pipeline/ai_similar.py)
+_films: dict[str, list[str]] | None = None        # same for films, from artifacts/models/ai_similar_films.json (pipeline/ai_similar_films.py)
 _file_ids: dict[int, list[int]] = {}               # movie id -> catalog ids, resolved once per process
 _cache: dict[int, tuple[float, list[int]]] = {}
 _calls: dict[str, int] = {}
@@ -74,22 +75,30 @@ def _budget() -> bool:
         return True
 
 
+def _load(name: str) -> dict[str, list[str]]:
+    path = MODELS / name
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("titles", {}) if path.exists() else {}
+    except (OSError, ValueError):
+        log.warning("%s could not be read", name)
+        return {}
+
+
 def precomputed(db: Session, movie_id: int, kind: str) -> list[int] | None:
-    """Catalog ids from the shipped file (asked once, offline, so no Gemini call at all), or None when the title is not in it."""
-    global _file
+    """Catalog ids from the shipped file (asked once, offline, so no Gemini call at all), or None when the title is not
+    in it. Series and anime use ai_similar.json, films ai_similar_films.json (Hindi films so far)."""
+    global _file, _films
     if _file is None:
-        path = MODELS / "ai_similar.json"
-        try:
-            _file = json.loads(path.read_text(encoding="utf-8")).get("titles", {}) if path.exists() else {}
-        except (OSError, ValueError):
-            log.warning("ai_similar.json could not be read")
-            _file = {}
-    if not _file:
+        _file = _load("ai_similar.json")
+    if _films is None:
+        _films = _load("ai_similar_films.json")
+    named = _films if kind == "movie" else _file
+    if not named:
         return None
     if movie_id in _file_ids:
         return _file_ids[movie_id]
     row = db.execute(text("SELECT tmdb_id FROM movies WHERE id = :i"), {"i": movie_id}).first()
-    names = _file.get(str(row[0])) if row else None
+    names = named.get(str(row[0])) if row else None
     if not names:
         return None
     parsed = [(m.group(1), int(m.group(2))) for n in names if (m := re.match(r"^(.+?)\s*\((\d{4})\)$", n))]
@@ -103,7 +112,7 @@ def suggest(db: Session, movie_id: int, title: str, year: int | None, genres: li
     pre = precomputed(db, movie_id, kind)
     if pre:
         return pre
-    if not enabled():
+    if kind == "movie" or not enabled():     # films come only from the offline file: no live Gemini call per film page
         return []
     now = time.time()
     hit = _cache.get(movie_id)
