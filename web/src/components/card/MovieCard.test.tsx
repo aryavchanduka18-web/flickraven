@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { RecItem } from "../../api/types";
 import { UIProvider } from "../layout/ui";
 import MovieCard from "./MovieCard";
@@ -30,9 +30,10 @@ async function setup() {
     <QueryClientProvider client={client}>
       <UIProvider>
         <MemoryRouter>
-          <div data-testid="rail" style={{ overflowX: "auto" }}>
-            <MovieCard item={item} source="test" position={0} />
-          </div>
+          <Routes>
+            <Route path="/" element={<div data-testid="rail" style={{ overflowX: "auto" }}><MovieCard item={item} source="test" position={0} /></div>} />
+            <Route path="/movie/:id" element={<p>title page</p>} />
+          </Routes>
         </MemoryRouter>
       </UIProvider>
     </QueryClientProvider>,
@@ -70,4 +71,19 @@ test("the details open once, at their final size: the film details are loaded be
   expect(globalThis.fetch).toHaveBeenCalledWith("/api/movies/7", expect.anything());
   expect(screen.getByTestId("hover-details")).toBeInTheDocument();
   expect(screen.queryByText("Loading", { exact: false })).not.toBeInTheDocument();
+});
+
+
+test("a click anywhere on the hover details opens the title's page (they cover the cards below in a grid)", async () => {
+  await setup();
+  fireEvent.click(screen.getByText("A short plot."));
+  expect(screen.getByText("title page")).toBeInTheDocument();
+});
+
+test("the hover details show the title as a link to its page, and their own buttons do not navigate", async () => {
+  await setup();
+  fireEvent.click(screen.getByRole("button", { name: "Quick view Test Film" }));
+  expect(screen.queryByText("title page")).toBeNull();
+  fireEvent.click(screen.getByRole("link", { name: "Test Film" }));
+  expect(screen.getByText("title page")).toBeInTheDocument();
 });

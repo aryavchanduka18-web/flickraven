@@ -186,6 +186,7 @@ function HoverDetails({ item, source, anchor, body, onEnter, onLeave }: {
   onEnter: () => void; onLeave: () => void;
 }) {
   const { openQuickView, openWhy } = useUI();
+  const navigate = useNavigate();
   const m = item.movie;
   const panel = useRef<HTMLDivElement>(null);
   const detail = useQuery(detailQuery(m.id));
@@ -223,10 +224,17 @@ function HoverDetails({ item, source, anchor, body, onEnter, onLeave }: {
       animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } }}
       exit={{ opacity: 0, transition: { duration: 0.12, ease: "easeIn" } }}
       style={place.style}
-      className={`z-[45] bg-surface shadow-2xl ring-1 ring-white/10 ${place.above ? "rounded-t-md" : "rounded-b-md"}`}
+      className={`z-[45] cursor-pointer bg-surface shadow-2xl ring-1 ring-white/10 ${place.above ? "rounded-t-md" : "rounded-b-md"}`}
       data-testid="hover-details"
+      // The panel covers the cards below it (My List, genre grids), so a click on it must open this title's page,
+      // except on its own buttons and links (rate, list, Why?, cast).
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("a, button, input, select, textarea")) return;
+        navigate(`/movie/${m.id}`, { state: { source } });
+      }}
     >
-      <div className="flex items-center justify-between p-3 pb-2">
+      <Link to={`/movie/${m.id}`} state={{ source }} className="block truncate px-3 pt-3 text-sm font-bold hover:underline">{m.title}</Link>
+      <div className="flex items-center justify-between p-3 pb-2 pt-2">
         {/* The film's own record (fresh) wins over the rail's copy, which may be older. */}
         <ActionButtons movieId={m.id} state={detail.data?.user_state ?? item.user_state} source={source} />
         <button
