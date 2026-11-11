@@ -41,9 +41,12 @@ export function Privacy() {
         <h2>The AI assistant</h2>
         <p>
           The "Ask FlickRaven" assistant uses Google's Gemini model. When you send it a message, Google receives your recent messages
-          in that chat, a short summary of your taste (favourite genres and a few titles you rated highly) and the catalog's own
-          synopsis of titles you name. It does not receive your name, email address or account number. Chats are not stored by
-          FlickRaven. On Google's free tier, prompts may be used by Google to improve its products, so do not type anything private.
+          in that chat and the catalog's own synopsis of titles you name. When you ask for suggestions, FlickRaven also picks a
+          short list of titles for you on its own servers, using your ratings, likes, dislikes and taste, and sends Google only that
+          list as plain catalog facts (title, year, type, language, genres). Google does not receive your ratings, likes, dislikes,
+          taste profile or viewing history, and not your name, email address or account number. Titles you disliked or rated low are
+          never suggested or linked. Chats are not stored by FlickRaven. On Google's free tier, prompts may be used by Google to
+          improve its products and may be read by reviewers, so do not type anything private.
           The assistant can be wrong, and the number of messages per day is limited.
         </p>
         <p>

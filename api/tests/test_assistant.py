@@ -205,3 +205,61 @@ def test_titles_outside_the_catalog_are_simply_not_linked(client):
     from app.db import SessionLocal
     with SessionLocal() as db:
         assert ai.resolve_titles(db, "Try [[A Show That Does Not Exist At All (1999)]].") == []
+
+
+def test_no_taste_profile_or_history_is_sent_and_disliked_titles_are_never_linked(client, test_engine, monkeypatch):
+    """Aryav 2026-11-11: ratings, likes, dislikes, Taste DNA and history stay inside FlickRaven (free Gemini tier)."""
+    with test_engine.begin() as conn:
+        uid = conn.execute(text("INSERT INTO users (email, display_name, password_hash, is_guest) VALUES ('ai-priv@example.com', 'x', 'x', false) RETURNING id")).scalar()
+        mid = conn.execute(text("SELECT id FROM movies WHERE tmdb_id = 990900")).scalar()
+        conn.execute(text("INSERT INTO reactions (user_id, movie_id, value) VALUES (:u, :m, -1)"), {"u": uid, "m": mid})
+    app.dependency_overrides[current_user] = lambda: {"id": uid, "email": "ai-priv@example.com", "display_name": "x", "is_guest": False}
+    try:
+        r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend a film please"}]}).json()
+        blob = json.dumps(client.sent[-1]["body"])
+        assert "Taste summary" not in blob and "rated highly" not in blob
+        assert r["items"] == []                       # Gemini named the disliked film; FlickRaven does not link it
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(text("DELETE FROM reactions WHERE user_id = :u"), {"u": uid})
+            conn.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})
+
+
+def test_request_intent_is_read_locally_and_japanese_is_not_anime():
+    from app.services import assistant_context as ctx
+    assert ctx.intent("any good Japanese shows?") == {"kinds": ["series"], "languages": ["ja"], "genres": []}
+    assert ctx.intent("suggest an anime like Death Note")["kinds"] == ["anime"]
+    assert ctx.intent("funny Hindi series")["languages"] == ["hi"] and ctx.intent("funny Hindi series")["genres"] == ["Comedy"]
+    assert ctx.intent("something to watch tonight")["kinds"] == ["movie", "series"]
+    assert ctx.wants_suggestions("what should I watch next") and not ctx.wants_suggestions("who directed Heat?")
+
+
+def test_shortlist_follows_the_engine_filters_the_request_and_drops_blocked_titles():
+    import numpy as np
+    from types import SimpleNamespace
+    from app.services import assistant_context as ctx
+    cat = SimpleNamespace(kind=["movie", "series", "series", "series"], language=["en", "hi", "en", "hi"],
+                          genres=[["Drama"], ["Comedy"], ["Comedy"], ["Drama"]], titles=["F", "A", "B", "C"],
+                          year=np.array([2000.0, 2001.0, np.nan, 2003.0]))
+    engine = SimpleNamespace(cat=cat, kind_rank=lambda st, kind: (np.array([2, 1, 3]), np.array([0.9, 0.8, 0.7])),
+                             rail_scores=lambda st: np.array([1.0, -np.inf, -np.inf, -np.inf]))
+    want = {"kinds": ["series"], "languages": ["hi"], "genres": []}
+    assert ctx.shortlist(engine, None, want, blocked_rows=set()) == [1, 3]
+    assert ctx.shortlist(engine, None, want, blocked_rows={1}) == [3]
+    assert ctx.shortlist(engine, None, {"kinds": ["series"], "languages": ["fr"], "genres": []}, set()) == [2, 1, 3]   # nothing fits: unfiltered
+    text_ = ctx.shortlist_prompt(engine, [1, 2])
+    assert "A (2001, series, language hi, Comedy)" in text_ and "B (series" in text_
+
+
+def test_like_x_requests_lead_with_x_and_keep_the_persons_exclusions():
+    import numpy as np
+    from types import SimpleNamespace
+    from cinematch_engine.online import UserState
+    from app.services import assistant_context as ctx
+    cat = SimpleNamespace(titles=["Death Note", "Death Note", "Up"], votes=np.array([10.0, 99.0, 5.0]))
+    engine = SimpleNamespace(cat=cat)
+    assert ctx.named_row(engine, "something like death note please") == 1          # the better-known of the two
+    assert ctx.named_row(engine, "pick me something, cheer me up") is None          # short words never match
+    st = UserState(ratings={5: 9.0, 6: 3.0}, likes={7}, dislikes={8}, watched={9})
+    s2 = ctx.like_state(st, 1)
+    assert s2.likes == {1} and s2.ratings == {6: 3.0} and s2.dislikes == {8} and s2.watched == {9}

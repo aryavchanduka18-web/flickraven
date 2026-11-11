@@ -190,6 +190,15 @@ export default function Movie() {
           <SimilarGrid items={similar.data.items} source="more_like_this" />
         </section>
       )}
+      {similar.data?.cross_kind && similar.data.cross_kind.items.length > 0 && (
+        <section id="cross-kind" className="mx-auto mt-10 max-w-[1800px] px-4 md:px-10">
+          <div className="mb-4">
+            <h2 className="font-display text-xl font-bold md:text-2xl">{similar.data.cross_kind.title}</h2>
+            <p className="text-sm text-muted">A different kind of show with a similar feel, picked with Google Gemini.</p>
+          </div>
+          <SimilarGrid items={similar.data.cross_kind.items} source="more_like_this" />
+        </section>
+      )}
     </div>
   );
 }
