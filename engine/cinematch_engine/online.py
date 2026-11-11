@@ -204,12 +204,14 @@ class OnlineEngine:
         # Anime is lifted by fame: the big names (Attack on Titan, Demon Slayer, Solo Leveling) are what most people want
         # to see first. Fame is the TMDB vote-count percentile; the quality score alone favoured obscure titles.
         fame = pct(cat.fame_pct[rows]) if kind == "anime" and len(rows) else None
+        # Someone who already likes anime is ranked more by their own taste and less by fame than someone who does not.
+        w_fame = 0.3 if kind == "anime" and self.anime_interest(st) >= 2 else 0.5
         if fame is not None:
-            score = 0.5 * score + 0.5 * fame
+            score = (1 - w_fame) * score + w_fame * fame
         content = self.scores(st)["content"][rows]
         if len(rows) and np.isfinite(content).any():
             c = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]))
-            score = (0.5 if fame is not None else 0.65) * pct(c) + (0.5 if fame is not None else 0.35) * score
+            score = ((1 - w_fame) if fame is not None else 0.65) * pct(c) + (w_fame if fame is not None else 0.35) * score
             learned = self.learned_series(st, rows)
             gem = self.learned_series(st, rows, cat.gemini_sim)
             pop, ct = pct(cat.popularity[rows]), pct(c)
@@ -225,8 +227,40 @@ class OnlineEngine:
                 score = np.where(gc & ~lc, gb, score)
             if lb is not None:
                 score = np.where(lc & ~gc, lb, score)
+        if len(rows) and kind != "anime":      # anime are all Japanese: a language lift means nothing there, and must not stand in for anime interest
+            score = np.maximum(score, self.language_floor(st, rows, score))
         order = np.argsort(-score, kind="stable")
         return rows[order], score[order].astype(float)
+
+    def engaged_rows(self, st: UserState) -> set[int]:
+        """Titles the person has shown they like: rated 7+, liked, picked in onboarding or saved to My List."""
+        return {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
+
+    def anime_interest(self, st: UserState) -> int:
+        """How many anime the person has shown they like (see engaged_rows). This is separate from language:
+        choosing Japanese, or liking Japanese live-action, is not anime interest."""
+        return sum(1 for r in self.engaged_rows(st) if self.cat.kind[r] == "anime")
+
+    def language_floor(self, st: UserState, rows: np.ndarray, base: np.ndarray) -> np.ndarray:
+        """Per-title score floor (0..1) for series/anime in languages the person cares about; the caller uses
+        max(score, floor), so nothing goes down and nothing is removed, and there are no quotas. Small languages sit
+        far below Hollywood on popularity (a flat bonus did nothing for Hindi), so the floor is the title's
+        popularity rank inside its own language. Chosen languages (profile or onboarding) count fully; a language
+        in the person's own history (liked, rated 7+ or saved titles, films too, at least 3 of them) counts in
+        proportion to its share, doubled and capped at 1. No choice and no history gives zero."""
+        lang = np.asarray(self.cat.language, dtype=object)[rows]
+        weight = np.zeros(len(rows))
+        engaged = [self.cat.language[r] for r in self.engaged_rows(st) if self.cat.language[r]]
+        if len(engaged) >= 3:
+            share = {l: min(1.0, 2 * engaged.count(l) / len(engaged)) for l in set(engaged)}
+            weight = np.array([share.get(l, 0.0) for l in lang])
+        if st.languages:
+            weight = np.maximum(weight, np.isin(lang, st.languages).astype(float))
+        floor = np.zeros(len(rows))
+        for l in set(lang[weight > 0]):
+            m = lang == l
+            floor[m] = weight[m] * (np.argsort(np.argsort(base[m])) + 1) / m.sum()     # rank inside the language
+        return floor
 
     def personal_fit(self, st: UserState, rows: list[int]) -> tuple[np.ndarray, np.ndarray, bool]:
         """How well each of `rows` suits this user: (keep mask, fit 0..1, has_taste_signal). Used to personalise

@@ -24,8 +24,13 @@ class Cat:
 
 
 class Engine:
+    anime_fans = 1                      # how many anime the test person has shown interest in
+
     def __init__(self, cat):
         self.cat = cat
+
+    def anime_interest(self, st):
+        return self.anime_fans
 
     def kind_rank(self, st, kind):
         rows = [i for i, k in enumerate(self.cat.kind) if k == kind][::-1]
@@ -81,6 +86,12 @@ def client(test_engine, monkeypatch):
         conn.execute(text("DELETE FROM recommendation_logs WHERE user_id = :u"), {"u": uid})
         conn.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})
         conn.execute(text("DELETE FROM movies WHERE tmdb_id BETWEEN 992000 AND 992999"))
+
+
+def test_anime_hits_wait_for_people_with_no_anime_interest(client, monkeypatch):
+    monkeypatch.setattr(Engine, "anime_fans", 0)
+    keys = [r["key"] for r in client.get("/api/recs/series-rails").json()["rails"]]
+    assert "anime_hits" in keys and keys.index("anime_hits") == 2        # after the first two themed rows, still shown
 
 
 def test_series_rails_have_anime_hits_first_and_the_new_rows(client):

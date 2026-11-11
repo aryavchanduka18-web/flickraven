@@ -136,8 +136,13 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
             lead.append({"key": key, "title": title, "subtitle": sub, "ids": ids})
             shown_series.update(ids)
     # The anime hits row comes first among the themed rows; the other anime rows follow the other themes.
-    rails = [r for r in rails if r["key"] == "because"] + [r for r in lead if r["key"] == "anime_hits"] + \
-            [r for r in rails if r["key"] != "because"] + [r for r in lead if r["key"] != "anime_hits"]
+    # Anime hits lead only for people who have shown interest in anime (a Japanese language choice is not that); others see it after their first two themed rows.
+    themed = [r for r in rails if r["key"] != "because"]
+    hits_row = [r for r in lead if r["key"] == "anime_hits"]
+    if engine.anime_interest(st) >= 1:
+        rails = [r for r in rails if r["key"] == "because"] + hits_row + themed + [r for r in lead if r["key"] != "anime_hits"]
+    else:
+        rails = [r for r in rails if r["key"] == "because"] + themed[:2] + hits_row + themed[2:] + [r for r in lead if r["key"] != "anime_hits"]
 
     # Films and series, alternating.
     film_scores = engine.rail_scores(st)
