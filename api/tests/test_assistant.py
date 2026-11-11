@@ -92,3 +92,21 @@ def test_a_failed_gemini_call_does_not_use_up_a_message(client, monkeypatch):
     r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "hi"}]})
     assert r.status_code == 502
     assert client.get("/api/assistant/status").json()["remaining"] == before
+
+
+def test_gemini_call_turns_off_thinking_and_leaves_room_for_the_answer(monkeypatch):
+    from app.services import assistant as svc
+    seen = {}
+
+    class R:
+        status_code = 200
+        def json(self): return {"candidates": [{"content": {"parts": [{"text": "hi"}]}}]}
+
+    def fake_post(url, json=None, **kw):
+        seen.update(json)
+        return R()
+
+    monkeypatch.setattr(svc.httpx, "post", fake_post)
+    assert svc.ask_gemini([{"role": "user", "text": "hello"}], "sys") == "hi"
+    cfg = seen["generationConfig"]
+    assert cfg["thinkingConfig"]["thinkingBudget"] == 0 and cfg["maxOutputTokens"] >= 1000
