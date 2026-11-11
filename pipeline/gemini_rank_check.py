@@ -28,7 +28,7 @@ def learned(tmdb_ids):
     for f in ("drama_neighbors.json", "anime_neighbors.json"):
         p = MODELS / f
         if p.exists():
-            for a, nbs in json.loads(p.read_text())["neighbors"].items():
+            for a, nbs in json.loads(p.read_text(encoding="utf-8"))["neighbors"].items():
                 for b, x in nbs:
                     if int(a) in row_of and b in row_of:
                         r.append(row_of[int(a)]); c.append(row_of[b]); v.append(x)

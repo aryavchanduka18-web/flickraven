@@ -520,3 +520,51 @@ def test_chat_cards_report_my_list_state_and_an_assistant_add_is_a_normal_list_a
             for t in ("user_movie_list", "interactions"):
                 conn.execute(text(f"DELETE FROM {t} WHERE user_id = :u"), {"u": uid})
             conn.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})
+
+
+def test_taste_dna_reorders_series_candidates_on_our_side_and_keeps_every_hard_rule():
+    import numpy as np
+    from types import SimpleNamespace
+    from app.services import assistant_context as ctx
+    n = 8
+    cat = SimpleNamespace(kind=["series"] * n, language=["en"] * n, genres=[["Drama"]] * n, titles=list("ABCDEFGH"),
+                          year=np.full(n, 2020.0))
+    engine = SimpleNamespace(cat=cat, kind_rank=lambda st, kind: (np.arange(n), np.zeros(n)))      # engine order: 0, 1, 2 ...
+    want = {"kinds": ["series"], "languages": [], "genres": []}
+    plain = ctx.shortlist(engine, None, want, set(), n=3)
+    assert plain == [0, 1, 2]
+    fit = {r: (1.0 if r in (3, 4) else 0.0) for r in range(n)}                      # Taste DNA loves two middle-ranked ones
+    got = ctx.shortlist(engine, None, want, {4}, n=3, dna=lambda rows: {r: fit[r] for r in rows})
+    assert got[0] == 3 and 4 not in got and len(got) == 3                              # reordered by DNA; the blocked title stays out
+    # too little DNA evidence: the engine order stands
+    assert ctx.shortlist(engine, None, want, set(), n=3, dna=lambda rows: {6: 1.0}) == [0, 1, 2]
+    # films keep the hybrid rail score; DNA is for series and anime
+    movie_engine = SimpleNamespace(cat=SimpleNamespace(kind=["movie"] * n, language=["en"] * n, genres=[["Drama"]] * n, titles=list("ABCDEFGH"),
+                                                       year=np.full(n, 2020.0)), rail_scores=lambda st: np.arange(n)[::-1].astype(float))
+    assert ctx.shortlist(movie_engine, None, {"kinds": ["movie"], "languages": [], "genres": []}, set(), n=3,
+                         dna=lambda rows: pytest.fail("films must not use DNA")) == [0, 1, 2]
+
+
+def test_taste_labels_name_only_traits_the_title_really_shows_and_stay_off_the_reply(monkeypatch):
+    from types import SimpleNamespace
+    from app.services import assistant_context as ctx
+    from app.services import taste_dna as dna
+    monkeypatch.setattr(dna, "title_vectors", lambda db, ids: {1: {"dark": 0.9, "humour": 0.1}, 2: None})
+    monkeypatch.setattr(dna, "fit", lambda prof, v: (0.5, ["dark"]) if v else (None, []))
+    got = ctx.dna_reasons(None, SimpleNamespace(), [1, 2])
+    assert list(got) == [1] and got[1]["reasons"][0]["text"] == "Fits your Taste DNA: dark, atmospheric tone."
+    assert ctx.dna_reasons(None, None, [1]) == {}
+
+
+def test_chat_uses_taste_dna_locally_and_sends_none_of_it_to_gemini(client, monkeypatch):
+    from types import SimpleNamespace
+    from app.routers import assistant as router
+    from app.services import assistant_context as ctx
+    monkeypatch.setattr(router, "taste_profile", lambda db, uid: SimpleNamespace(marker="PRIVATE"))
+    monkeypatch.setattr(ctx, "dna_reasons", lambda db, prof, ids: {i: {"reasons": [{"code": "taste_dna", "text": "Fits your Taste DNA: humour.",
+                                                                                     "source": "taste_dna", "share": 0.0, "anchor_movie_id": None}]} for i in ids})
+    r = ask(client, "Recommend a film please").json()
+    assert r["items"] and r["items"][0]["reasons"][0]["text"] == "Fits your Taste DNA: humour."
+    blob = json.dumps(client.sent[-1]["body"])
+    assert "Taste DNA" not in blob and "humour" not in blob and "PRIVATE" not in blob
+    assert "Taste DNA" not in r["reply"]               # the chat history is sent back to Gemini, so the label never goes in the text

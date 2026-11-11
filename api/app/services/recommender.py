@@ -47,7 +47,7 @@ def artifacts_ready() -> bool:
 
 
 def _settings(name: str) -> dict:
-    return json.loads((MODELS / f"{name}.json").read_text())["settings"]
+    return json.loads((MODELS / f"{name}.json").read_text(encoding="utf-8"))["settings"]
 
 
 LEARNED_FILES = ("drama_neighbors.json", "anime_neighbors.json")
@@ -63,7 +63,7 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
     row_of = {t: i for i, t in enumerate(tmdb_ids)}
     rows, cols, vals = [], [], []
     for path in files:
-        for a, nbs in json.loads(path.read_text())["neighbors"].items():
+        for a, nbs in json.loads(path.read_text(encoding="utf-8"))["neighbors"].items():
             for b, v in nbs:
                 if int(a) in row_of and b in row_of:
                     rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
@@ -79,7 +79,7 @@ def _gemini_similarities(movies: pd.DataFrame) -> sp.csr_matrix | None:
     if not path.exists():
         return None
     try:
-        named = json.loads(path.read_text()).get("titles", {})
+        named = json.loads(path.read_text(encoding="utf-8")).get("titles", {})
     except (OSError, ValueError):
         log.warning("ai_similar.json could not be read; series ranking runs without it")
         return None
@@ -159,7 +159,7 @@ def load_engine(db: Session) -> OnlineEngine:
             user_cf={"k": uc["k"], "min_overlap": uc["min_overlap"], "beta": uc["beta"]},
             svd={"mu": float(f["svd_mu"]), "bi": f["svd_bi"], "Q": f["svd_Q"], "reg": sv["reg_all"]},
             als={"Y": f["als_Y"], "alpha": al["alpha"], "reg": al["regularization"]})
-        weights = json.loads((MODELS / "hybrid_weights.json").read_text())
+        weights = json.loads((MODELS / "hybrid_weights.json").read_text(encoding="utf-8"))
         calibrator = joblib.load(MODELS / "calibration.joblib")
         engine = OnlineEngine(catalog, sources, weights, calibrator, (f["item_nb_idx"], f["item_nb_vals"]), train)
         engine.similar_table = _similar_table(movies["tmdb_id"].tolist())

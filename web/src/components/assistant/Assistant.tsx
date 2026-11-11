@@ -49,9 +49,12 @@ function ReplyCards({ items, busy, failed, onAdd }: { items: RecItem[]; busy: Se
       {items.map((it, n) => (
         <div key={it.movie.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-2.5 py-1.5">
           <span className="w-4 shrink-0 text-[11px] text-white/40">{n + 1}</span>
-          <Link to={`/movie/${it.movie.id}`} className="min-w-0 flex-1 truncate font-semibold hover:underline">
-            {it.movie.title}{it.movie.year ? <span className="font-normal text-white/50"> ({it.movie.year})</span> : null}
-          </Link>
+          <div className="min-w-0 flex-1">
+            <Link to={`/movie/${it.movie.id}`} className="block truncate font-semibold hover:underline">
+              {it.movie.title}{it.movie.year ? <span className="font-normal text-white/50"> ({it.movie.year})</span> : null}
+            </Link>
+            {it.reasons?.[0]?.code === "taste_dna" && <p className="text-[11px] leading-snug text-white/55">{it.reasons[0].text}</p>}
+          </div>
           {it.user_state.in_list ? (
             <span className="shrink-0 text-xs text-white/60">✓ In your list</span>
           ) : (

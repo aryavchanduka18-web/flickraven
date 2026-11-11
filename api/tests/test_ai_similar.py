@@ -191,3 +191,23 @@ def test_cross_kind_row_never_repeats_titles_the_person_already_acted_on(test_en
         body = c.get(f"/api/movies/{a}/similar").json()
     shown = [i["movie"]["id"] for i in body["cross_kind"]["items"]]
     assert f not in shown and o in shown, value
+
+
+def test_shipped_files_are_read_as_utf8_whatever_the_machine_default_is(tmp_path, monkeypatch):
+    """The laptop (Windows, cp1252 default) failed with "ai_similar.json could not be read": the file is UTF-8 with
+    accented titles, and read_text() without an encoding used the machine default."""
+    import json
+    import pathlib
+    from app.services import ai_similar as ai_mod
+    from app.services import recommender as rec_mod
+    (tmp_path / "ai_similar.json").write_text(json.dumps({"titles": {"1": ["Naruto Shippūden (2007)", "Ōoku (2003)"]}}, ensure_ascii=False), encoding="utf-8")
+    real = pathlib.Path.read_text
+    monkeypatch.setattr(pathlib.Path, "read_text", lambda self, encoding=None, errors=None: real(self, encoding=encoding or "cp1252", errors=errors))
+    monkeypatch.setattr(ai_mod, "MODELS", tmp_path)
+    monkeypatch.setattr(ai_mod, "_file", None)
+    monkeypatch.setattr(ai_mod, "_file_ids", {})
+    try:
+        ai_mod.precomputed(None, 1, "anime")        # the file is loaded first; the lookup that follows needs a database
+    except AttributeError:
+        pass
+    assert ai_mod._file == {"1": ["Naruto Shippūden (2007)", "Ōoku (2003)"]}
