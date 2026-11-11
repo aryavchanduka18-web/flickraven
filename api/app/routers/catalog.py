@@ -96,6 +96,12 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
             kept = {i for i, k in zip(pool, keep) if k}
             seen = getattr(st, "watched", set())      # watched titles never show just because Gemini named them
             kept -= {i for i in pool[:len(ai_ids[:30])] if engine.cat.row_of[i] in seen}
+            if kind == "movie":
+                # Films: a disliked genre is a hard rule (personal_fit only bends it). The one exception is a genre the
+                # page's own film is in: someone who opened a Drama still gets a list although they dislike Drama.
+                bad = set(getattr(st, "disliked_genres", ())) - set(engine.cat.genres[row])
+                if bad:
+                    kept -= {i for i in pool if bad & set(engine.cat.genres[engine.cat.row_of[i]])}
             n_ai = len(ai_ids[:30])
             score = {i: 0.4 * (1 - n / max(n_ai, 1)) + 0.6 * fit[n] for n, i in enumerate(pool[:n_ai])}
             ai_ids = sorted((i for i in pool[:n_ai] if i in kept), key=lambda i: -score[i])
