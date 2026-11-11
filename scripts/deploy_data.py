@@ -37,6 +37,15 @@ DEMO_EMAIL = "demo@cinematch.local"
 USER_TABLES = ["user_preferences", "onboarding_picks", "ratings", "reactions", "user_movie_list", "watched",
                "interactions"]
 ARTIFACT_DIRS = ["models", "metrics", "lab"]
+REQUIRED_MODEL_FILES = (
+    "fitted.npz",
+    "content_matrix.npz",
+    "content_rows.parquet",
+    "hybrid_weights.json",
+    "calibration.joblib",
+    "train_ratings.npz",
+    "availability_calibration.json",
+)
 
 sys.path.insert(0, str(ROOT / "api"))
 
@@ -57,7 +66,31 @@ def _mb(p: Path) -> str:
     return f"{p.stat().st_size / 1e6:.1f} MB"
 
 
+def validate_model_directory(model_dir: Path) -> None:
+    missing = [name for name in REQUIRED_MODEL_FILES if not (model_dir / name).is_file()]
+    if missing:
+        names = ", ".join(missing)
+        raise ValueError(f"Model directory is missing required recommender files: {names}")
+
+
+def validate_model_bundle(bundle_path: Path) -> None:
+    try:
+        with tarfile.open(bundle_path, "r:gz") as bundle:
+            members = {member.name for member in bundle.getmembers() if member.isfile()}
+    except (OSError, tarfile.TarError) as exc:
+        raise ValueError(f"Cannot read model bundle {bundle_path}: {exc}") from exc
+
+    missing = [f"models/{name}" for name in REQUIRED_MODEL_FILES if f"models/{name}" not in members]
+    if missing:
+        names = ", ".join(missing)
+        raise ValueError(
+            f"Model bundle is missing required recommender files: {names}. "
+            "Run `python scripts/deploy_data.py export` to create a fresh bundle before uploading."
+        )
+
+
 def export() -> None:
+    validate_model_directory(ROOT / "artifacts" / "models")
     OUT.mkdir(exist_ok=True)
     user, db = _env("POSTGRES_USER", "cinematch"), _env("POSTGRES_DB", "cinematch")
     dump = OUT / "catalog.dump"
@@ -82,6 +115,7 @@ def export() -> None:
     with tarfile.open(bundle, "w:gz", compresslevel=9) as tar:
         for d in ARTIFACT_DIRS:
             tar.add(ROOT / "artifacts" / d, arcname=d)
+    validate_model_bundle(bundle)
 
     print("Exported to deploy-out/:")
     print(f"  catalog.dump      {_mb(dump)}   rows: " + ", ".join(f"{t} {n:,}" for t, n in counts.items()))
@@ -199,6 +233,10 @@ def upload(target: str | None, refresh: bool = False) -> None:
     for f in ("catalog.dump", "demo_user.json", "artifacts.tar.gz"):
         if not (OUT / f).exists():
             sys.exit(f"deploy-out/{f} is missing. Run the export step first.")
+    try:
+        validate_model_bundle(OUT / "artifacts.tar.gz")
+    except ValueError as exc:
+        sys.exit(str(exc))
     url = _target_url(target)
     engine = target_engine(url)
     state = with_retry(engine, "the first check", lambda conn: (

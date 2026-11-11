@@ -50,6 +50,17 @@ def test_negative_preferences_are_kept_separate():
     assert s_fast > 0 > s_viol and because == ["fast"]
 
 
+def test_title_explanation_labels_a_mixed_trait_once():
+    sig = dna.Signals(weights={**{i: 1.0 for i in range(1, 6)}, **{i: -1.0 for i in range(6, 8)}})
+    vectors = {i: vec(psychological=0.9) for i in range(1, 8)}
+    profile = dna.build_profile(sig, vectors, MEAN)
+
+    assert "psychological" in profile.preferred() and "psychological" in profile.avoided()
+    because, clash, mixed = dna.title_explanation(profile, vec(psychological=0.9))
+    assert "psychological" not in because and "psychological" not in clash
+    assert mixed == ["psychological"]
+
+
 def test_tags_count_and_overrides_win():
     sig = dna.Signals(tags=[(1, "slow_burn"), (2, "slow_burn"), (3, "too_slow")], weights={1: 1.0, 2: 1.0, 3: -1.0})
     p = dna.build_profile(sig, {}, MEAN)

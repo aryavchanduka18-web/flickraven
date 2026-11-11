@@ -267,6 +267,19 @@ def fit(profile: Profile, v: dict[str, float] | None) -> tuple[float | None, lis
     return s, because[:3]
 
 
+def title_explanation(profile: Profile, v: dict[str, float] | None) -> tuple[list[str], list[str], list[str]]:
+    """Return supporting, avoided, and mixed traits for one title without contradictory labels."""
+    if not v:
+        return [], [], []
+    _, because = fit(profile, v)
+    preferred_on_title = {k for k in profile.preferred() if v.get(k, 0.0) >= 0.5}
+    clash = [k for k in profile.avoided() if v.get(k, 0.0) >= 0.5]
+    mixed_set = preferred_on_title.intersection(clash)
+    mixed = [k for k in profile.preferred() if k in mixed_set]
+    return ([k for k in because if k not in mixed_set],
+            [k for k in clash if k not in mixed_set], mixed)
+
+
 def reason(because: list[str], source: str = "keywords") -> str | None:
     """A sentence backed by stored evidence, or None."""
     if not because:
