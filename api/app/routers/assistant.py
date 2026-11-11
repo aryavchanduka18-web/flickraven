@@ -46,8 +46,7 @@ def picks(db: Session, user_id: int, message: str, blocked: set[int]) -> str:
         named = ctx.named_row(engine, message)
         if named is not None:       # "something like X": X leads, in X's own kind unless the message names one
             st = ctx.like_state(st, named)
-            if want["kinds"] == ["movie", "series"]:
-                want["kinds"] = [engine.cat.kind[named]]
+            want["kinds"] = ctx.kinds_for_named(want, engine.cat.kind[named])        # "like X, but not anime" stays movie+series
         rows = ctx.shortlist(engine, st, want, {row_of[i] for i in blocked if i in row_of})
         return ctx.shortlist_prompt(engine, rows, want)
     except Exception:

@@ -313,7 +313,8 @@ def test_a_disliked_or_low_rated_title_in_the_written_reply_is_removed_end_to_en
 
 def test_requests_with_negations_are_read_correctly():
     i = ctx2.intent
-    assert i("I want a psychological thriller series.") == {"kinds": ["series"], "languages": [], "genres": ["Thriller"], "exclude_languages": [], "exclude_genres": []}
+    t = i("I want a psychological thriller series.")
+    assert (t["kinds"], t["languages"], t["genres"], t["exclude_languages"], t["exclude_genres"]) == (["series"], [], ["Thriller"], [], [])
     assert i("Recommend Hindi crime dramas.")["languages"] == ["hi"] and i("Recommend Hindi crime dramas.")["genres"] == ["Crime"]
     j = i("I want Japanese live-action shows, not anime.")
     assert j["kinds"] == ["series"] and j["languages"] == ["ja"] and j["genres"] == []     # "live-action" is not the Action genre
@@ -323,7 +324,8 @@ def test_requests_with_negations_are_read_correctly():
     assert k["languages"] == [] and k["exclude_languages"] == ["hi"]
     assert i("something to watch, not anime")["kinds"] == ["movie", "series"]
     assert i("recommend something, no horror")["exclude_genres"] == ["Horror"]
-    assert i("not anime, a Japanese series please") == {"kinds": ["series"], "languages": ["ja"], "genres": [], "exclude_languages": [], "exclude_genres": []}
+    z = i("not anime, a Japanese series please")
+    assert (z["kinds"], z["languages"], z["genres"], z["exclude_kinds"]) == (["series"], ["ja"], [], ["anime"])
     assert i("suggest an anime like Death Note")["kinds"] == ["anime"]
 
 
@@ -367,3 +369,41 @@ def test_ruled_out_language_and_genre_are_removed():
     e = _fake_engine()
     got = ctx2.shortlist(e, None, {"kinds": ["series"], "languages": [], "genres": [], "exclude_languages": ["hi"], "exclude_genres": ["Crime"]}, set())
     assert 1 not in got and 3 not in got and 4 not in got and 0 in got
+
+
+# ---- review round 2 on #102 -----------------------------------------------------------------------------------
+def test_a_negation_does_not_carry_past_but():
+    i = ctx2.intent
+    a = i("I don't want Hindi, but Korean is fine")
+    assert a["exclude_languages"] == ["hi"] and a["languages"] == ["ko"]
+    b = i("No horror, but psychological thrillers are fine")
+    assert b["exclude_genres"] == ["Horror"] and b["genres"] == ["Thriller"]
+    c = i("not anime however a Japanese series would be good")
+    assert c["kinds"] == ["series"] and c["languages"] == ["ja"]
+
+
+def test_a_named_title_cannot_override_an_explicit_kind_or_exclusion():
+    w = ctx2.intent("Something like Death Note, but not anime")
+    assert w["exclude_kinds"] == ["anime"] and w["kinds"] == ["movie", "series"]
+    assert ctx2.kinds_for_named(w, "anime") == ["movie", "series"]                  # Death Note is anime, which was ruled out
+    plain = ctx2.intent("something like Death Note please")
+    assert ctx2.kinds_for_named(plain, "anime") == ["anime"]                        # nothing said: the title's own kind
+    asked = ctx2.intent("a series like Death Note")
+    assert ctx2.kinds_for_named(asked, "anime") == ["series"]                       # an asked-for kind wins over the title's
+
+
+def test_live_action_describes_the_format_and_never_picks_series_on_its_own():
+    assert ctx2.intent("Recommend a live-action movie")["kinds"] == ["movie"]
+    assert ctx2.intent("Recommend something live-action")["kinds"] == ["movie", "series"]        # and never anime
+    assert ctx2.intent("live-action shows please")["kinds"] == ["series"]
+    assert ctx2.intent("a live-action thriller")["genres"] == ["Thriller"]                        # not the Action genre
+
+
+def test_scrub_catches_long_titles_and_titles_with_full_stops():
+    long = "The Lord of the Rings The Fellowship of the Ring Extended Edition"
+    titles = {"mr. robot": ["Mr. Robot"], long.lower(): [long], "dr. strangelove or how i learned to stop worrying and love the bomb": ["x"]}
+    clean, removed = ctx2.scrub_reply(f"Try [[Inception (2010)]]. Mr. Robot is dark. Also {long} is long. Fine.", titles)
+    assert removed == 2 and clean == "Try [[Inception (2010)]]. Fine."
+    assert ctx2.scrub_reply("See Mr. Robot (2015) for that. Nice.", titles) == ("Nice.", 1)
+    assert ctx2.scrub_reply("Dr. Strangelove or How I Learned to Stop Worrying and Love the Bomb is a classic. Fine.", titles) == ("Fine.", 1)
+    assert ctx2.scrub_reply("Robot movies are fun. Mr smith is here.", titles)[1] == 0               # parts of a title are not the title

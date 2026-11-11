@@ -43,9 +43,10 @@ def wants_suggestions(message: str) -> bool:
 
 NEGATION = re.compile(r"\b(not|no|without|except|excluding|exclude|avoid|never|skip|nothing|don'?t|do not|dont|didn'?t|doesn'?t|"
                       r"won'?t|can'?t|cannot|rather than|instead of)\b", re.I)
+CONTRAST = re.compile(r"\b(?:but|however|although|though|yet)\b", re.I)
 KIND_WORDS = {
     "anime": r"anime",
-    "series": r"series|shows?|tv|dramas?|k-?dramas?|j-?dramas?|c-?dramas?|sitcoms?|seasons?|episodes?|live-?action",
+    "series": r"series|shows?|tv|dramas?|k-?dramas?|j-?dramas?|c-?dramas?|sitcoms?|seasons?|episodes?",
     "movie": r"films?|movies?|cinema",
 }
 
@@ -56,7 +57,7 @@ def _mentions(m: str, pattern: str) -> tuple[bool, bool]:
     A clause ends at . ; ! ? or a comma that is followed by a new request ("but ..."). Only the nearest 6 words count."""
     asked = ruled = False
     for hit in re.finditer(rf"\b({pattern})\b", m):
-        clause = re.split(r"[.;!?]", m[:hit.start()])[-1]
+        clause = CONTRAST.split(re.split(r"[.;!?]", m[:hit.start()])[-1])[-1]       # "no Hindi, but Korean is fine": Korean is not ruled out
         near = " ".join(clause.split()[-6:])
         # "a movie, not a series": the comma belongs to the series part; "a series, not anime" likewise. A negation
         # earlier than a comma does not reach past it ("not anime, a Japanese series" keeps the series).
@@ -102,7 +103,8 @@ def intent(message: str) -> dict:
             no_genres.append(g)
         elif a:
             genres.append(g)
-    return {"kinds": kinds, "languages": langs, "genres": genres, "exclude_languages": no_langs, "exclude_genres": no_genres}
+    return {"kinds": kinds, "languages": langs, "genres": genres, "exclude_languages": no_langs, "exclude_genres": no_genres,
+            "kind_asked": bool(asked_k), "exclude_kinds": sorted(ruled_k)}
 
 
 def blocked_ids(db: Session, user_id: int) -> set[int]:
@@ -123,6 +125,14 @@ def named_row(engine, message: str) -> int | None:
         if tl in runs and (best is None or (len(tl), cat.votes[r]) > (len(str(cat.titles[best])), cat.votes[best])):
             best = r
     return best
+
+
+def kinds_for_named(want: dict, named_kind: str) -> list[str]:
+    """Kinds to search when the message names a title ("something like Death Note"): that title's own kind, unless the
+    person already said a kind or ruled that kind out ("... but not anime" keeps movies and series)."""
+    if want["kind_asked"] or named_kind in want["exclude_kinds"]:
+        return want["kinds"]
+    return [named_kind]
 
 
 def like_state(st, row: int):
@@ -176,7 +186,7 @@ def shortlist_prompt(engine, rows: list[int], want: dict | None = None) -> str:
             "Keep to the kind and language they asked for:\n" + "\n".join(lines))
 
 
-DATED = re.compile(r"([\w'&.:-]+(?: [\w'&.:-]+){0,5})\s*\((?:19|20)\d{2}\)")
+DATED = re.compile(r"([\w'&.:-]+(?: [\w'&.:-]+){0,19})\s*\((?:19|20)\d{2}\)")
 WORDS = re.compile(r"[\w'&.:-]+")
 FALLBACK = ("I held back a suggestion because you told FlickRaven you did not like it. Tell me what you are in the mood "
             "for and I will try other ideas.")
@@ -197,7 +207,7 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
     written reply either. Two channels are checked independently of the prose:
     - [[Title (Year)]] marks, the structured channel the model is told to use for recommendations: any mark naming a
       blocked title removes its sentence, always;
-    - plain mentions: a run of 1 to 6 words equal to a blocked title. A multi-word title matches ignoring case; a
+    - plain mentions: a run of words (as long as the longest blocked title) equal to a blocked title. A multi-word title matches ignoring case; a
       one-word title must be 5+ letters and spelled exactly as in the catalog (capitalised), so common words ("up",
       "her", "it", "heat" in a sentence about weather) are left alone. Titles the person typed themselves
       (`allowed`, their latest message) may be named in plain text, never as a [[mark]].
@@ -205,6 +215,7 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
     if not titles:
         return reply, 0
     own = allowed.lower()
+    longest = min(max(len(WORDS.findall(t)) for t in titles), 30)         # longest blocked title, in words
 
     def blocked_mark(sentence: str) -> bool:
         for raw in TITLE_RE.findall(sentence):
@@ -215,7 +226,7 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
 
     def blocked_plain(sentence: str) -> bool:
         words = WORDS.findall(TITLE_RE.sub(" ", sentence))
-        for k in range(1, 7):
+        for k in range(1, longest + 1):
             for i in range(len(words) - k + 1):
                 run = " ".join(words[i:i + k]).strip(".:-")
                 low = run.lower()
@@ -235,7 +246,12 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
                     return True
         return False
 
-    parts = [x for x in re.findall(r".*?(?:[.!?](?=\s|$)|\n+|$)\s*", reply, flags=re.S) if x]
+    # A full stop inside a blocked title ("Mr. Robot") must not end a sentence: hide those dots while splitting.
+    masked = reply
+    for low in titles:
+        if "." in low:
+            masked = re.sub(re.escape(low), lambda m_: m_.group(0).replace(".", "\u2024"), masked, flags=re.I)
+    parts = [x.replace("\u2024", ".") for x in re.findall(r".*?(?:[.!?](?=\s|$)|\n+|$)\s*", masked, flags=re.S) if x]
     kept, removed = [], 0
     for sent in parts:
         if sent.strip() and (blocked_mark(sent) or blocked_plain(sent) or blocked_dated(sent)):
