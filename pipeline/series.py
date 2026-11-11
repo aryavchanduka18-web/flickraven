@@ -23,7 +23,7 @@ from pipeline.common import DISCOVER_DIR, PROCESSED, TMDB_DIR, get_logger, write
 from pipeline.tmdb import TMDB
 
 log = get_logger("series")
-CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text())["series"]
+CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text(encoding="utf-8"))["series"]
 CANDIDATES = PROCESSED / "series_candidates.csv"
 COLUMNS = ["tmdb_id", "tmdb_vote_count", "group", "found_on", "part"]
 TV_OFFSET = 10_000_000

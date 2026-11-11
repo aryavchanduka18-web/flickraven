@@ -34,10 +34,10 @@ def fingerprint() -> dict[str, str]:
 def main(cmd: str) -> int:
     now = fingerprint()
     if cmd == "save":
-        OUT.write_text(json.dumps(now, indent=1))
+        OUT.write_text(json.dumps(now, indent=1), encoding="utf-8")
         print(f"saved fingerprint of {len(now)} files")
         return 0
-    before = json.loads(OUT.read_text())
+    before = json.loads(OUT.read_text(encoding="utf-8"))
     changed = sorted(k for k in before.keys() | now.keys() if before.get(k) != now.get(k))
     print(f"{len(before)} files fingerprinted; " + (f"{len(changed)} changed: {changed}" if changed else "all identical"))
     return 1 if changed else 0

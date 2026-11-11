@@ -58,7 +58,7 @@ def build_engine():
         part=movies["catalog_part"].to_numpy(), popularity=np.log1p(votes) / 2, votes=votes,
         has_award=np.zeros(len(movies), bool), content=content, universe_rows=universe,
         recent=(movies["catalog_part"] == "C").to_numpy(), kind=movies["title_type"].to_numpy(dtype=object))
-    s = lambda n: json.loads((MODELS / f"{n}.json").read_text())["settings"]
+    s = lambda n: json.loads((MODELS / f"{n}.json").read_text(encoding="utf-8"))["settings"]
     uc, ic, sv, al = s("user_cf"), s("item_cf"), s("svd"), s("als")
     train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
     src = SourceModels(
@@ -67,7 +67,7 @@ def build_engine():
         user_cf={"k": uc["k"], "min_overlap": uc["min_overlap"], "beta": uc["beta"]},
         svd={"mu": float(f["svd_mu"]), "bi": f["svd_bi"], "Q": f["svd_Q"], "reg": sv["reg_all"]},
         als={"Y": f["als_Y"], "alpha": al["alpha"], "reg": al["regularization"]})
-    engine = OnlineEngine(cat, src, json.loads((MODELS / "hybrid_weights.json").read_text()),
+    engine = OnlineEngine(cat, src, json.loads((MODELS / "hybrid_weights.json").read_text(encoding="utf-8")),
                           joblib.load(MODELS / "calibration.joblib"), (f["item_nb_idx"], f["item_nb_vals"]), train)
     return engine, movies, f
 

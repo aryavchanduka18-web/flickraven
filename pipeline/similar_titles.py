@@ -71,7 +71,7 @@ def _new_scorer(f, weights):
 
 def testset(f: S.SimilarFeatures, movies: pd.DataFrame) -> list[dict]:
     out = []
-    for t in yaml.safe_load(TESTSET.read_text()):
+    for t in yaml.safe_load(TESTSET.read_text(encoding="utf-8")):
         s = movies[movies["title"] == t["anchor"]]
         if t.get("year"):
             s = s[s["year"] == t["year"]]

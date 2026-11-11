@@ -37,7 +37,7 @@ def write(src: str, dest: str, title: str, intro: list[str]) -> None:
     path = ARTIFACTS / "metrics" / src
     if not path.exists():
         return
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     lines = [f"# {title}", "", *intro, "",
              f"Validation split, {data['evaluated_users']:,} evaluated users (fixed sample, seed 42), full ranking over "
              f"{data['universe_films']:,} part-A films, relevant = rating >= {data['relevant_threshold']}/10. "
@@ -61,7 +61,7 @@ def write(src: str, dest: str, title: str, intro: list[str]) -> None:
 
 def load(name):
     p = ARTIFACTS / "metrics" / f"{name}.json"
-    return json.loads(p.read_text()) if p.exists() else None
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
 def phase5() -> None:

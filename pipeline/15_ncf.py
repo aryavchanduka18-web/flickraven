@@ -29,7 +29,7 @@ def main() -> None:
     recs = np.vstack([top_k(model.score_users(users[s:s + 200], data.n_items), seen[s:s + 200], 10)
                       for s in range(0, len(users), 200)])
     result = evaluate_ranking(recs, users, data, content_sim_for(data), 10)
-    comparison = json.loads((ARTIFACTS / "metrics" / "test_comparison.json").read_text())["ranking"]
+    comparison = json.loads((ARTIFACTS / "metrics" / "test_comparison.json").read_text(encoding="utf-8"))["ranking"]
     write_json(ARTIFACTS / "lab" / "ncf.json", {
         "split": "test", "evaluated_users": int(len(users)), "ranking": result,
         "settings": {"gmf_dim": 32, "mlp": [64, 32, 16], "negatives_per_positive": 4, "epochs": 6, "lr": 0.002},

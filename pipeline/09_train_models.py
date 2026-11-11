@@ -360,7 +360,7 @@ def assemble(ctx_meta: dict) -> None:
     """validation_baselines.json (Phase 3 models) and validation_mf.json (Phase 4) from per-model files."""
     per = METRICS / "validation"
     for out_name, names in (("validation_baselines.json", PHASE3), ("validation_mf.json", PHASE4)):
-        models = {n: json.loads((per / f"{n}.json").read_text()) for n in names if (per / f"{n}.json").exists()}
+        models = {n: json.loads((per / f"{n}.json").read_text(encoding="utf-8")) for n in names if (per / f"{n}.json").exists()}
         if models:
             write_json(METRICS / out_name, {**ctx_meta, "models": models})
 
@@ -377,7 +377,7 @@ def main(only: list[str] | None = None) -> None:
     write_json(METRICS / "eval_users_val.json", {"seed": SEED, "n": int(len(ctx.users)), "users": ctx.users.tolist()})
     log.info("data: %d users x %d films; %d evaluated users; setup %.0fs, peak %d MB",
              ctx.data.n_users, ctx.data.n_items, len(ctx.users), time.time() - t0, peak_mb())
-    bias = BiasBaseline(**json.loads((MODELS / "bias.json").read_text())["settings"]).fit(ctx.data.train) \
+    bias = BiasBaseline(**json.loads((MODELS / "bias.json").read_text(encoding="utf-8"))["settings"]).fit(ctx.data.train) \
         if "bias" not in only and (MODELS / "bias.json").exists() else None
     runners = {"bias": run_bias, "popularity": run_popularity, "content": run_content,
                "item_cf": run_item_cf, "user_cf": run_user_cf, "svd": run_svd, "als": run_als}
@@ -389,7 +389,7 @@ def main(only: list[str] | None = None) -> None:
             out, bias = out
         out["runtime_seconds"] = round(time.time() - start, 1)
         out["peak_memory_mb_so_far"] = peak_mb()
-        (MODELS / f"{name}.json").write_text(json.dumps({"settings": out["settings"], "grid": out["grid"]}, indent=2))
+        (MODELS / f"{name}.json").write_text(json.dumps({"settings": out["settings"], "grid": out["grid"]}, indent=2), encoding="utf-8")
         write_json(METRICS / "validation" / f"{name}.json", {k: v for k, v in out.items() if k != "grid"})
         log.info("%s tuned: %s (%.0fs, peak %d MB)", name, out["settings"], out["runtime_seconds"], peak_mb())
         if name == "popularity":

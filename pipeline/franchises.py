@@ -22,7 +22,7 @@ from pipeline.tmdb import TMDB
 
 log = get_logger("franchises")
 COLLECTIONS_DIR = RAW / "tmdb_collections"
-CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text())["franchise"]
+CFG = yaml.safe_load((Path(__file__).parent / "catalog_config.yaml").read_text(encoding="utf-8"))["franchise"]
 
 
 def collection_of(tmdb_id: int) -> dict | None:

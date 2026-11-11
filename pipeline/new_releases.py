@@ -23,8 +23,8 @@ from pipeline.tmdb import TMDB
 
 log = get_logger("new_releases")
 _HERE = Path(__file__).parent
-CFG = yaml.safe_load((_HERE / "catalog_config.yaml").read_text())["new_releases"]
-PART_B = yaml.safe_load((_HERE / "curated" / "language_quotas.yaml").read_text())["part_b"]
+CFG = yaml.safe_load((_HERE / "catalog_config.yaml").read_text(encoding="utf-8"))["new_releases"]
+PART_B = yaml.safe_load((_HERE / "curated" / "language_quotas.yaml").read_text(encoding="utf-8"))["part_b"]
 CANDIDATES = PROCESSED / "new_release_candidates.csv"
 COLUMNS = ["tmdb_id", "tmdb_vote_count", "discover_language", "found_on", "part"]
 

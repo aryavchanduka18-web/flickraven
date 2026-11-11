@@ -20,8 +20,8 @@ from pipeline.tmdb import TMDB
 
 log = get_logger("05_clean")
 _HERE = __import__("pathlib").Path(__file__).parent
-CFG = yaml.safe_load((_HERE / "curated" / "language_quotas.yaml").read_text())
-CFG["hollywood"] = yaml.safe_load((_HERE / "catalog_config.yaml").read_text())["hollywood"]
+CFG = yaml.safe_load((_HERE / "curated" / "language_quotas.yaml").read_text(encoding="utf-8"))
+CFG["hollywood"] = yaml.safe_load((_HERE / "catalog_config.yaml").read_text(encoding="utf-8"))["hollywood"]
 MIN_LANGUAGE_FILMS = 150
 
 

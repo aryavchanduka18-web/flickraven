@@ -51,7 +51,7 @@ sys.path.insert(0, str(ROOT / "api"))
 
 
 def _env(name: str, default: str = "") -> str:
-    for line in (ROOT / ".env").read_text().splitlines():
+    for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
         if line.startswith(name + "="):
             return line.split("=", 1)[1].strip()
     return os.environ.get(name, default)
@@ -109,7 +109,7 @@ def export() -> None:
             for t in USER_TABLES:
                 demo[t] = list(conn.execute(text(f"SELECT * FROM {t} WHERE user_id = :u"), {"u": uid}).mappings())
         counts = {t: conn.execute(text(f"SELECT count(*) FROM {t}")).scalar() for t in CATALOG_TABLES}
-    (OUT / "demo_user.json").write_text(json.dumps({t: [dict(r) for r in rows] for t, rows in demo.items()}, default=str))
+    (OUT / "demo_user.json").write_text(json.dumps({t: [dict(r) for r in rows] for t, rows in demo.items()}, default=str), encoding="utf-8")
 
     bundle = OUT / "artifacts.tar.gz"
     with tarfile.open(bundle, "w:gz", compresslevel=9) as tar:
@@ -269,7 +269,7 @@ def upload(target: str | None, refresh: bool = False) -> None:
                         'pg_restore --data-only --no-owner --no-privileges --single-transaction -d "$TARGET" '
                         "/dump/catalog.dump"], check=True, env={**os.environ, "TARGET": url})
 
-    demo = json.loads((OUT / "demo_user.json").read_text())
+    demo = json.loads((OUT / "demo_user.json").read_text(encoding="utf-8"))
 
     def add_demo(conn) -> str:
         if not demo:
