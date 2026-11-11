@@ -975,3 +975,9 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 
 ### 14.2m Assistant answers freely (2026-11-11)
 - The assistant is not limited to the catalog: it answers from Gemini's own knowledge about any film, series or anime (story, cast, endings, comparisons, trivia, recommendations), and stays on that topic. Titles are linked only when FlickRaven has them; others show as plain bold text. Spoilers stay hidden behind a tap, Google's safety filters and the daily limits apply, and the panel says AI can be wrong. Catalog synopses are still added for titles the person names, to reduce mistakes.
+
+### 14.2o Add to My List from the chat (2026-11-11)
+- Each assistant reply that recommends catalog titles now lists them as numbered rows under the answer, each with a **+ My List** button (or "✓ In your list" when already saved), and the line "Want me to add this to your list?". The assistant proposes; the person confirms with one tap.
+- Typed answers also work: "yes, add it", "add the second one", "save Heat", "add them all". They are read in the browser (`web/src/lib/assistantActions.ts`), only against the cards of the latest reply, and turned into the normal `PUT /api/list/{id}` call (source `assistant`) with the person's own sign-in. A bare "yes" with several cards gets "Which one?"; an add for a title not shown gets a short refusal; anything that is not clearly an add goes to the assistant as usual. A bare "yes" after a reply that itself asked a question ("Want something darker?") goes to the assistant, not to My List.
+- Gemini never adds anything, never sees the add, and these add exchanges are left out of the history sent with later messages; they also do not use a daily message. So the privacy page is unchanged.
+- Only My List. The chat never likes, dislikes, rates or marks anything watched. Double taps add once; a failed add shows "Retry add".
