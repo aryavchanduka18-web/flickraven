@@ -9,6 +9,7 @@ from app.db import get_db
 from app.services import ai_similar
 from app.services import anime_tags as anime_tags_mod
 from app.services import franchise as fr
+from app.services import match_display
 from app.services import search as sq
 from app.services import similar as similar_svc
 from app.services.confidence import confidence
@@ -32,16 +33,17 @@ def movie(movie_id: int, request: Request, db: Session = Depends(get_db)) -> dic
             source_scores = engine.scores(st)
             scores = engine.rail_scores(st, source_scores)
             raw = float(scores[row]) if np.isfinite(scores[row]) else None
-            d["match_pct"] = engine.match(st.stage, raw) if raw is not None else None
+            mp = engine.match(st.stage, raw) if raw is not None else None
+            d["match_pct"] = match_display.shown(mp)
             us = d["user_state"]
-            if d["match_pct"] is None and (us["rating"] is not None or us["reaction"] != 0):
+            if mp is None and (us["rating"] is not None or us["reaction"] != 0):
                 # Already rated, liked or disliked: part of the user's profile, not recommended back to them,
                 # so no "why you're seeing this" and no confidence card (the page says so instead).
                 d["in_profile"] = True
             else:
                 shares = _shares(engine, st, row, source_scores)
                 d["why"] = engine.reasons(st, row, shares)
-                d["confidence"] = confidence(engine, st, row, d["match_pct"], source_scores)
+                d["confidence"] = confidence(engine, st, row, match_display.shown(mp), source_scores)
     return d
 
 
@@ -162,6 +164,11 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     """Browse the catalog. `type` is movie (the default), series, anime or all. Extra filters: `year_min`/`year_max`
     (release period), `min_imdb` (IMDb score), `provider` (a TMDB provider id that streams it for free or on subscription
     in the stored region) and `min_match` (Match %, needs a personal sort and a signed-in user)."""
+    if not match_display.MATCH_VISIBLE:
+        # Match % is hidden until it is recalibrated, so it must not filter or order lists either (old links still work).
+        min_match = None
+        if sort == "match":
+            sort = "recommended"
     where, p = ["true"], {}
     kinds = media_kinds(type, genre)
     where.append("m.title_type = ANY(:kinds)"); p["kinds"] = kinds

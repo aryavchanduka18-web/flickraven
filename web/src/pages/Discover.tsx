@@ -9,15 +9,18 @@ import TonightPanel from "../components/discovery/TonightPanel";
 import { LANGUAGES } from "../lib/format";
 
 // [value, label, what it does]; the first four are ranked by the recommender (GET /movies, personal_order).
-const SORTS: [string, string, string][] = [
-  ["recommended", "Recommended for you", "your match, re-ranked with your Tune settings"],
+// Match % is hidden until it is recalibrated (api/app/services/match_display.py), so no Match sort or filter either.
+const MATCH_VISIBLE = false;
+const ALL_SORTS: [string, string, string][] = [
+  ["recommended", "Recommended for you", "your ranking, re-ranked with your Tune settings"],
   ["match", "Highest match", "pure predicted match"],
-  ["hidden", "Hidden gems", "high match, less well known"],
+  ["hidden", "Hidden gems", "high in your ranking, less well known"],
   ["novel", "Most novel", "genres you have not liked yet come first"],
   ["popular", "Most popular", "most voted on TMDB"],
   ["rating", "Highest rated", "community rating"],
   ["newest", "Newest", "latest releases first"],
 ];
+const SORTS = MATCH_VISIBLE ? ALL_SORTS : ALL_SORTS.filter(([v]) => v !== "match");
 
 const PERSONAL = ["recommended", "match", "hidden", "novel"];
 
@@ -47,7 +50,7 @@ export default function Discover({ fixed }: { fixed?: "movie" | "show" } = {}) {
   const genres = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { slug: string; name: string }[] }>("/genres") });
   const options = useQuery({ queryKey: ["discover-options"], queryFn: () => api<Options>("/discover/options"), staleTime: 3600_000 });
   // A Match % exists only for films, and only with a personal sort.
-  const matchOk = (f.type === "movie" || f.type === "all") && PERSONAL.includes(f.sort);
+  const matchOk = MATCH_VISIBLE && (f.type === "movie" || f.type === "all") && PERSONAL.includes(f.sort);
   const qs = new URLSearchParams(Object.entries(f).filter(([k, v]) => v && (k !== "min_match" || matchOk)) as [string, string][]);
   const set = (k: keyof Filters) => (e: React.ChangeEvent<HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   // Series and anime have no ratings, so only these sorts apply to them (hidden gems and most novel need ratings).
@@ -134,12 +137,12 @@ export default function Discover({ fixed }: { fixed?: "movie" | "show" } = {}) {
               <option value="">Any score</option>{[6, 6.5, 7, 7.5, 8, 8.5].map((r) => <option key={r} value={r}>{r}+</option>)}
             </select>
           </label>
-          <label className={label}>Match %
+          {MATCH_VISIBLE && <label className={label}>Match %
             <select className={sel} value={matchOk ? f.min_match : ""} onChange={set("min_match")} disabled={!matchOk} aria-label="Minimum match">
               <option value="">Any match</option>{[60, 70, 80, 90].map((r) => <option key={r} value={r}>{r}%+</option>)}
             </select>
             {!matchOk && <span className="normal-case tracking-normal text-white/40">Films with a personal sort only.</span>}
-          </label>
+          </label>}
           <label className={label}>Streaming on
             <select className={sel} value={f.provider} onChange={set("provider")} aria-label="Streaming service">
               <option value="">Any service</option>
