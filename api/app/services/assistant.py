@@ -19,6 +19,7 @@ from app.config import get_settings
 MAX_CHARS = 1000            # one message
 MAX_TURNS = 12              # messages of history sent to the model
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+RETRYABLE_STATUS_CODES = {500, 502, 503, 504}
 TITLE_RE = re.compile(r"\[\[(.+?)\]\]")
 
 SYSTEM = """You are FlickRaven's assistant: a friendly, knowledgeable guide to films, TV series and anime. You may chat about \
@@ -100,19 +101,75 @@ def named_titles(db: Session, message: str) -> str:
     return ("Catalog facts about titles mentioned (use these for story questions, say if they are not enough):\n" + "\n".join(lines)) if lines else ""
 
 
+def _gemini_error_details(response) -> tuple[str, str]:
+    """Return short provider diagnostics without logging request content or credentials."""
+    try:
+        error = response.json().get("error", {})
+    except (ValueError, AttributeError):
+        return "", ""
+    if not isinstance(error, dict):
+        return "", ""
+    status = str(error.get("status") or error.get("code") or "")
+    message = " ".join(str(error.get("message") or "").split())[:240]
+    api_key = get_settings().gemini_api_key
+    if api_key:
+        message = message.replace(api_key, "[redacted]")
+    return status, message
+
+
+_working_model: str | None = None   # the last model id that answered; tried first next time
+
+
+def _post(model: str, body: dict, key: str):
+    """One request to one model, with a single retry after a network error or a Google 5xx."""
+    for attempt in range(2):
+        try:
+            r = httpx.post(URL.format(model=model), json=body, headers={"x-goog-api-key": key},
+                           timeout=httpx.Timeout(25.0, connect=5.0))
+        except httpx.HTTPError as e:
+            if attempt == 0:
+                log.info("gemini request failed (%s); retrying once", type(e).__name__)
+                time.sleep(0.25)
+                continue
+            log.warning("gemini request failed after retry: %s", type(e).__name__)
+            raise HTTPException(502, "The assistant could not be reached. Try again in a moment.")
+        if r.status_code in RETRYABLE_STATUS_CODES and attempt == 0:
+            log.warning("gemini returned transient HTTP %s; retrying once", r.status_code)
+            time.sleep(0.25)
+            continue
+        return r
+
+
 def ask_gemini(history: list[dict], system: str) -> str:
+    """Asks Gemini. If a model id is unknown (HTTP 404) the next one in GEMINI_FALLBACK_MODELS is tried, and the one
+    that works is remembered and logged, so a retired model name does not switch the assistant off."""
+    global _working_model
     s = get_settings()
     body = {"system_instruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["text"]}]} for m in history],
-            "generationConfig": {"maxOutputTokens": 1200, "temperature": 0.7, "thinkingConfig": {"thinkingBudget": 0}}}
-    try:
-        r = httpx.post(URL.format(model=s.gemini_model), json=body, headers={"x-goog-api-key": s.gemini_api_key}, timeout=httpx.Timeout(25.0, connect=5.0))
-    except httpx.HTTPError as e:
-        log.warning("gemini request failed: %s", type(e).__name__)
-        raise HTTPException(502, "The assistant could not be reached. Try again in a moment.")
+            "generationConfig": {"maxOutputTokens": 1500, "temperature": 0.7}}
+    models = [m for m in dict.fromkeys([_working_model, s.gemini_model, *[x.strip() for x in s.gemini_fallback_models.split(",")]]) if m]
+    for model in models:
+        r = _post(model, body, s.gemini_api_key)
+        if r.status_code != 404:
+            break
+        log.warning("gemini model %s not found (HTTP 404); trying the next one", model)
+    else:
+        model = models[-1]
+    if r.status_code == 200 and model != _working_model:
+        log.warning("gemini model in use: %s", model)
+        _working_model = model
     if r.status_code != 200:
-        log.warning("gemini returned HTTP %s", r.status_code)
-        raise HTTPException(502, "The assistant is busy right now. Try again in a moment.")
+        provider_status, provider_message = _gemini_error_details(r)
+        log.warning("gemini returned HTTP %s (provider_status=%s, message=%s)",
+                    r.status_code, provider_status or "unknown", provider_message or "none")
+        if r.status_code in (400, 401, 403, 404):
+            detail = "The assistant service needs a configuration update. Please try again later."
+        elif r.status_code == 429:
+            detail = "The AI service has reached its current request limit. Please try again later."
+        else:
+            detail = "The assistant is temporarily busy. Try again in a moment."
+        raise HTTPException(502, detail)
     try:
         parts = r.json()["candidates"][0]["content"]["parts"]
         return "".join(p.get("text", "") for p in parts).strip() or "I could not think of an answer to that. Try asking another way."
