@@ -6,10 +6,12 @@ title, matching year). Nothing it invents can reach the page. Only the title, ye
 no account. Answers are cached per title (a week, in memory) and the number of calls per day is capped, so the free
 Gemini quota is safe; if anything fails the page silently falls back to the stored similarity list.
 """
+import json
 import logging
 import re
 import threading
 import time
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -27,6 +29,9 @@ SYSTEM = ("You recommend TV. Given one TV series, list the %d TV series (or anim
           "would enjoy most: same tone, themes, audience and style, not just the same genre. Mix well-known and lesser-known. "
           "Only real titles you are sure exist. Output one per line, exactly 'Title (First air year)', nothing else." % ASK)
 
+MODELS = Path(__file__).resolve().parents[3] / "artifacts" / "models"
+_file: dict[str, list[str]] | None = None          # tmdb id -> names, from artifacts/models/ai_similar.json (pipeline/ai_similar.py)
+_file_ids: dict[int, list[int]] = {}               # movie id -> catalog ids, resolved once per process
 _cache: dict[int, tuple[float, list[int]]] = {}
 _calls: dict[str, int] = {}
 _lock = threading.Lock()
@@ -69,8 +74,35 @@ def _budget() -> bool:
         return True
 
 
+def precomputed(db: Session, movie_id: int, kind: str) -> list[int] | None:
+    """Catalog ids from the shipped file (asked once, offline, so no Gemini call at all), or None when the title is not in it."""
+    global _file
+    if _file is None:
+        path = MODELS / "ai_similar.json"
+        try:
+            _file = json.loads(path.read_text()).get("titles", {}) if path.exists() else {}
+        except (OSError, ValueError):
+            log.warning("ai_similar.json could not be read")
+            _file = {}
+    if not _file:
+        return None
+    if movie_id in _file_ids:
+        return _file_ids[movie_id]
+    row = db.execute(text("SELECT tmdb_id FROM movies WHERE id = :i"), {"i": movie_id}).first()
+    names = _file.get(str(row[0])) if row else None
+    if not names:
+        return None
+    parsed = [(m.group(1), int(m.group(2))) for n in names if (m := re.match(r"^(.+?)\s*\((\d{4})\)$", n))]
+    ids = resolve(db, parsed, ["anime", "series"] if kind in ("anime", "series") else [kind], movie_id)
+    _file_ids[movie_id] = ids
+    return ids
+
+
 def suggest(db: Session, movie_id: int, title: str, year: int | None, genres: list[str], kind: str) -> list[int]:
     """Catalog ids of series that Gemini says are like this one (best first), or [] on any problem."""
+    pre = precomputed(db, movie_id, kind)
+    if pre:
+        return pre
     if not enabled():
         return []
     now = time.time()

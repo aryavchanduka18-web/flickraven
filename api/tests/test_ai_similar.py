@@ -88,3 +88,17 @@ def test_series_page_puts_gemini_picks_first_then_the_stored_list(test_engine, t
     got = [i["movie"]["id"] for i in items]
     assert got == [f, o]
     assert items[0]["reasons"][0]["code"] == "ai_similar" and not items[1]["reasons"]
+
+
+def test_shipped_file_answers_without_any_gemini_call(test_engine, titles, monkeypatch):
+    from app.db import SessionLocal
+    with SessionLocal() as db:
+        tmdb = db.execute(text("SELECT tmdb_id FROM movies WHERE id = :i"), {"i": titles["AIS Anchor"]}).scalar()
+    monkeypatch.setattr(ai, "_file", {str(tmdb): ["AIS Friend (2019)", "Unknown Show (2020)", "AIS Film (2019)"]})
+    ai._file_ids.clear(); ai._cache.clear()
+    def boom(*a, **k): raise AssertionError("Gemini must not be called")
+    monkeypatch.setattr(ai.assistant, "ask_gemini", boom)
+    monkeypatch.setattr(ai.get_settings(), "gemini_api_key", "k")
+    with SessionLocal() as db:
+        assert ai.suggest(db, titles["AIS Anchor"], "AIS Anchor", 2020, [], "series") == [titles["AIS Friend"]]
+    ai._file_ids.clear()
