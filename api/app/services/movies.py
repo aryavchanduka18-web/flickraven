@@ -35,7 +35,7 @@ def short(text_: str | None, words: int = 28) -> str | None:
 
 
 def user_states(db: Session, user_id: int | None, ids: list[int]) -> dict[int, dict]:
-    states = {i: {"rating": None, "reaction": 0, "in_list": False, "watched": False} for i in ids}
+    states = {i: {"rating": None, "reaction": 0, "in_list": False, "watched": False, "not_interested": False} for i in ids}
     if user_id is None or not ids:
         return states
     p = {"u": user_id, "ids": ids}
@@ -47,6 +47,9 @@ def user_states(db: Session, user_id: int | None, ids: list[int]) -> dict[int, d
         states[m]["in_list"] = True
     for (m,) in db.execute(text("SELECT movie_id FROM watched WHERE user_id = :u AND movie_id = ANY(:ids)"), p):
         states[m]["watched"] = True
+    from app.services.rec_feedback import hidden_titles
+    for m in hidden_titles(db, user_id, ids):      # marked "Not interested": the card offers Undo
+        states[m]["not_interested"] = True
     return states
 
 

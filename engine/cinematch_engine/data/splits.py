@@ -3,6 +3,7 @@
 The evaluation universe is part A of the catalog minus the new-movie holdout films
 (spec section 4.2 and 12): only films with MovieLens ratings that the models are allowed to see.
 """
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,6 +63,24 @@ def build_split(train: pd.DataFrame, held: pd.DataFrame, items: pd.DataFrame, sp
     return SplitData(user_ids, items["ml_movie_id"].to_numpy(), items["tmdb_id"].to_numpy(), mat, eval_df, split)
 
 
+SITE_FEEDBACK_ENV = "FLICKRAVEN_SITE_FEEDBACK"
+
+
+def site_feedback_ratings(processed: Path) -> pd.DataFrame | None:
+    """Ratings made on the live site (pipeline/export_site_feedback.py), in the MovieLens layout, or None.
+
+    Used only when the environment variable FLICKRAVEN_SITE_FEEDBACK=1 is set, so a normal build is unchanged.
+    Site users have ids from 100,000,000 up, so they never collide with MovieLens users. They are added to the
+    TRAINING ratings only; the held-out ratings that every metric is measured on stay MovieLens-only, so a build
+    with and without site feedback can be compared on exactly the same test.
+    """
+    path = processed / "site_feedback" / "ratings.parquet"
+    if os.environ.get(SITE_FEEDBACK_ENV) != "1" or not path.exists():
+        return None
+    df = pd.read_parquet(path)[["user_id", "ml_movie_id", "rating"]]
+    return df if len(df) else None
+
+
 def load_split(processed: Path, split: str = "val", train_parts: tuple[str, ...] = ("train",),
                include_holdout_items: bool = False) -> SplitData:
     """Train on the concatenation of `train_parts`, evaluate on `<split>.parquet`.
@@ -77,5 +96,8 @@ def load_split(processed: Path, split: str = "val", train_parts: tuple[str, ...]
         items = items[~items["ml_movie_id"].isin(holdout)]
     items = items[["ml_movie_id", "tmdb_id"]].astype({"ml_movie_id": "int64"})
     train = pd.concat([pd.read_parquet(splits / f"{p}.parquet") for p in train_parts], ignore_index=True)
+    site = site_feedback_ratings(processed)
+    if site is not None:
+        train = pd.concat([train, site.astype({c: train[c].dtype for c in site.columns if c in train.columns})], ignore_index=True)
     held = pd.read_parquet(splits / f"{split}.parquet")
     return build_split(train, held, items, split)

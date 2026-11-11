@@ -7,6 +7,7 @@ from app.auth import current_user
 from app.db import get_db
 from app.ratelimit import EVENTS
 from app.services import events as ev
+from app.services import rec_feedback
 from app.services.events import IMPLICIT_EVENTS
 from app.services.movies import cards
 
@@ -125,6 +126,61 @@ def event(body: EventBody, user=Depends(current_user), db: Session = Depends(get
     ev.log(db, user["id"], body.movie_id, body.event_type, None, body.source, body.position)
     db.commit()
     return {"ok": True}
+
+
+@router.put("/feedback/not-interested/{movie_id}")
+def not_interested(movie_id: int, body: SourceBody | None = None, user=Depends(current_user),
+                   db: Session = Depends(get_db)) -> dict:
+    """ "Not interested" on a recommendation: the title leaves this person's recommendation rows for HIDE_DAYS and
+    counts against the row it came from. It is not a dislike: the taste profile, the models and the user stage do
+    not change, and the title still shows in search, Discover and on its own page."""
+    exists(db, movie_id)
+    rec_feedback.set_not_interested(db, user["id"], movie_id, body.source if body else None)
+    db.commit()
+    return {"ok": True, "days": rec_feedback.HIDE_DAYS}
+
+
+@router.delete("/feedback/not-interested/{movie_id}")
+def not_interested_undo(movie_id: int, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    rec_feedback.undo_not_interested(db, user["id"], movie_id)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/feedback/not-interested")
+def not_interested_list(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    return {"items": cards(db, rec_feedback.hidden_titles(db, user["id"])[:60], user["id"]), "days": rec_feedback.HIDE_DAYS}
+
+
+class RowBody(BaseModel):
+    source: str = Field(min_length=1, max_length=80)
+
+
+@router.put("/feedback/rows")
+def hide_row(body: RowBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Hide a Home row for ROW_HIDE_DAYS. The main picks row cannot be hidden."""
+    key = rec_feedback.base_key(body.source)
+    if key in rec_feedback.PINNED_ROWS:
+        raise HTTPException(422, "This row cannot be hidden")
+    rec_feedback.hide_row(db, user["id"], key)
+    db.commit()
+    return {"ok": True, "hidden_rows": rec_feedback.hidden_rows(db, user["id"]), "days": rec_feedback.ROW_HIDE_DAYS}
+
+
+@router.delete("/feedback/rows")
+def restore_rows(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    restored = rec_feedback.restore_rows(db, user["id"])
+    db.commit()
+    return {"ok": True, "restored": restored}
+
+
+@router.get("/feedback/rows")
+def rows_feedback(user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    """Hidden rows, and what the site has learned about each Home row from this person's use of it."""
+    stats = rec_feedback.row_stats(db, user["id"])
+    move = rec_feedback.shifts(list(stats), stats)
+    return {"hidden_rows": rec_feedback.hidden_rows(db, user["id"]),
+            "rows": [{"key": k, **v, "shift": move.get(k, 0)} for k, v in sorted(stats.items())]}
 
 DISLIKE_REASONS = {"genre", "long", "slow", "predictable", "language", "seen", "similar", "unexpected", "none"}
 
