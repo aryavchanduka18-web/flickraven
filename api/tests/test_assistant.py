@@ -407,3 +407,60 @@ def test_scrub_catches_long_titles_and_titles_with_full_stops():
     assert ctx2.scrub_reply("See Mr. Robot (2015) for that. Nice.", titles) == ("Nice.", 1)
     assert ctx2.scrub_reply("Dr. Strangelove or How I Learned to Stop Worrying and Love the Bomb is a classic. Fine.", titles) == ("Fine.", 1)
     assert ctx2.scrub_reply("Robot movies are fun. Mr smith is here.", titles)[1] == 0               # parts of a title are not the title
+
+
+# ---- review round 3 on #102 -----------------------------------------------------------------------------------
+def test_a_later_negation_beats_an_earlier_request_for_the_same_kind():
+    a = ctx2.intent("I want anime, but not anime. Recommend something else.")
+    assert a["kinds"] == ["movie", "series"] and a["exclude_kinds"] == ["anime"] and a["kind_asked"] is False
+    b = ctx2.intent("Give me movies and series, but no series.")
+    assert b["kinds"] == ["movie"] and b["exclude_kinds"] == ["series"]
+    c = ctx2.intent("recommend Hindi shows, but no Hindi")
+    assert c["languages"] == [] and c["exclude_languages"] == ["hi"]
+
+
+def test_scrub_has_no_title_length_cap_for_plain_text_or_dated_mentions():
+    words = " ".join(f"Word{n}" for n in range(45))                         # a 45-word blocked title
+    titles = {words.lower(): [words]}
+    assert ctx2.scrub_reply(f"Try Inception. {words} is long. Fine.", titles) == ("Try Inception. Fine.", 1)
+    assert ctx2.scrub_reply(f"Also {words} (2001) maybe. Fine.", titles) == ("Fine.", 1)
+
+
+def _add_titles(test_engine, rows):
+    with test_engine.begin() as conn:
+        for n, (name, year, lang, kind) in enumerate(rows):
+            conn.execute(text("""INSERT INTO movies (tmdb_id, title, year, original_language, countries, backdrop_path, popularity_score,
+                tmdb_vote_count, title_type) VALUES (:t, :n, :y, :l, ARRAY['IN'], '/b.jpg', 7, 5000, :k)"""),
+                         {"t": 990950 + n, "n": name, "y": year, "l": lang, "k": kind})
+
+
+def _remove_titles(test_engine):
+    with test_engine.begin() as conn:
+        conn.execute(text("DELETE FROM movies WHERE tmdb_id BETWEEN 990950 AND 990960"))
+
+
+def test_a_marked_title_in_the_wrong_language_or_kind_is_dropped_from_cards_and_text(client, test_engine, monkeypatch):
+    _add_titles(test_engine, [("Hindi Show Zed", 2020, "hi", "series"), ("English Show Zed", 2021, "en", "series"),
+                              ("Hindi Film Zed", 2019, "hi", "movie")])
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: FakeResp(
+        "Start with [[Hindi Show Zed (2020)]]. Also try [[English Show Zed (2021)]] for fun. And [[Hindi Film Zed (2019)]] is a film. "
+        "Enjoy."))
+    try:
+        r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend Hindi series"}]}).json()
+        assert [i["movie"]["title"] for i in r["items"]] == ["Hindi Show Zed"]
+        assert "English Show Zed" not in r["reply"] and "Hindi Film Zed" not in r["reply"]
+        assert "Hindi Show Zed" in r["reply"] and "Enjoy." in r["reply"]
+    finally:
+        _remove_titles(test_engine)
+
+
+def test_a_title_in_a_ruled_out_language_is_dropped_and_questions_of_fact_are_not_filtered(client, test_engine, monkeypatch):
+    _add_titles(test_engine, [("Hindi Show Zed", 2020, "hi", "series"), ("English Show Zed", 2021, "en", "series")])
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: FakeResp("Try [[Hindi Show Zed (2020)]]. Or [[English Show Zed (2021)]]."))
+    try:
+        r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Suggest a series, I don't want Hindi"}]}).json()
+        assert [i["movie"]["title"] for i in r["items"]] == ["English Show Zed"]
+        q = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Compare Hindi Show Zed with English Show Zed"}]}).json()
+        assert len(q["items"]) == 2                         # a question of fact is not a suggestion request: no filtering
+    finally:
+        _remove_titles(test_engine)

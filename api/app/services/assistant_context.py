@@ -83,6 +83,7 @@ def intent(message: str) -> dict:
         if r:
             ruled_k.add(kind)
     # "anime" beats the generic "shows/series" words when both are asked for, as before
+    asked_k = [k for k in asked_k if k not in ruled_k]       # a later "but not X" beats an earlier "X"
     if "anime" in asked_k:
         kinds = ["anime"]
     elif asked_k:
@@ -186,7 +187,7 @@ def shortlist_prompt(engine, rows: list[int], want: dict | None = None) -> str:
             "Keep to the kind and language they asked for:\n" + "\n".join(lines))
 
 
-DATED = re.compile(r"([\w'&.:-]+(?: [\w'&.:-]+){0,19})\s*\((?:19|20)\d{2}\)")
+YEAR = re.compile(r"\((?:19|20)\d{2}\)")
 WORDS = re.compile(r"[\w'&.:-]+")
 FALLBACK = ("I held back a suggestion because you told FlickRaven you did not like it. Tell me what you are in the mood "
             "for and I will try other ideas.")
@@ -202,7 +203,7 @@ def blocked_titles(db: Session, ids: set[int]) -> dict[str, list[str]]:
     return out
 
 
-def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> tuple[str, int]:
+def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "", bad_marks: set[str] | None = None) -> tuple[str, int]:
     """Remove every sentence that presents a blocked title (disliked or rated 4 or lower), so it cannot appear in the
     written reply either. Two channels are checked independently of the prose:
     - [[Title (Year)]] marks, the structured channel the model is told to use for recommendations: any mark naming a
@@ -210,23 +211,25 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
     - plain mentions: a run of words (as long as the longest blocked title) equal to a blocked title. A multi-word title matches ignoring case; a
       one-word title must be 5+ letters and spelled exactly as in the catalog (capitalised), so common words ("up",
       "her", "it", "heat" in a sentence about weather) are left alone. Titles the person typed themselves
-      (`allowed`, their latest message) may be named in plain text, never as a [[mark]].
+      (`allowed`, their latest message) may be named in plain text, never as a [[mark]]. `bad_marks` are marked titles that break the
+    request's language or kind (see off_request_marks); their sentences go too.
     Returns (clean reply, number of sentences removed)."""
-    if not titles:
+    if not titles and not bad_marks:
         return reply, 0
     own = allowed.lower()
-    longest = min(max(len(WORDS.findall(t)) for t in titles), 30)         # longest blocked title, in words
+    lengths = sorted({len(WORDS.findall(t)) for t in titles} - {0})        # every blocked title length, in words: no cap
+    bad_marks = {m.lower() for m in (bad_marks or set())}
 
     def blocked_mark(sentence: str) -> bool:
         for raw in TITLE_RE.findall(sentence):
             name = re.sub(r"\s*\(\d{4}\)\s*$", "", raw).strip().lower()
-            if name in titles:
+            if name in titles or name in bad_marks:
                 return True
         return False
 
     def blocked_plain(sentence: str) -> bool:
         words = WORDS.findall(TITLE_RE.sub(" ", sentence))
-        for k in range(1, longest + 1):
+        for k in lengths:
             for i in range(len(words) - k + 1):
                 run = " ".join(words[i:i + k]).strip(".:-")
                 low = run.lower()
@@ -238,11 +241,12 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
 
     def blocked_dated(sentence: str) -> bool:
         """"Heat (1995)": a name followed by a year is a title mention whatever its length or spelling."""
-        for m in DATED.finditer(TITLE_RE.sub(" ", sentence)):
-            words = m.group(1).split()
-            for i in range(len(words)):
-                low = " ".join(words[i:]).strip(".:-").lower()
-                if low in titles and low not in own:
+        plain = TITLE_RE.sub(" ", sentence)
+        for m in YEAR.finditer(plain):
+            before = WORDS.findall(plain[:m.start()])
+            for k in lengths:
+                low = " ".join(before[-k:]).strip(".:-").lower() if len(before) >= k else ""
+                if low and low in titles and low not in own:
                     return True
         return False
 
@@ -260,3 +264,24 @@ def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> 
         kept.append(sent)
     text_ = "".join(kept).strip()
     return (text_ or FALLBACK), removed
+
+
+def off_request_marks(db: Session, reply: str, want: dict) -> set[str]:
+    """Lowercase names of [[marked]] titles in the reply that FlickRaven has and that break what the person asked for:
+    a kind they named (or ruled out), a language they named, a language they ruled out. A prompt cannot guarantee
+    this, so it is checked after Gemini answers. Titles FlickRaven does not have cannot be checked and are left."""
+    allowed_kinds = set(want["kinds"]) if want.get("kind_asked") else {"movie", "series", "anime"} - set(want.get("exclude_kinds") or [])
+    bad: set[str] = set()
+    for raw in dict.fromkeys(TITLE_RE.findall(reply)):
+        m = re.match(r"(.+?)\s*\((\d{4})\)\s*$", raw)
+        name, year = (m.group(1), int(m.group(2))) if m else (raw, None)
+        row = db.execute(text("""SELECT title_type, original_language FROM movies WHERE lower(title) = lower(:t)
+            AND (CAST(:y AS int) IS NULL OR year = CAST(:y AS int)) ORDER BY tmdb_vote_count DESC NULLS LAST LIMIT 1"""),
+                         {"t": name.strip(), "y": year}).first()
+        if not row:
+            continue
+        kind, lang = row
+        if kind not in allowed_kinds or (want.get("languages") and lang not in want["languages"]) \
+                or lang in (want.get("exclude_languages") or []):
+            bad.add(name.strip().lower())
+    return bad

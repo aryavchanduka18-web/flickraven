@@ -70,7 +70,10 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
                                            ai.named_titles(db, msgs[-1]["text"])) if x)
         reply = ai.ask_gemini(msgs, system)
         # Hard exclusions win over Gemini, in the written reply as well as the cards (assistant_context.scrub_reply).
-        reply, _ = ctx.scrub_reply(reply, ctx.blocked_titles(db, blocked), msgs[-1]["text"])
+        # Language and kind the person asked for are checked on Gemini's answer too: a prompt is not a guarantee.
+        asked = msgs[-1]["text"]
+        off = ctx.off_request_marks(db, reply, ctx.intent(asked)) if ctx.wants_suggestions(asked) else set()
+        reply, _ = ctx.scrub_reply(reply, ctx.blocked_titles(db, blocked), asked, off)
         ids = [i for i in ai.resolve_titles(db, reply) if i not in blocked]
     except HTTPException:
         ai.refund(user["id"], user["is_guest"])
