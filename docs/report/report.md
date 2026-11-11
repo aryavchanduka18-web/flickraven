@@ -153,6 +153,26 @@ the other way (the Match % becomes too low by up to 0.2), so one global curve is
 those users chose to make, so these are not recommendations the users were shown; the live report (`/performance`)
 measures that.
 
+### 5.7 New-user ranking experiments (2026-11-10)
+Question: can the early blend (0 to 6 signals) be made more accurate? `pipeline/cold_eval.py` runs every variant on the same held-out
+MovieLens users, scored the way the site scores (availability-aware blend, stored popularity), NDCG@10 against later ratings of
+7+. Regimes: 2 ratings, 5 onboarding picks, 6 ratings. 700 users, repeated on 1,000 fresh users.
+
+| Variant | 2 ratings | 5 picks | 6 ratings |
+|---|---|---|---|
+| Current hybrid | 0.043 | 0.049 | 0.039 |
+| Popularity only | 0.072 | 0.073 | 0.073 |
+| Hybrid with 80% popularity | 0.057 | 0.051 | 0.058 |
+| Title-similarity table added to content | 0.041 | 0.047 | 0.040 |
+| Popular-first, then re-rank (best variant) | 0.052 | 0.060 | 0.053 |
+
+What it says, plainly:
+- With so few signals, the personal models (content, user CF, item CF, ALS) are each worse than just ranking by popularity; mixing them in lowers accuracy. The held-out ratings are mostly of popular films, so this benchmark favours popularity, but it does mean the early personal signal is weak.
+- Raising the popularity weight raises NDCG (+0.014 to +0.019, standard error 0.002 to 0.003) but makes lists almost identical: 1,000 cold users received 18 distinct films at 80% popularity against 221 today. That is not a better product, so it was not shipped.
+- The new title-similarity table as a taste source gave +/-0.002, no gain. Popular-first re-ranking is worse than popularity alone.
+- Not measurable from MovieLens: onboarding languages and genres, session signals, series and anime (no ratings), and what real users actually click. Those need the live report (`/performance`) over real users.
+Nothing in the blend was changed because of this.
+
 ## 6. The website
 React + TypeScript front end and a FastAPI back end over PostgreSQL. Every visitor is a user (guest
 accounts upgrade on registration). The home page is planned in one call: hero (top 5 picks), up to 13
