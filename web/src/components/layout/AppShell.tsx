@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Footer from "./Footer";
 import MobileTabBar from "./MobileTabBar";
 import NavBar from "./NavBar";
@@ -33,6 +33,8 @@ export default function AppShell() {
   const main = useRef<HTMLElement>(null);
   const first = useRef(true);
   const [moving, setMoving] = useState(false);
+  // Onboarding is a focused flow with its own bottom bar (Back / Next); the tab bar and chat button would cover it.
+  const focused = useLocation().pathname === "/onboarding";
 
   // The layout changes at once; the content then glides from where it was. Only transforms move, so it stays on
   // the GPU (animating the layout every frame was janky in the prototype). The panel goes solid while it slides.
@@ -62,8 +64,8 @@ export default function AppShell() {
         <Outlet />
       </main>
       <div className="shell-main"><Footer /></div>
-      <MobileTabBar />
-      <Assistant />
+      {!focused && <MobileTabBar />}
+      {!focused && <Assistant />}
       <QuickViewPanel />
       <WhyPanel />
       <DislikeReasonSheet />

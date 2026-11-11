@@ -57,4 +57,17 @@ describe("Onboarding language preferences", () => {
 
     await waitFor(() => expect(savedBody).toMatchObject({ languages: ["hi"] }));
   });
+
+  it("tells the person how many more picks they need before Next turns on", async () => {
+    setup();
+    for (let id = 1; id <= 4; id++) {
+      fireEvent.click(await screen.findByRole("button", { name: new RegExp(`Title ${id}`) }));
+    }
+    expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("status").textContent).toContain("Pick 1 more to continue");
+
+    fireEvent.click(screen.getByRole("button", { name: /Title 5/ }));
+    expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("status").textContent).toContain("5 picked");
+  });
 });
