@@ -82,17 +82,44 @@ def test_series_only_and_film_only(client):
 
 def test_film_time_band_and_language_and_reasons(client):
     got = pick(client, kind="movie", time="90_120", languages=["hi"], adventure="familiar")
-    assert got["relaxed"] == ["languages"]          # only one Hindi film fits 90-120 minutes, so language is relaxed last
-    assert "pp-f2" in [i["movie"]["title"] for i in got["items"]]
+    # only one Hindi film fits 90-120 minutes; English ones are offered, never added silently
+    assert [i["movie"]["title"] for i in got["items"]] == ["pp-f2"] and got["alternatives"] == []
+    assert got["offer"] == "other_languages" and "Include other languages" in got["message"]
+    wider = pick(client, kind="movie", time="90_120", languages=["hi"], adventure="familiar", other_languages=True)
+    assert {i["movie"]["title"] for i in wider["items"]} == {"pp-f2", "pp-f4"} and wider["offer"] is None
     for it in got["items"]:
         assert it["reasons"] and all(r["source"] == "perfect_pick" for r in it["reasons"])
 
 
 def test_relaxation_is_reported_and_not_these_excludes(client):
     first = pick(client, kind="movie", mood="Scary", time="any", adventure="familiar")
-    assert first["relaxed"] and "relaxed" in first["message"]
-    again = pick(client, kind="movie", time="any", adventure="familiar", exclude=[i["movie"]["id"] for i in first["items"]])
-    assert not {i["movie"]["id"] for i in again["items"]} & {i["movie"]["id"] for i in first["items"]}
+    # no horror film exists: nothing is passed off as an exact match; the alternatives each say they miss the mood
+    assert first["items"] == [] and len(first["alternatives"]) == 3 and first["relaxed"] == ["mood"]
+    assert all(a["misses"] == ["mood"] for a in first["alternatives"]) and "broader alternatives" in first["message"]
+    assert all(any(r["text"] == 'Does not match the "scary" mood' for r in a["reasons"]) for a in first["alternatives"])
+    again = pick(client, kind="movie", time="any", adventure="familiar", exclude=[i["movie"]["id"] for i in first["alternatives"]])
+    assert not {i["movie"]["id"] for i in again["items"]} & {i["movie"]["id"] for i in first["alternatives"]}
+
+
+def test_some_exact_then_labelled_alternatives(client, test_engine):
+    got = pick(client, kind="movie", genres=["Drama"], time="any", adventure="familiar")
+    assert [i["movie"]["title"] for i in got["items"]] == ["pp-f3"] and all(i["misses"] == [] for i in got["items"])
+    assert len(got["alternatives"]) == 2 and all(a["misses"] == ["genres"] for a in got["alternatives"])
+    assert got["message"].startswith("Only 1 title meets every answer")
+    with test_engine.begin() as conn:
+        surfaces = {r[0] for r in conn.execute(text("SELECT surface FROM recommendation_logs WHERE movie_id = ANY(:i)"), {"i": client.ids})}
+    assert {"perfect_pick", "perfect_pick_alt"} <= surfaces
+
+
+def test_romantic_korean_series_match_through_keywords(client, monkeypatch):
+    # TMDB gives series no Romance genre; a "romance" keyword must be enough for the Romantic mood and the Romance genre
+    cat = recs_router.engine_or_503(None).cat
+    cat.keywords[4] = ["romance", "first love"]
+    got = pick(client, kind="series", mood="Romantic", genres=["Romance"], languages=["ko"], time="h10", adventure="familiar")
+    assert [i["movie"]["title"] for i in got["items"]] == ["pp-s1"]
+    assert any("from TMDB keywords" in r["text"] for r in got["items"][0]["reasons"])
+    assert {a["movie"]["title"] for a in got["alternatives"]} == {"pp-s2", "pp-s3"}
+    assert all(a["misses"] == ["mood", "genres"] for a in got["alternatives"])
 
 
 def test_bad_values_are_refused(client):
