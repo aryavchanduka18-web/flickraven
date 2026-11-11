@@ -8,6 +8,7 @@ from cinematch_engine.rerank import refresh
 from app.auth import user_id_from
 from app.db import get_db
 from app.services import collections as col
+from app.services import rec_feedback
 from app.services import daily
 from app.services import recommender as rec
 from app.services.movies import cards
@@ -19,13 +20,13 @@ PAGE = 40
 
 def hidden(db: Session, uid: int | None) -> set[int]:
     """Films the user rated, liked, disliked, watched or picked in onboarding: like Home and Top Picks,
-    collections do not offer them again (More Like This still shows them; it is similarity alone)."""
+    collections do not offer them again, nor titles marked Not interested (More Like This still shows them; it is similarity alone)."""
     if uid is None:
         return set()
     return set(db.execute(text("""SELECT movie_id FROM ratings WHERE user_id = :u
         UNION SELECT movie_id FROM reactions WHERE user_id = :u
         UNION SELECT movie_id FROM watched WHERE user_id = :u
-        UNION SELECT movie_id FROM onboarding_picks WHERE user_id = :u"""), {"u": uid}).scalars())
+        UNION SELECT movie_id FROM onboarding_picks WHERE user_id = :u"""), {"u": uid}).scalars()) | set(rec_feedback.hidden_titles(db, uid))
 
 
 @router.get("/collections")

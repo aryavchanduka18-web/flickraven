@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { RecItem } from "../api/types";
 import { Link, Navigate } from "react-router-dom";
-import { useCollections, useHome, useKindRail, useMe, useSeriesRails, useSetMode } from "../api/hooks";
+import { useCollections, useHideRow, useHome, useKindRail, useMe, useSeriesRails, useSetMode } from "../api/hooks";
 import type { Mode } from "../api/types";
 import DiscoveryModeControl from "../components/discovery/DiscoveryModeControl";
 import TonightPanel from "../components/discovery/TonightPanel";
@@ -20,6 +20,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode | undefined>(undefined);
   const home = useHome(mode);
   const saveMode = useSetMode();
+  const hideRow = useHideRow();
   const [tonight, setTonight] = useState(false);
   const [tune, setTune] = useState(false);
   const collections = useCollections();
@@ -86,11 +87,18 @@ export default function Home() {
           <Rail title="Popular right now" subtitle="Your personal picks are loading." items={quick.data.items.slice(0, 20)} source="rail:quick" personal={false} />
         )}
         {home.isLoading && !quick.data && [0, 1, 2].map((i) => <RailSkeleton key={i} />)}
+        {!!home.data?.hidden_rows?.length && (
+          <p className="px-4 pb-2 text-xs text-muted md:px-10">
+            {home.data.hidden_rows.length} row{home.data.hidden_rows.length > 1 ? "s" : ""} hidden for 30 days.{" "}
+            <button onClick={() => hideRow.mutate(null)} className="underline hover:text-white">Show them again</button>
+          </p>
+        )}
         <div className="space-y-6">
           {home.data?.rails.map((r, i) => (
             <Fragment key={r.key}>
               <Rail title={r.title} subtitle={r.subtitle ?? undefined} items={r.items} source={`rail:${r.key.split(":")[0]}`}
-                personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} />
+                personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} learned={r.learned}
+                onHide={r.key === "top_picks" ? undefined : () => hideRow.mutate(`rail:${r.key.split(":")[0]}`)} />
               {/* Series and anime come right after the first two film rails, so they are seen without long scrolling. */}
               {i === 1 && series.data && series.data.items.length > 0 && (
                 <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."

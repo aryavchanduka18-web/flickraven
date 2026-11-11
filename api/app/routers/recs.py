@@ -13,6 +13,7 @@ from app.services import recommender as rec
 from app.services import daily
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
+from app.services import rec_feedback
 from app.services import series_rails as series_rails_service
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
@@ -52,6 +53,10 @@ def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_
     engine = engine_or_503(db)
     st = rec.user_state(db, user["id"], engine)
     rows, scores = engine.kind_rank(st, kind)
+    skip = {engine.cat.row_of[m] for m in rec_feedback.hidden_titles(db, user["id"]) if m in engine.cat.row_of}
+    if skip:                                # "Not interested" titles stay out of recommendation rows
+        keep_at = [i for i, r in enumerate(rows) if int(r) not in skip]
+        rows, scores = [rows[i] for i in keep_at], [scores[i] for i in keep_at]
     page = slice(max(offset, 0), max(offset, 0) + min(limit, 60))
     rows, scores = list(rows), list(scores)
     if offset <= 0 and len(rows) > limit:
@@ -78,6 +83,7 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     st = rec.user_state(db, uid, engine)
     cat = engine.cat
     rows, scores = engine.kind_rank(st, "series")
+    not_interested = set(rec_feedback.hidden_titles(db, uid))
     ranked = [int(cat.movie_ids[r]) for r in rows]
     ranked_series_rows = set(rows.tolist())
     series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
@@ -155,7 +161,7 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     out = []
     request_id = str(uuid.uuid4())
     for r in rails:
-        items = cards(db, r["ids"], uid)
+        items = cards(db, [i for i in r["ids"] if i not in not_interested], uid)
         if len(items) >= series_rails_service.MIN_ROW:
             out.append({"key": r["key"], "title": r["title"], "subtitle": r["subtitle"], "items": items})
             log_shown(db, uid, request_id, None, f"series_{r['key']}", None, items)   # the report counts series too
@@ -236,14 +242,22 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
                           "agreement": agreement(e["row"])}
         return cards(db, list(extra), uid, extra)
 
-    hero = scored_items(plan["hero"])
+    # Feedback on the recommendations themselves (services/rec_feedback.py): "Not interested" titles and hidden rows
+    # are left out, and rows this person uses move up while rows they ignore move down.
+    skip = {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of}
+    hidden_rows = rec_feedback.hidden_rows(db, uid)
+    hero = scored_items([e for e in plan["hero"] if e["row"] not in skip] or plan["hero"])
+    shown = [r for r in plan["rails"] if rec_feedback.base_key(f"rail:{r['key']}") not in hidden_rows]
+    order, learned = rec_feedback.reorder([rec_feedback.base_key(f"rail:{r['key']}") for r in shown],
+                                          rec_feedback.row_stats(db, uid))
     rails = []
-    for r in plan["rails"]:
+    for r in (shown[i] for i in order):
+        rows = [row for row in r["rows"] if row not in skip]
         if r["scored"]:
-            items = scored_items([r["scored"][row] for row in r["rows"]])
+            items = scored_items([r["scored"][row] for row in rows])
         else:
             extra = {}
-            for row in r["rows"]:
+            for row in rows:
                 s = float(plan["rail_scores"][row])
                 extra[int(cat.movie_ids[row])] = {"score": s, "match_pct": engine.match(st.stage, s) if np.isfinite(s) else None,
                                                   "reasons": [r["reason"]] if r.get("reason") else [],
@@ -253,11 +267,13 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
         if r["key"] == "current_phase" and r["reason"].get("genre"):
             subtitle = (f"You've been into {r['reason']['genre'].lower()} films lately. "
                         "Recent likes, ratings and saves count more here than your older history.")
-        rails.append({"key": r["key"], "title": r["title"], "subtitle": subtitle, "source": r["source"], "items": items})
+        rails.append({"key": r["key"], "title": r["title"], "subtitle": subtitle, "source": r["source"], "items": items,
+                      "learned": learned.get(rec_feedback.base_key(f"rail:{r['key']}"))})
         log_shown(db, uid, request_id, page_id, r["key"], mode, items)
     log_shown(db, uid, request_id, page_id, "hero", mode, hero)
     db.commit()
-    return {"stage": plan["stage"], "mode": mode, "hero": hero, "rails": rails, "page_id": page_id, "day": daily.today().isoformat()}
+    return {"stage": plan["stage"], "mode": mode, "hero": hero, "rails": rails, "page_id": page_id, "day": daily.today().isoformat(),
+            "hidden_rows": hidden_rows}
 
 
 class TonightBody(BaseModel):

@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import type { RecItem } from "../../api/types";
 import MovieCard from "../card/MovieCard";
 
-type Props = { title: string; subtitle?: string; items: RecItem[]; source: string; personal?: boolean };
+type Props = {
+  title: string; subtitle?: string; items: RecItem[]; source: string; personal?: boolean;
+  /** Home film rows: lets the person hide the row, and says when it moved because of their use. */
+  onHide?: () => void; learned?: "up" | "down" | null;
+};
 
 /** One horizontal rail. Card width gives about 2-3 large cards on desktop with the next one peeking,
  *  about 2 on tablet and 1-1.5 on phones (spec 8.4). Vertical padding keeps hovered cards unclipped. */
-export default function Rail({ title, subtitle, items, source, personal = true }: Props) {
+export default function Rail({ title, subtitle, items, source, personal = true, onHide, learned }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false });
 
@@ -25,7 +29,20 @@ export default function Rail({ title, subtitle, items, source, personal = true }
   if (!items.length) return null;
   return (
     <section className="group/rail relative" aria-label={title}>
-      <h2 className="mb-1 px-4 font-display text-lg font-bold md:px-10 md:text-xl">{title}</h2>
+      <div className="mb-1 flex items-baseline gap-3 px-4 md:px-10">
+        <h2 className="font-display text-lg font-bold md:text-xl">{title}</h2>
+        {learned && (
+          <span className="rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-muted"
+            title="Rows move from how you use them: ones you open and like go up, ones you skip go down.">
+            {learned === "up" ? "Moved up: you use this row" : "Moved down: you skip this row"}
+          </span>
+        )}
+        {onHide && (
+          <button onClick={onHide} className="ml-auto text-xs text-muted hover:text-white" aria-label={`Show fewer rows like ${title}`}>
+            Hide row
+          </button>
+        )}
+      </div>
       {subtitle && <p className="-mt-0.5 mb-1 px-4 text-xs text-muted md:px-10">{subtitle}</p>}
       <div
         ref={scroller}

@@ -106,6 +106,12 @@ already there, and finishes a bundle upload that stopped half way.
 
 If you skip a month nothing breaks; the catalog just stops getting newer.
 
+**Optional: retrain with the ratings made on the site.** After the refresh, run
+`powershell -ExecutionPolicy Bypass -File .\scripts\retrain_with_feedback.ps1` (20 to 40 minutes, no Docker needed).
+It copies the site's ratings out of Neon (read only), retrains with them added to training, measures again on the same
+MovieLens test ratings and prints either "Safe to ship" or "Keep the old models" (and how to go back). It never uploads.
+Until many people use the site, expect "no measurable change"; that is the honest result, not a failure.
+
 The refresh also updates **Where to watch** on film pages (step 3b): TMDB's list of streaming, rental and
 purchase services for each film, data by JustWatch. India is shown; a film with nothing listed in India
 shows the US instead, and a film with nothing in either says so. Only links out; the page credits JustWatch.

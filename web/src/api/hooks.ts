@@ -92,6 +92,33 @@ export function useFeedback(movieId: number, source?: string) {
   });
 }
 
+/** "Not interested": the title leaves every recommendation row at once (before the server answers) and stays out
+ *  for 90 days. It is not a dislike and does not change the taste profile. */
+export function useNotInterested(movieId: number, source?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (undo: boolean) =>
+      undo ? send("DELETE", `/feedback/not-interested/${movieId}`) : send("PUT", `/feedback/not-interested/${movieId}`, { source }),
+    onMutate: (undo: boolean) => {
+      for (const key of ["home", "collections", "kind", "series-rails"]) {
+        qc.setQueriesData({ queryKey: [key] }, (d: unknown) => (d === undefined || undo ? d : patchFilm(d, movieId, {}, true)));
+      }
+    },
+    onSettled: () => {
+      for (const key of ["home", "collections", "kind", "series-rails", "movie", "activity", "activity-titles", "not-interested"]) qc.invalidateQueries({ queryKey: [key] });
+    },
+  });
+}
+
+/** Hide a Home row for 30 days, or bring every hidden row back. */
+export function useHideRow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (source: string | null) => (source ? send("PUT", "/feedback/rows", { source }) : send("DELETE", "/feedback/rows")),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["home"] }),
+  });
+}
+
 export function useLogEvent() {
   return (event_type: "detail_view" | "quick_view" | "search_click" | "hero_view", movie_id: number, source?: string, position?: number) =>
     send("POST", "/events", { event_type, movie_id, source, position }).catch(() => undefined);

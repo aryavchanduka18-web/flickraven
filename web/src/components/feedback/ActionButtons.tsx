@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState, type ReactNode } from "react";
-import { useFeedback } from "../../api/hooks";
+import { useFeedback, useNotInterested } from "../../api/hooks";
 import type { UserState } from "../../api/types";
 import { useUI } from "../layout/ui";
 
@@ -21,6 +21,11 @@ const Icon = {
     <svg viewBox="0 0 24 24" className="h-[1.1em] w-[1.1em]" fill="none" stroke="currentColor" strokeWidth="1.9">
       {on ? <motion.path d="m5 12 4.5 4.5L19 7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3 }} />
         : <path d="M12 5v14M5 12h14" />}
+    </svg>
+  ),
+  hide: () => (
+    <svg viewBox="0 0 24 24" className="h-[1.1em] w-[1.1em]" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="m6 6 12 12M18 6 6 18" />
     </svg>
   ),
   watched: (on: boolean) => (
@@ -79,6 +84,9 @@ function ActionButton({ on, label, title, onClick, burst, size, children }: {
 
 export default function ActionButtons({ movieId, state: server, source, size = "sm", showWatched = false }: Props) {
   const fb = useFeedback(movieId, source);
+  const hide = useNotInterested(movieId, source);
+  // "Not interested" is for recommendation rows only (Home, collections, More Like This), not for search or My List.
+  const canHide = !!source && /^(rail|collection|similar)/.test(source) && !server.in_list && server.reaction === 0 && server.rating == null;
   const { notify, askDislikeReason } = useUI();
   // Optimistic: the button changes on click; the server's answer replaces it when the lists refresh.
   const [state, setState] = useState(server);
@@ -111,6 +119,15 @@ export default function ActionButtons({ movieId, state: server, source, size = "
         }}>
         {Icon.dislike(state.reaction === -1)}
       </ActionButton>
+      {canHide && (
+        <ActionButton size={size} on={false} label="Not interested" title="Not interested: hide this, small effect on your picks"
+          onClick={() => {
+            hide.mutate(false);
+            notify("Hidden from your picks. This is not a dislike, so your taste profile is unchanged.");
+          }}>
+          {Icon.hide()}
+        </ActionButton>
+      )}
       {showWatched && (
         <ActionButton size={size} on={state.watched} label={state.watched ? "Unmark watched" : "Mark watched"}
           title={state.watched ? "Watched" : "Mark watched"}

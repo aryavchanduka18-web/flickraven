@@ -17,6 +17,7 @@ type Taste = {
 const LABEL: Record<string, string> = {
   detail_view: "Viewed", quick_view: "Quick viewed", search_click: "Opened from search", rate: "Rated", unrate: "Removed rating",
   like: "Liked", dislike: "Disliked", clear_reaction: "Cleared reaction", list_add: "Added to My List", list_remove: "Removed from My List",
+  not_interested: "Not interested", not_interested_undo: "Not interested undone", row_hide: "Hid a Home row", row_restore: "Showed a Home row again",
   watched: "Marked watched", unwatched: "Unmarked watched", onboarding_pick: "Picked in onboarding", hero_view: "Opened from hero",
 };
 const TABS = [["", "All"], ["ratings", "Ratings"], ["likes", "Likes"], ["list", "My List"], ["watched", "Watched"], ["views", "Views"]];

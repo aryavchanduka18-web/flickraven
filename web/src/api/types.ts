@@ -1,4 +1,4 @@
-export type UserState = { rating: number | null; reaction: number; in_list: boolean; watched: boolean };
+export type UserState = { rating: number | null; reaction: number; in_list: boolean; watched: boolean; not_interested?: boolean };
 
 export type Reason = { code: string; source?: string; text: string; share: number; anchor_movie_id?: number | null };
 
@@ -30,9 +30,10 @@ export type RecItem = {
   agreement?: number | null;
 };
 
-export type Rail = { key: string; title: string; subtitle?: string | null; source: string; items: RecItem[] };
+/** `learned`: this row moved up or down on Home because of how this person uses it. */
+export type Rail = { key: string; title: string; subtitle?: string | null; source: string; items: RecItem[]; learned?: "up" | "down" | null };
 
-export type HomePayload = { stage: string; mode: Mode; hero: RecItem[]; rails: Rail[]; page_id: string };
+export type HomePayload = { stage: string; mode: Mode; hero: RecItem[]; rails: Rail[]; page_id: string; hidden_rows?: string[] };
 
 export type Mode = "familiar" | "balanced" | "discover";
 

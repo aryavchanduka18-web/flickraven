@@ -10,7 +10,7 @@ The site has an Apple TV style: a floating dark-glass sidebar (hide it with the 
 
 An "Ask FlickRaven" chat assistant (Google Gemini; needs `GEMINI_API_KEY`, see `docs/spec.md` 14.2d, 14.2n and 14.2o; no taste data is sent to Google unless the person turns on the opt-in taste summary in Account) answers questions about films and series, and can add the titles it recommends to My List when the person taps + My List or types "add it".
 
-What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), save to My
+What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), tap ✕ "Not interested" on a recommendation (a light hide that is not a dislike), hide a whole Home row (rows you use move up and rows you skip move down; see `docs/spec.md` 14.2p), save to My
 List, tune the recommendations, open "Why?" on any recommendation (what each model contributed, how much the
 models agree), browse franchises ("More from John Wick", "More from Marvel"), cast and crew pages, themed rows
 (Rom-Com, Crime Thriller, ...), genre and Discover pages (Anime is its own genre next to Animation: Anime means Japanese animation, TV and films; Animation is everything else) with every title (separate Movies and Shows pages; genre and Discover pages can show films, shows or both),
