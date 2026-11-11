@@ -174,22 +174,29 @@ export default function Movie() {
         </aside>
       </div>
       <FranchiseRails id={m.id} />
-      {similar.data && similar.data.items.length > 0 && (
-        <section id="more-like-this" className="mx-auto mt-12 max-w-[1800px] scroll-mt-24 px-4 md:px-10">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 className="font-display text-xl font-bold md:text-2xl">More Like This</h2>
-              <p className="text-sm text-muted">{m.title_type && m.title_type !== "movie" ? "Series" : "Films"} with a similar story, themes or people</p>
-            </div>
-            {similar.data.total > similar.data.items.length && (
-              <Link to={`/movie/${id}/similar`} className="text-sm text-white/80 underline underline-offset-4 hover:text-white">
-                View all {similar.data.total} similar titles
-              </Link>
-            )}
+      <section id="more-like-this" className="mx-auto mt-12 max-w-[1800px] scroll-mt-24 px-4 md:px-10">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="font-display text-xl font-bold md:text-2xl">More Like This</h2>
+            <p className="text-sm text-muted">{m.title_type && m.title_type !== "movie" ? "Series" : "Films"} with a similar story, themes or people</p>
           </div>
+          {similar.data && similar.data.total > similar.data.items.length && (
+            <Link to={`/movie/${id}/similar`} className="text-sm text-white/80 underline underline-offset-4 hover:text-white">
+              View all {similar.data.total} similar titles
+            </Link>
+          )}
+        </div>
+        {similar.data && similar.data.items.length > 0 ? (
           <SimilarGrid items={similar.data.items} source="more_like_this" />
-        </section>
-      )}
+        ) : (
+          // Never leave the "More like this" tab pointing at nothing: say what happened.
+          <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-6 text-sm text-muted" role="status">
+            {similar.isError ? "Similar titles could not be loaded. Try again in a moment."
+              : similar.isLoading ? "Finding similar titles…"
+              : "No similar titles to show for this one yet."}
+          </p>
+        )}
+      </section>
       {similar.data?.cross_kind && similar.data.cross_kind.items.length > 0 && (
         <section id="cross-kind" className="mx-auto mt-10 max-w-[1800px] px-4 md:px-10">
           <div className="mb-4">

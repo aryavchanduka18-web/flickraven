@@ -37,3 +37,11 @@ def test_no_taste_signal_means_neutral_fit_and_nothing_dropped():
     e = engine([-np.inf, -np.inf, -np.inf])
     keep, f, has = fit(e, UserState(), [0, 1, 2])
     assert keep.all() and f.tolist() == [0.5, 0.5, 0.5] and not has
+
+
+def test_a_disliked_genre_that_would_empty_the_list_is_ignored_but_real_dislikes_still_apply():
+    # Anime pages: every neighbour is "Animation". Disliking that genre must not hide the whole More Like This list.
+    e = engine([0.5, 0.4, 0.3, 0.2, 0.1], genres=[["Animation"]] * 5)
+    st = UserState(dislikes={0}, ratings={1: 3.0}, disliked_genres=["Animation"])
+    keep, _, _ = fit(e, st, [0, 1, 2, 3, 4])
+    assert keep.tolist() == [False, False, True, True, True]
