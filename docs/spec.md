@@ -929,3 +929,10 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 ### 14.2e Taste Evolution (2026-11-11)
 
 - On `/taste-dna`, "How your taste changed": per month (last 6 with activity) the top 3 genres of titles liked or rated 7+, and, with 5+ titles in the latest two months and 5+ before, the genre that rose and the one that fell (change of 10 points or more). Counts only; `GET /api/me/taste-evolution`.
+
+### 14.2j Mood chips on every genre list (2026-11-11)
+- Every genre page and Discover has a mood row: **Any mood / Feel-good / Romantic**. It works on top of the chosen genre and the Movies / Shows choice, for films and shows.
+- API: `vibe=feelgood|romance` on `/movies` and `/genres/{slug}/movies`.
+- Feel-good: a light genre (Comedy, Romance, Family, Animation, Music), none of Horror, Crime, War, Thriller, Mystery, rated 6.5 or more.
+- Romantic: the Romance or Soap genre, or a "romance" / "love" keyword (TV has no Romance genre).
+- Ranking stays personal; the chip only narrows the list. A mood with no matches in a genre (for example Horror + Romantic) shows an empty list.

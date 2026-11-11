@@ -98,7 +98,7 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
              runtime: str | None = None, country: str | None = None, min_rating: float | None = None,
              sort: str = "popular", page: int = 1, type: str | None = None,
              year_min: int | None = None, year_max: int | None = None, min_imdb: float | None = None,
-             provider: int | None = None, min_match: int | None = None,
+             provider: int | None = None, min_match: int | None = None, vibe: str | None = None,
              db: Session = Depends(get_db)) -> dict:
     """Browse the catalog. `type` is movie (the default), series, anime or all. Extra filters: `year_min`/`year_max`
     (release period), `min_imdb` (IMDb score), `provider` (a TMDB provider id that streams it for free or on subscription
@@ -113,6 +113,9 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
         p["genre"] = genre
         if genre == ANIMATION_SLUG:
             where.append("m.original_language IS DISTINCT FROM 'ja'")  # Japanese animation is Anime, not Animation
+    vw, vp = vibe_where(vibe)
+    if vw:
+        where.append(vw); p.update(vp)
     if lang:
         where.append("m.original_language = :lang"); p["lang"] = lang
     if decade:
@@ -169,6 +172,26 @@ PERSONAL_SORTS = {"recommended", "match", "hidden", "novel"}
 # `type` on /movies: movie (default), show (TV series and anime TV), series, anime, all (films and shows).
 MEDIA_KINDS = {"movie": ["movie"], "series": ["series"], "anime": ["anime"], "show": ["series", "anime"],
                "all": ["movie", "series", "anime"]}
+
+
+VIBES = {"feelgood", "romance"}
+FEEL_GOOD_GENRES = ["Comedy", "Romance", "Family", "Animation", "Music"]
+DARK_GENRES = ["Horror", "Crime", "War", "Thriller", "War & Politics", "Mystery"]
+
+
+def vibe_where(vibe: str | None) -> tuple[str | None, dict]:
+    """SQL for a mood chip that works on any genre page or Discover list, for films AND shows.
+    feelgood: a light genre (comedy, romance, family, animation, music) and no dark one, decently rated.
+    romance: the Romance genre, or (TV has no Romance genre) a romance/love keyword or the Soap genre."""
+    if vibe == "feelgood":
+        return ("EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name = ANY(:vg)) "
+                "AND NOT EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name = ANY(:vdark)) "
+                "AND m.popularity_score >= 6.5", {"vg": FEEL_GOOD_GENRES, "vdark": DARK_GENRES})
+    if vibe == "romance":
+        return ("(EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name IN ('Romance', 'Soap')) "
+                "OR EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
+                "WHERE mk.movie_id = m.id AND (k.name ILIKE '%romance%' OR k.name = 'love')))", {})
+    return None, {}
 
 
 def media_kinds(type: str | None, genre: str | None) -> list[str]:
@@ -314,7 +337,7 @@ def genres(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/genres/{slug}/movies")
-def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", db: Session = Depends(get_db)) -> dict:
+def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", vibe: str | None = None, db: Session = Depends(get_db)) -> dict:
     """A genre page lists films AND shows (type=all, the default), only films (movie) or only shows (show), ranked for
     this user: films by the hybrid, shows by taste similarity, woven together by relative position. Anime is Japanese
     animation (TV anime and animated films); Animation is the rest."""
@@ -327,4 +350,4 @@ def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", 
         name = g[1]
     if type not in ("all", "movie", "show"):
         type = "all"
-    return discover(request, genre=slug, sort="recommended", page=page, type=type, db=db) | {"genre": name}
+    return discover(request, genre=slug, sort="recommended", page=page, type=type, vibe=vibe, db=db) | {"genre": name}

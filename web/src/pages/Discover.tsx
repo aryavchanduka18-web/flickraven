@@ -1,3 +1,4 @@
+import VibeChips from "../components/discovery/VibeChips";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -22,9 +23,9 @@ const PERSONAL = ["recommended", "match", "hidden", "novel"];
 
 type Filters = {
   type: string; genre: string; lang: string; country: string; year_min: string; year_max: string; runtime: string;
-  min_imdb: string; min_match: string; provider: string; sort: string;
+  min_imdb: string; min_match: string; provider: string; sort: string; vibe: string;
 };
-const EMPTY: Filters = { type: "movie", genre: "", lang: "", country: "", year_min: "", year_max: "", runtime: "", min_imdb: "", min_match: "", provider: "", sort: "recommended" };
+const EMPTY: Filters = { type: "movie", genre: "", lang: "", country: "", year_min: "", year_max: "", runtime: "", min_imdb: "", min_match: "", provider: "", sort: "recommended", vibe: "" };
 type Options = { countries: { code: string; titles: number }[]; providers: { id: number; name: string; logo: string | null; titles: number }[] };
 
 const countryName = (code: string) => {
@@ -40,7 +41,7 @@ const YEARS = Array.from({ length: new Date().getFullYear() - 1920 + 1 }, (_, i)
 export default function Discover({ fixed }: { fixed?: "movie" | "show" } = {}) {
   const [params] = useSearchParams();
   const urlType = params.get("type");
-  const [f, setF] = useState<Filters>({ ...EMPTY, type: fixed ?? (urlType === "show" || urlType === "all" ? urlType : "movie"), genre: params.get("genre") ?? "" });
+  const [f, setF] = useState<Filters>({ ...EMPTY, type: fixed ?? (urlType === "show" || urlType === "all" ? urlType : "movie"), genre: params.get("genre") ?? "", vibe: ["feelgood", "romance"].includes(params.get("vibe") ?? "") ? params.get("vibe")! : "" });
   const [open, setOpen] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
   const genres = useQuery({ queryKey: ["genres"], queryFn: () => api<{ genres: { slug: string; name: string }[] }>("/genres") });
@@ -82,12 +83,13 @@ export default function Discover({ fixed }: { fixed?: "movie" | "show" } = {}) {
             className={`glass-btn shrink-0 rounded-full px-4 py-1.5 text-sm ${f.genre === g.slug ? "on" : ""}`}>{g.name}</button>
         ))}
       </div>
+      <div className="mt-3"><VibeChips value={f.vibe} onChange={(vibe) => setF({ ...f, vibe })} /></div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className={`glass-btn rounded-full px-5 py-2 text-sm font-semibold ${open ? "on" : ""}`}>
           Filters{active ? ` · ${active}` : ""}
         </button>
         {active > 0 && (
-          <button onClick={() => setF({ ...EMPTY, type: f.type, genre: f.genre, sort: f.sort })} className="text-sm text-white/65 underline underline-offset-2 hover:text-white">Clear filters</button>
+          <button onClick={() => setF({ ...EMPTY, type: f.type, genre: f.genre, sort: f.sort, vibe: f.vibe })} className="text-sm text-white/65 underline underline-offset-2 hover:text-white">Clear filters</button>
         )}
         <label className="ml-auto flex items-center gap-2 text-sm text-white/65">
           Sort
