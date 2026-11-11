@@ -71,13 +71,17 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
     offset, limit = max(offset, 0), min(max(limit, 1), 40)
     row = engine.cat.row_of[movie_id]
     kind = engine.cat.kind[row]
-    ai_ids = []
+    ai_ids, cross_ids = [], []
     if kind in ("series", "anime"):
         # Stored similarity is weak for TV (no viewing data): Gemini names similar series, we keep only those in the catalog.
         year = engine.cat.year[row]
         ai_ids = ai_similar.suggest(db, movie_id, engine.cat.titles[row], None if np.isnan(year) else int(year),
                                     list(engine.cat.genres[row]), kind)
         ai_ids = [i for i in ai_ids if i in engine.cat.row_of]     # titles the model has never seen cannot be scored or shown with it
+        # Type-aware: the main list keeps this page's kind (anime page: anime only). Gemini's few cross-kind picks
+        # (about 2% of its names) go to their own, clearly labelled row.
+        cross_ids = [i for i in ai_ids if engine.cat.kind[engine.cat.row_of[i]] != kind]
+        ai_ids = [i for i in ai_ids if engine.cat.kind[engine.cat.row_of[i]] == kind]
     if ai_ids:
         _, extra_all, _ = similar_svc.similar_page(db, engine, movie_id, 0, 40)
         stored = [i for i in extra_all if i not in ai_ids]
@@ -110,7 +114,19 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
     for i in ids:
         if i in match:
             extra[i]["match_pct"] = match[i]["match_pct"]
-    return {"items": cards(db, ids, uid, extra), "total": total, "offset": offset}
+    out = {"items": cards(db, ids, uid, extra), "total": total, "offset": offset}
+    if cross_ids and offset == 0:
+        if uid is not None:
+            st = rec.user_state(db, uid, engine)
+            rows = [engine.cat.row_of[i] for i in cross_ids]
+            keep, _, _ = engine.personal_fit(st, rows)
+            gone = set(st.ratings) | st.watched | st.dislikes
+            cross_ids = [i for i, r, k in zip(cross_ids, rows, keep) if k and r not in gone]
+        cross_ids = cross_ids[:12]
+        if cross_ids:
+            out["cross_kind"] = {"title": "Live-action series in a similar vein" if kind == "anime" else "Anime in a similar vein",
+                                 "items": cards(db, cross_ids, uid)}
+    return out
 
 
 @router.get("/movies/{movie_id}/franchise")

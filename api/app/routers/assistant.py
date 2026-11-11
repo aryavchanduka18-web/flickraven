@@ -7,6 +7,8 @@ from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
 from app.services import assistant as ai
+from app.services import assistant_context as ctx
+from app.services import recommender as rec
 from app.services.movies import cards
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
@@ -31,6 +33,29 @@ def status(user=Depends(current_user)) -> dict:
     return {"enabled": available(), "remaining": ai.remaining(user["id"], user["is_guest"]), "cap": ai.cap_for(user["is_guest"])}
 
 
+def picks(db: Session, user_id: int, message: str, blocked: set[int]) -> str:
+    """The engine's shortlist for a suggestion request, as catalog facts (assistant_context.py); empty for other
+    messages, before the models are built, or on any engine problem (the chat must not break)."""
+    if not ctx.wants_suggestions(message) or not rec.artifacts_ready():
+        return ""
+    try:
+        engine = rec.load_engine(db)
+        st = rec.user_state(db, user_id, engine)
+        row_of = engine.cat.row_of
+        want = ctx.intent(message)
+        named = ctx.named_row(engine, message)
+        if named is not None:       # "something like X": X leads, in X's own kind unless the message names one
+            st = ctx.like_state(st, named)
+            if want["kinds"] == ["movie", "series"]:
+                want["kinds"] = [engine.cat.kind[named]]
+        rows = ctx.shortlist(engine, st, want, {row_of[i] for i in blocked if i in row_of})
+        return ctx.shortlist_prompt(engine, rows)
+    except Exception:
+        db.rollback()
+        ai.log.exception("assistant shortlist failed; answering without it")
+        return ""
+
+
 @router.post("/chat")
 def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_db)) -> dict:
     if not available():
@@ -41,9 +66,11 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
         raise HTTPException(422, "Send a question first.")
     ai.spend(user["id"], user["is_guest"])
     try:
-        system = "\n\n".join(x for x in (ai.SYSTEM, ai.taste_summary(db, user["id"]), ai.named_titles(db, msgs[-1]["text"])) if x)
+        blocked = ctx.blocked_ids(db, user["id"])
+        system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], msgs[-1]["text"], blocked),
+                                           ai.named_titles(db, msgs[-1]["text"])) if x)
         reply = ai.ask_gemini(msgs, system)
-        ids = ai.resolve_titles(db, reply)
+        ids = [i for i in ai.resolve_titles(db, reply) if i not in blocked]      # hard exclusions win over Gemini
     except HTTPException:
         ai.refund(user["id"], user["is_guest"])
         raise

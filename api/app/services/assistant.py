@@ -1,8 +1,9 @@
 """The AI assistant: Google Gemini (Flash), grounded in the catalog so it never shows a title we do not have.
 
-Privacy: the model gets the conversation, a short taste summary (genres and a few liked titles) and, for titles the
-user names, the catalog's own synopsis. It never gets a name, an email or an id. Free-tier prompts may be used by
-Google to improve its products; the privacy page says so.
+Privacy: the model gets the conversation, the catalog's own synopsis for titles the user names and, when the message asks
+for suggestions, a shortlist of catalog titles that FlickRaven's engine picked (assistant_context.py). It never gets a
+name, an email, an id, or anything from the person's ratings, likes, dislikes, Taste DNA or history. Free-tier prompts may
+be used by Google to improve its products; the privacy page says so.
 """
 import logging
 import re
@@ -34,15 +35,15 @@ have a title. If you are not sure about a fact or a story, \
 say "I am not sure about that one", and answer from what you know if you are confident.
 - Follow what the person asks for right now. Keep suggestions in the same kind (TV series for a series request, films for a \
 film request), the same language or country (a K-drama request gets K-dramas) and the same mood. Never answer a series \
-request with a film unless they ask for films. The taste summary is only a hint for choosing between good fits; it never \
-overrides the request.
+request with a film unless they ask for films. When FlickRaven gives you its picks for the request, recommend mainly from \
+them; they already suit the person.
 - Put any plot spoiler (twists, endings, who dies) between || and || so the app can hide it until the person taps. Avoid \
 spoilers unless they asked for the ending.
 - FlickRaven does not stream anything. Do not claim a title is on a particular service; point people to the Where to watch \
 section on the title's page.
 - Keep answers short (under 150 words) unless the person asks for detail. Use plain, simple English. You can be wrong: for facts you\
   are unsure of (dates, cast, episode counts), say so rather than guess.
-- Use the taste summary only to personalise suggestions; do not recite it back."""
+- Do not say how the picks were chosen or claim to know the person's history."""
 
 _used: dict[tuple[str, str], int] = {}
 log = logging.getLogger(__name__)
@@ -80,21 +81,6 @@ def refund(user_id: int, is_guest: bool) -> None:
     with _lock:
         if _used.get(key, 0) > 0:
             _used[key] -= 1
-
-
-def taste_summary(db: Session, user_id: int) -> str:
-    genres = [r[0] for r in db.execute(text("""SELECT g.name FROM (
-        SELECT movie_id FROM ratings WHERE user_id = :u AND rating >= 8
-        UNION SELECT movie_id FROM reactions WHERE user_id = :u AND value = 1) l
-        JOIN movie_genres mg ON mg.movie_id = l.movie_id JOIN genres g ON g.id = mg.genre_id
-        GROUP BY g.name ORDER BY count(*) DESC LIMIT 4"""), {"u": user_id})]
-    liked = [r[0] for r in db.execute(text("""SELECT m.title FROM movies m JOIN (
-        SELECT movie_id, rating AS s FROM ratings WHERE user_id = :u AND rating >= 8
-        UNION SELECT movie_id, 10 FROM reactions WHERE user_id = :u AND value = 1) l ON l.movie_id = m.id
-        ORDER BY l.s DESC, m.tmdb_vote_count DESC NULLS LAST LIMIT 6"""), {"u": user_id})]
-    if not genres and not liked:
-        return "Taste summary: nothing yet (a new user)."
-    return f"Taste summary: likes {', '.join(genres) or 'various genres'}; rated highly: {', '.join(liked) or 'none yet'}."
 
 
 def named_titles(db: Session, message: str) -> str:

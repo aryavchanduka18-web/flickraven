@@ -131,3 +131,29 @@ def test_signed_in_user_never_gets_a_gemini_pick_they_dislike_and_taste_reorders
         got = [i["movie"]["id"] for i in c.get(f"/api/movies/{a}/similar").json()["items"]]
     assert f not in got                     # disliked: never shown just because Gemini named it
     assert got == [o, fi]                   # o fits this person's taste better, so it moves ahead of Gemini's earlier fi
+
+
+def test_anime_page_keeps_anime_in_the_main_list_and_labels_live_action_separately(test_engine, titles, monkeypatch):
+    a, f, o = titles["AIS Anchor"], titles["AIS Friend"], titles["AIS Other"]
+
+    class Cat:
+        row_of = {a: 0, f: 1, o: 2}
+        kind = ["anime", "series", "anime"]; titles = ["AIS Anchor", "f", "o"]; year = np.array([2020.0] * 3); genres = [["Drama"]] * 3
+        universe_of_row = [-1, -1, -1]
+
+    class Engine:
+        cat = Cat()
+
+    monkeypatch.setattr(catalog_router.rec, "artifacts_ready", lambda: True)
+    monkeypatch.setattr(catalog_router.rec, "load_engine", lambda db: Engine())
+    monkeypatch.setattr(catalog_router.rec, "match_for", lambda db, uid, ids: {})
+    monkeypatch.setattr(catalog_router.similar_svc, "similar_page",
+                        lambda db, e, mid, off, lim: ([], {o: {"score": 0.5, "reasons": []}}, 1))
+    monkeypatch.setattr(catalog_router.ai_similar, "suggest", lambda *a_, **k: [f, o])      # f is live-action
+    with TestClient(app) as c:
+        body = c.get(f"/api/movies/{a}/similar").json()
+    assert [i["movie"]["id"] for i in body["items"]] == [o]                  # anime only in the main list
+    assert body["cross_kind"]["title"] == "Live-action series in a similar vein"
+    assert [i["movie"]["id"] for i in body["cross_kind"]["items"]] == [f]
+    with TestClient(app) as c:
+        assert "cross_kind" not in c.get(f"/api/movies/{a}/similar?offset=1").json()

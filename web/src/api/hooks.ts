@@ -9,7 +9,7 @@ export const useHome = (mode?: Mode) =>
 
 export const useMovie = (id: number) => useQuery({ queryKey: ["movie", id], queryFn: () => api<MovieDetail>(`/movies/${id}`) });
 
-export type SimilarPage = { items: RecItem[]; total: number; offset: number };
+export type SimilarPage = { items: RecItem[]; total: number; offset: number; cross_kind?: { title: string; items: RecItem[] } };
 
 /** More Like This, first `limit` titles (same type as the title, with reasons). */
 export const useSimilar = (id: number, limit = 8) =>
