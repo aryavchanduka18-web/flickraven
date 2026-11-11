@@ -215,6 +215,26 @@ class OnlineEngine:
         order = np.argsort(-score, kind="stable")
         return rows[order], score[order].astype(float)
 
+    def personal_fit(self, st: UserState, rows: list[int]) -> tuple[np.ndarray, np.ndarray, bool]:
+        """How well each of `rows` suits this user: (keep mask, fit 0..1, has_taste_signal). Used to personalise
+        candidate lists that come from outside the recommender (for example series that Gemini names as similar).
+        Dropped: titles the user disliked or rated 4 or lower, titles in genres they dislike, and titles whose
+        taste score is negative (closer to what they disliked than to what they liked) and in the weakest third of
+        this list. Fit is the percentile of the content taste score within the list; 0.5 for everyone when the user
+        has no taste signal yet. The thresholds are not tuned."""
+        rows = np.asarray(rows, dtype=int)
+        bad = set(st.disliked_genres)
+        low = {r for r, v in st.ratings.items() if v <= 4}
+        keep = np.array([int(r) not in st.dislikes and int(r) not in low and not (bad & set(self.cat.genres[r])) for r in rows], dtype=bool)
+        content = self.scores(st)["content"][rows] if len(rows) else np.array([])
+        finite = np.isfinite(content)
+        if len(rows) == 0 or not finite.any():
+            return keep, np.full(len(rows), 0.5), False
+        c = np.where(finite, content, np.nanmin(content[finite]))
+        fit = (np.argsort(np.argsort(c)) + 1) / len(c)
+        keep &= ~((c < 0) & (fit < 0.34))
+        return keep, fit, True
+
     def learned_series(self, st: UserState, rows: np.ndarray) -> np.ndarray | None:
         """Learned similarity of each of `rows` to the series the user rated 7+, liked or picked (weights 0.25..1),
         or None when there is no model or no such series. Zero for series the model has no data on."""
