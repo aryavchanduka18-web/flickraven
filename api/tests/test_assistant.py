@@ -494,3 +494,29 @@ def test_a_dotted_title_rejected_for_language_cannot_slip_through_the_sentence_s
     finally:
         _remove_titles(test_engine)
     assert ctx2.scrub_reply("Also [[Mr. Robot (2015)]] is tense. Enjoy.", {}, "", {"mr. robot"}) == ("Enjoy.", 1)
+
+
+def test_chat_cards_report_my_list_state_and_an_assistant_add_is_a_normal_list_add(client, test_engine):
+    """The chat's + My List button relies on each card's user_state.in_list, and adds through PUT /api/list/{id}
+    with source 'assistant'. Nothing about the list is sent to Gemini."""
+    with test_engine.begin() as conn:
+        uid = conn.execute(text("INSERT INTO users (email, display_name, password_hash, is_guest) VALUES ('ai-list@example.com', 'x', 'x', false) RETURNING id")).scalar()
+    app.dependency_overrides[current_user] = lambda: {"id": uid, "email": "ai-list@example.com", "display_name": "x", "is_guest": False}
+    try:
+        first = ask(client).json()["items"][0]
+        assert first["user_state"]["in_list"] is False
+        mid = first["movie"]["id"]
+        assert client.put(f"/api/list/{mid}", json={"source": "assistant"}).status_code == 200
+        assert client.put(f"/api/list/{mid}", json={"source": "assistant"}).status_code == 200    # a double add is harmless
+        assert ask(client).json()["items"][0]["user_state"]["in_list"] is True
+        with test_engine.begin() as conn:
+            assert conn.execute(text("SELECT count(*) FROM user_movie_list WHERE user_id = :u AND movie_id = :m"), {"u": uid, "m": mid}).scalar() == 1
+            assert conn.execute(text("""SELECT count(*) FROM interactions WHERE user_id = :u AND movie_id = :m
+                AND event_type = 'list_add' AND source = 'assistant'"""), {"u": uid, "m": mid}).scalar() == 2
+        sent = json.dumps(client.sent[-1]["body"])
+        assert "in_list" not in sent and "user_state" not in sent and "My List" not in sent
+    finally:
+        with test_engine.begin() as conn:
+            for t in ("user_movie_list", "interactions"):
+                conn.execute(text(f"DELETE FROM {t} WHERE user_id = :u"), {"u": uid})
+            conn.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})

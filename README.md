@@ -8,7 +8,7 @@ minute while the recommender loads). How it is hosted and how to update it: `doc
 
 The site has an Apple TV style: a floating dark-glass sidebar (hide it with the tall button at its top) and a full-bleed Home header with View details, Add to list and Why this.
 
-An "Ask FlickRaven" chat assistant (Google Gemini; needs `GEMINI_API_KEY`, see `docs/spec.md` 14.2d and 14.2n; no taste data is sent to Google) answers questions about films and series.
+An "Ask FlickRaven" chat assistant (Google Gemini; needs `GEMINI_API_KEY`, see `docs/spec.md` 14.2d and 14.2n; no taste data is sent to Google) answers questions about films and series, and can add the titles it recommends to My List when the person taps + My List or types "add it".
 
 What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), save to My
 List, tune the recommendations, open "Why?" on any recommendation (what each model contributed, how much the
