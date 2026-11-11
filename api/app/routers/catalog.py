@@ -120,7 +120,7 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
             st = rec.user_state(db, uid, engine)
             rows = [engine.cat.row_of[i] for i in cross_ids]
             keep, _, _ = engine.personal_fit(st, rows)
-            gone = set(st.ratings) | st.watched | st.dislikes
+            gone = set(st.ratings) | st.watched | st.dislikes | st.likes | st.picks | st.in_list    # nothing they already rated, liked, picked, saved, watched or disliked
             cross_ids = [i for i, r, k in zip(cross_ids, rows, keep) if k and r not in gone]
         cross_ids = cross_ids[:12]
         if cross_ids:

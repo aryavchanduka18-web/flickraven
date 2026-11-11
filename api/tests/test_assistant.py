@@ -227,7 +227,7 @@ def test_no_taste_profile_or_history_is_sent_and_disliked_titles_are_never_linke
 
 def test_request_intent_is_read_locally_and_japanese_is_not_anime():
     from app.services import assistant_context as ctx
-    assert ctx.intent("any good Japanese shows?") == {"kinds": ["series"], "languages": ["ja"], "genres": []}
+    assert ctx.intent("any good Japanese shows?")["kinds"] == ["series"] and ctx.intent("any good Japanese shows?")["languages"] == ["ja"]
     assert ctx.intent("suggest an anime like Death Note")["kinds"] == ["anime"]
     assert ctx.intent("funny Hindi series")["languages"] == ["hi"] and ctx.intent("funny Hindi series")["genres"] == ["Comedy"]
     assert ctx.intent("something to watch tonight")["kinds"] == ["movie", "series"]
@@ -246,7 +246,7 @@ def test_shortlist_follows_the_engine_filters_the_request_and_drops_blocked_titl
     want = {"kinds": ["series"], "languages": ["hi"], "genres": []}
     assert ctx.shortlist(engine, None, want, blocked_rows=set()) == [1, 3]
     assert ctx.shortlist(engine, None, want, blocked_rows={1}) == [3]
-    assert ctx.shortlist(engine, None, {"kinds": ["series"], "languages": ["fr"], "genres": []}, set()) == [2, 1, 3]   # nothing fits: unfiltered
+    assert ctx.shortlist(engine, None, {"kinds": ["series"], "languages": ["fr"], "genres": []}, set()) == []   # an asked-for language is never swapped for another
     text_ = ctx.shortlist_prompt(engine, [1, 2])
     assert "A (2001, series, language hi, Comedy)" in text_ and "B (series" in text_
 
@@ -263,3 +263,107 @@ def test_like_x_requests_lead_with_x_and_keep_the_persons_exclusions():
     st = UserState(ratings={5: 9.0, 6: 3.0}, likes={7}, dislikes={8}, watched={9})
     s2 = ctx.like_state(st, 1)
     assert s2.likes == {1} and s2.ratings == {6: 3.0} and s2.dislikes == {8} and s2.watched == {9}
+
+
+# ---- hardening after #101 -------------------------------------------------------------------------------------
+from app.services import assistant_context as ctx2
+
+BLOCKED = {"parasite": ["Parasite"], "up": ["Up"], "the dark knight": ["The Dark Knight"], "heat": ["Heat"]}
+
+
+def test_scrub_removes_blocked_titles_from_marks_and_plain_text_but_keeps_valid_recommendations():
+    reply = ("Try [[Inception (2010)]] for twists. You might also enjoy [[Parasite (2019)]].\n"
+             "The Dark Knight is great too! Another idea is Heat (1995). Great choices all round.")
+    clean, removed = ctx2.scrub_reply(reply, BLOCKED)
+    assert removed == 3
+    assert "Inception" in clean and "Great choices all round." in clean
+    assert "Parasite" not in clean and "Dark Knight" not in clean and "Heat" not in clean
+
+
+def test_scrub_does_not_touch_ordinary_words_that_are_also_titles():
+    clean, removed = ctx2.scrub_reply("Look up the hill. I love the heat of summer. A parasite is an organism.", BLOCKED)
+    assert removed == 0 and clean.startswith("Look up the hill.")
+
+
+def test_scrub_lets_the_person_name_a_title_they_typed_but_never_recommends_it_as_a_card():
+    assert ctx2.scrub_reply("You said Parasite was not for you.", BLOCKED, allowed="why did i dislike Parasite")[1] == 0
+    assert ctx2.scrub_reply("Maybe [[Parasite (2019)]] again?", BLOCKED, allowed="Parasite")[1] == 1
+
+
+def test_scrub_with_nothing_left_gives_an_honest_note_not_an_empty_reply():
+    clean, removed = ctx2.scrub_reply("[[Parasite (2019)]].", BLOCKED)
+    assert removed == 1 and "held back" in clean
+
+
+def test_a_disliked_or_low_rated_title_in_the_written_reply_is_removed_end_to_end(client, test_engine, monkeypatch):
+    with test_engine.begin() as conn:
+        uid = conn.execute(text("INSERT INTO users (email, display_name, password_hash, is_guest) VALUES ('ai-scrub@example.com', 'x', 'x', false) RETURNING id")).scalar()
+        mid = conn.execute(text("SELECT id FROM movies WHERE tmdb_id = 990900")).scalar()
+        conn.execute(text("INSERT INTO ratings (user_id, movie_id, rating) VALUES (:u, :m, 3)"), {"u": uid, "m": mid})
+    app.dependency_overrides[current_user] = lambda: {"id": uid, "email": "ai-scrub@example.com", "display_name": "x", "is_guest": False}
+    monkeypatch.setattr(ai.httpx, "post", lambda *a, **k: FakeResp("I would suggest Assistant Test Film because it is gripping. A second idea is [[Other Film (2001)]]."))
+    try:
+        r = client.post("/api/assistant/chat", json={"messages": [{"role": "user", "text": "Recommend a film please"}]}).json()
+        assert "Assistant Test Film" not in r["reply"] and "Other Film" in r["reply"] and r["items"] == []
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(text("DELETE FROM ratings WHERE user_id = :u"), {"u": uid})
+            conn.execute(text("DELETE FROM users WHERE id = :u"), {"u": uid})
+
+
+def test_requests_with_negations_are_read_correctly():
+    i = ctx2.intent
+    assert i("I want a psychological thriller series.") == {"kinds": ["series"], "languages": [], "genres": ["Thriller"], "exclude_languages": [], "exclude_genres": []}
+    assert i("Recommend Hindi crime dramas.")["languages"] == ["hi"] and i("Recommend Hindi crime dramas.")["genres"] == ["Crime"]
+    j = i("I want Japanese live-action shows, not anime.")
+    assert j["kinds"] == ["series"] and j["languages"] == ["ja"] and j["genres"] == []     # "live-action" is not the Action genre
+    assert i("Give me a movie, not a series.")["kinds"] == ["movie"]
+    assert i("Give me a series, no movies please")["kinds"] == ["series"]
+    k = i("I don't want Hindi recommendations.")
+    assert k["languages"] == [] and k["exclude_languages"] == ["hi"]
+    assert i("something to watch, not anime")["kinds"] == ["movie", "series"]
+    assert i("recommend something, no horror")["exclude_genres"] == ["Horror"]
+    assert i("not anime, a Japanese series please") == {"kinds": ["series"], "languages": ["ja"], "genres": [], "exclude_languages": [], "exclude_genres": []}
+    assert i("suggest an anime like Death Note")["kinds"] == ["anime"]
+
+
+def test_wants_suggestions_covers_common_phrasings_and_not_questions_of_fact():
+    w = ctx2.wants_suggestions
+    assert all(w(q) for q in ["I want a psychological thriller series.", "Suggest something like Death Note.", "Recommend Hindi crime dramas.",
+                              "I want Japanese live-action shows, not anime.", "Give me a movie, not a series.", "I don't want Hindi recommendations."])
+    assert not w("I want to know who directed Heat") and not w("who directed Heat?")
+
+
+def _fake_engine():
+    import numpy as np
+    from types import SimpleNamespace
+    cat = SimpleNamespace(kind=["series"] * 8, language=["en", "hi", "en", "hi", "en", "ko", "en", "en"],
+                          genres=[["Drama"], ["Comedy"], ["Comedy"], ["Drama"], ["Crime"], ["Drama"], ["Comedy"], ["Comedy"]],
+                          titles=list("ABCDEFGH"), year=np.full(8, 2020.0))
+    return SimpleNamespace(cat=cat, kind_rank=lambda st, kind: (np.arange(8), np.linspace(1, 0, 8)))
+
+
+def test_an_asked_for_language_is_never_replaced_by_other_languages():
+    e = _fake_engine()
+    got = ctx2.shortlist(e, None, {"kinds": ["series"], "languages": ["hi"], "genres": [], "exclude_languages": [], "exclude_genres": []}, set())
+    assert got == [1, 3]                                               # only Hindi, even though fewer than 5
+    none = ctx2.shortlist(e, None, {"kinds": ["series"], "languages": ["ta"], "genres": [], "exclude_languages": [], "exclude_genres": []}, set())
+    assert none == []
+    note = ctx2.shortlist_prompt(e, none, {"languages": ["ta"]})
+    assert "no titles of the kind and language" in note and "do not offer titles in other languages" in note
+    assert ctx2.shortlist_prompt(e, [], {"languages": []}) == ""
+
+
+def test_a_genre_is_relaxed_when_too_few_match_but_the_language_is_kept():
+    e = _fake_engine()
+    got = ctx2.shortlist(e, None, {"kinds": ["series"], "languages": ["hi"], "genres": ["Crime"], "exclude_languages": [], "exclude_genres": []}, set())
+    assert got == [1, 3]                                               # no Hindi crime: genre dropped, Hindi kept
+    en = ctx2.shortlist(e, None, {"kinds": ["series"], "languages": ["en"], "genres": ["Comedy"], "exclude_languages": [], "exclude_genres": []}, set())
+    assert en == [2, 6, 7] or set(en) <= {2, 6, 7, 0, 4}               # 3 English comedies: too few, so English of any genre
+    assert all(e.cat.language[r] == "en" for r in en)
+
+
+def test_ruled_out_language_and_genre_are_removed():
+    e = _fake_engine()
+    got = ctx2.shortlist(e, None, {"kinds": ["series"], "languages": [], "genres": [], "exclude_languages": ["hi"], "exclude_genres": ["Crime"]}, set())
+    assert 1 not in got and 3 not in got and 4 not in got and 0 in got

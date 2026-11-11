@@ -49,7 +49,7 @@ def picks(db: Session, user_id: int, message: str, blocked: set[int]) -> str:
             if want["kinds"] == ["movie", "series"]:
                 want["kinds"] = [engine.cat.kind[named]]
         rows = ctx.shortlist(engine, st, want, {row_of[i] for i in blocked if i in row_of})
-        return ctx.shortlist_prompt(engine, rows)
+        return ctx.shortlist_prompt(engine, rows, want)
     except Exception:
         db.rollback()
         ai.log.exception("assistant shortlist failed; answering without it")
@@ -70,7 +70,9 @@ def chat(body: ChatBody, user=Depends(current_user), db: Session = Depends(get_d
         system = "\n\n".join(x for x in (ai.SYSTEM, picks(db, user["id"], msgs[-1]["text"], blocked),
                                            ai.named_titles(db, msgs[-1]["text"])) if x)
         reply = ai.ask_gemini(msgs, system)
-        ids = [i for i in ai.resolve_titles(db, reply) if i not in blocked]      # hard exclusions win over Gemini
+        # Hard exclusions win over Gemini, in the written reply as well as the cards (assistant_context.scrub_reply).
+        reply, _ = ctx.scrub_reply(reply, ctx.blocked_titles(db, blocked), msgs[-1]["text"])
+        ids = [i for i in ai.resolve_titles(db, reply) if i not in blocked]
     except HTTPException:
         ai.refund(user["id"], user["is_guest"])
         raise

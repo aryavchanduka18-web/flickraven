@@ -15,11 +15,14 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 SHORTLIST = 15
+TITLE_RE = re.compile(r"\[\[(.+?)\]\]")
 
 # A message is a request for suggestions when it uses one of these words. Questions of fact ("who directed Heat?")
 # get no shortlist, so nothing personal-derived is sent with them.
 ASKS = re.compile(r"\b(recommend\w*|suggest\w*|what (should|can|could) i watch|something (like|to watch|new|good)|"
-                  r"anything (like|good)|similar|like [a-z]|in the mood|pick (me|something)|ideas?|binge|watch next|for me)\b", re.I)
+                  r"anything (like|good)|similar|like [a-z]|in the mood|pick (me|something)|ideas?|binge|watch next|for me|"
+                  r"i want (?!to (know|understand|ask|see how)\b)|any good\b|give me (a|an|some|something)\b|looking for (a|an|some|something)\b|"
+                  r"i('d| would) like (a|an|some|something)\b|i need (a|an|some|something)\b)", re.I)
 
 LANGUAGES = {
     "ko": r"korean|k-?dramas?|kdramas?", "hi": r"hindi|bollywood", "ta": r"tamil|kollywood", "te": r"telugu|tollywood",
@@ -28,8 +31,8 @@ LANGUAGES = {
 }
 GENRES = {
     "Comedy": r"comed\w*|funny|laugh\w*|sitcoms?", "Romance": r"romance|romantic|love stor\w*", "Horror": r"horror|scary",
-    "Thriller": r"thriller\w*|suspense\w*", "Crime": r"crime|heist\w*|gangsters?|detectives?", "Drama": r"\bdrama\b",
-    "Action": r"action", "Science Fiction": r"sci-?fi|science fiction", "Fantasy": r"fantasy", "Mystery": r"myster\w*",
+    "Thriller": r"thriller\w*|suspense\w*|psychological", "Crime": r"crime|heist\w*|gangsters?|detectives?", "Drama": r"\bdrama\b",
+    "Action": r"(?<!live-)(?<!live )action", "Science Fiction": r"sci-?fi|science fiction", "Fantasy": r"fantasy", "Mystery": r"myster\w*",
     "Animation": r"animated|cartoons?", "Documentary": r"documentar\w*", "Family": r"family|kids",
 }
 
@@ -38,21 +41,68 @@ def wants_suggestions(message: str) -> bool:
     return bool(ASKS.search(message))
 
 
+NEGATION = re.compile(r"\b(not|no|without|except|excluding|exclude|avoid|never|skip|nothing|don'?t|do not|dont|didn'?t|doesn'?t|"
+                      r"won'?t|can'?t|cannot|rather than|instead of)\b", re.I)
+KIND_WORDS = {
+    "anime": r"anime",
+    "series": r"series|shows?|tv|dramas?|k-?dramas?|j-?dramas?|c-?dramas?|sitcoms?|seasons?|episodes?|live-?action",
+    "movie": r"films?|movies?|cinema",
+}
+
+
+def _mentions(m: str, pattern: str) -> tuple[bool, bool]:
+    """(asked for, ruled out) for a word in the message. A mention is ruled out when a negation word comes before it in the
+    same clause, close by ("not anime", "no Hindi", "I don't want Hindi recommendations", "a movie, not a series").
+    A clause ends at . ; ! ? or a comma that is followed by a new request ("but ..."). Only the nearest 6 words count."""
+    asked = ruled = False
+    for hit in re.finditer(rf"\b({pattern})\b", m):
+        clause = re.split(r"[.;!?]", m[:hit.start()])[-1]
+        near = " ".join(clause.split()[-6:])
+        # "a movie, not a series": the comma belongs to the series part; "a series, not anime" likewise. A negation
+        # earlier than a comma does not reach past it ("not anime, a Japanese series" keeps the series).
+        near = near.split(",")[-1]
+        if NEGATION.search(near):
+            ruled = True
+        else:
+            asked = True
+    return asked, ruled
+
+
 def intent(message: str) -> dict:
-    """Kinds, languages and genres the message asks for, read locally from its words. Japanese is a language, not
-    anime: "Japanese shows" means live-action series; only the word anime asks for anime."""
+    """Kinds, languages and genres the message asks for, read locally from its words, with negations. Japanese is a
+    language, not anime: "Japanese shows" means live-action series; only the word anime asks for anime, and "not anime"
+    rules it out. Returns kinds (asked for, or movie+series when nothing is named, minus any ruled out), languages and
+    genres asked for, and exclude_languages / exclude_genres the person ruled out."""
     m = message.lower()
-    if re.search(r"\banime\b", m):
+    asked_k, ruled_k = [], set()
+    for kind, pat in KIND_WORDS.items():
+        a, r = _mentions(m, pat)
+        if a:
+            asked_k.append(kind)
+        if r:
+            ruled_k.add(kind)
+    # "anime" beats the generic "shows/series" words when both are asked for, as before
+    if "anime" in asked_k:
         kinds = ["anime"]
-    elif re.search(r"\b(series|shows?|tv|dramas?|k-?dramas?|j-?dramas?|c-?dramas?|sitcoms?|seasons?|episodes?)\b", m):
-        kinds = ["series"]
-    elif re.search(r"\b(films?|movies?|cinema)\b", m):
-        kinds = ["movie"]
+    elif asked_k:
+        kinds = [k for k in ("series", "movie") if k in asked_k]
     else:
-        kinds = ["movie", "series"]
-    langs = [code for code, pat in LANGUAGES.items() if re.search(rf"\b({pat})\b", m)]
-    genres = [g for g, pat in GENRES.items() if re.search(rf"\b({pat})\b", m)]
-    return {"kinds": kinds, "languages": langs, "genres": genres}
+        kinds = [k for k in ("movie", "series") if k not in ruled_k] or ["movie", "series"]
+    langs, no_langs = [], []
+    for code, pat in LANGUAGES.items():
+        a, r = _mentions(m, pat)
+        if r:
+            no_langs.append(code)
+        elif a:
+            langs.append(code)
+    genres, no_genres = [], []
+    for g, pat in GENRES.items():
+        a, r = _mentions(m, pat)
+        if r:
+            no_genres.append(g)
+        elif a:
+            genres.append(g)
+    return {"kinds": kinds, "languages": langs, "genres": genres, "exclude_languages": no_langs, "exclude_genres": no_genres}
 
 
 def blocked_ids(db: Session, user_id: int) -> set[int]:
@@ -85,10 +135,13 @@ def like_state(st, row: int):
 
 def shortlist(engine, st, want: dict, blocked_rows: set[int], n: int = SHORTLIST) -> list[int]:
     """Catalog rows, best first, for this person and this request: films from the hybrid rail score, series and anime
-    from kind_rank (which already drops what they rated, watched, liked, disliked or whose genre they dislike). The
-    request's language and genres are filters; if they leave nothing, the filter is dropped rather than guessed."""
+    from kind_rank (which already drops what they rated, watched, liked, disliked or whose genre they dislike).
+    Hard rules, never relaxed: the kind, a language they asked for, a language or genre they ruled out. Soft: the genre
+    they asked for, relaxed (language kept) when fewer than 5 titles fit. If nothing fits the hard rules the list is
+    empty, and shortlist_prompt then tells Gemini to say so honestly instead of substituting other languages."""
     cat = engine.cat
     per_kind = max(n // len(want["kinds"]), 5)
+    no_lang, no_genre = set(want.get("exclude_languages") or []), set(want.get("exclude_genres") or [])
     out: list[int] = []
     for kind in want["kinds"]:
         if kind == "movie":
@@ -96,24 +149,98 @@ def shortlist(engine, st, want: dict, blocked_rows: set[int], n: int = SHORTLIST
             ranked = [int(r) for r in np.argsort(-s)[:3000] if np.isfinite(s[r])]
         else:
             ranked = [int(r) for r in engine.kind_rank(st, kind)[0][:3000]]
-        ranked = [r for r in ranked if r not in blocked_rows]
-        lang = [r for r in ranked if not want["languages"] or cat.language[r] in want["languages"]]
-        fit = [r for r in lang if not want["genres"] or set(want["genres"]) & set(cat.genres[r])]
-        pick = fit[:per_kind]
-        if len(pick) < 5:          # too few for both filters: fill with the language alone, then with anything
-            pick += [r for r in (lang or ranked) if r not in pick][:per_kind - len(pick)]
-        out += pick
+        hard = [r for r in ranked if r not in blocked_rows
+                and (not want["languages"] or cat.language[r] in want["languages"])
+                and cat.language[r] not in no_lang and not (no_genre & set(cat.genres[r]))]
+        fit = [r for r in hard if not want["genres"] or set(want["genres"]) & set(cat.genres[r])]
+        out += (fit if len(fit) >= 5 else hard)[:per_kind]
     return out[:n]
 
 
-def shortlist_prompt(engine, rows: list[int]) -> str:
-    """Catalog facts only: no scores, no reasons, nothing about the person."""
+def shortlist_prompt(engine, rows: list[int], want: dict | None = None) -> str:
+    """Catalog facts only: no scores, no reasons, nothing about the person. With no rows but a hard request (a language),
+    a note that tells Gemini to say honestly that FlickRaven has nothing matching."""
     cat = engine.cat
     if not rows:
+        if want and want.get("languages"):
+            return ("FlickRaven has no titles of the kind and language this person asked for that it can suggest right now. "
+                    "Tell them so plainly, and do not offer titles in other languages as a substitute. You may mention titles "
+                    "you are sure exist in that language and kind, but say FlickRaven may not have them.")
         return ""
     lines = []
     for r in rows:
         year = "" if np.isnan(cat.year[r]) else f"{int(cat.year[r])}, "
         lines.append(f"- {cat.titles[r]} ({year}{cat.kind[r]}, language {cat.language[r] or '?'}, {', '.join(cat.genres[r][:3])})")
     return ("FlickRaven's picks for this request, best first (real titles on the site). When the person asks for suggestions, "
-            "choose mainly from these and write them as [[Title (Year)]]; add another title only if none of these fits:\n" + "\n".join(lines))
+            "choose mainly from these and write them as [[Title (Year)]]; add another title only if none of these fits. "
+            "Keep to the kind and language they asked for:\n" + "\n".join(lines))
+
+
+DATED = re.compile(r"([\w'&.:-]+(?: [\w'&.:-]+){0,5})\s*\((?:19|20)\d{2}\)")
+WORDS = re.compile(r"[\w'&.:-]+")
+FALLBACK = ("I held back a suggestion because you told FlickRaven you did not like it. Tell me what you are in the mood "
+            "for and I will try other ideas.")
+
+
+def blocked_titles(db: Session, ids: set[int]) -> dict[str, list[str]]:
+    """{lowercase title: [exact spellings]} for the blocked ids."""
+    if not ids:
+        return {}
+    out: dict[str, list[str]] = {}
+    for (t,) in db.execute(text("SELECT title FROM movies WHERE id = ANY(:i)"), {"i": list(ids)}):
+        out.setdefault(str(t).lower(), []).append(str(t))
+    return out
+
+
+def scrub_reply(reply: str, titles: dict[str, list[str]], allowed: str = "") -> tuple[str, int]:
+    """Remove every sentence that presents a blocked title (disliked or rated 4 or lower), so it cannot appear in the
+    written reply either. Two channels are checked independently of the prose:
+    - [[Title (Year)]] marks, the structured channel the model is told to use for recommendations: any mark naming a
+      blocked title removes its sentence, always;
+    - plain mentions: a run of 1 to 6 words equal to a blocked title. A multi-word title matches ignoring case; a
+      one-word title must be 5+ letters and spelled exactly as in the catalog (capitalised), so common words ("up",
+      "her", "it", "heat" in a sentence about weather) are left alone. Titles the person typed themselves
+      (`allowed`, their latest message) may be named in plain text, never as a [[mark]].
+    Returns (clean reply, number of sentences removed)."""
+    if not titles:
+        return reply, 0
+    own = allowed.lower()
+
+    def blocked_mark(sentence: str) -> bool:
+        for raw in TITLE_RE.findall(sentence):
+            name = re.sub(r"\s*\(\d{4}\)\s*$", "", raw).strip().lower()
+            if name in titles:
+                return True
+        return False
+
+    def blocked_plain(sentence: str) -> bool:
+        words = WORDS.findall(TITLE_RE.sub(" ", sentence))
+        for k in range(1, 7):
+            for i in range(len(words) - k + 1):
+                run = " ".join(words[i:i + k]).strip(".:-")
+                low = run.lower()
+                if low not in titles or low in own:
+                    continue
+                if k > 1 or (len(low) >= 5 and run in titles[low]):
+                    return True
+        return False
+
+    def blocked_dated(sentence: str) -> bool:
+        """"Heat (1995)": a name followed by a year is a title mention whatever its length or spelling."""
+        for m in DATED.finditer(TITLE_RE.sub(" ", sentence)):
+            words = m.group(1).split()
+            for i in range(len(words)):
+                low = " ".join(words[i:]).strip(".:-").lower()
+                if low in titles and low not in own:
+                    return True
+        return False
+
+    parts = [x for x in re.findall(r".*?(?:[.!?](?=\s|$)|\n+|$)\s*", reply, flags=re.S) if x]
+    kept, removed = [], 0
+    for sent in parts:
+        if sent.strip() and (blocked_mark(sent) or blocked_plain(sent) or blocked_dated(sent)):
+            removed += 1
+            continue
+        kept.append(sent)
+    text_ = "".join(kept).strip()
+    return (text_ or FALLBACK), removed
