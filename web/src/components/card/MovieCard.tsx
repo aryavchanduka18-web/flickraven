@@ -215,16 +215,26 @@ function HoverDetails({ item, source, anchor, body, onEnter, onLeave }: {
     return () => el.removeEventListener("wheel", onWheel);
   }, [body]);
   const d = detail.data;
+  // iOS-style open: the panel first appears as a glass capsule (title + buttons), then grows into the full box
+  // on a spring. Only its body's height animates; the text is laid out at its final width from the start, so
+  // nothing reflows while it grows. Reduced motion: it simply fades in at full size.
+  const spring = reduce ? { duration: 0 } : { type: "spring" as const, stiffness: 320, damping: 32, mass: 0.9 };
+  const reveal = (i: number) => (reduce ? {} : {
+    initial: { opacity: 0, y: place.above ? -6 : 6 },
+    animate: { opacity: 1, y: 0, transition: { delay: 0.1 + i * 0.045, duration: 0.32, ease: [0.16, 1, 0.3, 1] as const } },
+  });
   return (
     <motion.div
       ref={panel}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
-      initial={{ opacity: 0, y: reduce ? 0 : place.above ? 6 : -6 }}
-      animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } }}
-      exit={{ opacity: 0, transition: { duration: 0.12, ease: "easeIn" } }}
-      style={place.style}
-      className={`z-[45] cursor-pointer bg-surface shadow-2xl ring-1 ring-white/10 ${place.above ? "rounded-t-md" : "rounded-b-md"}`}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: place.above ? 8 : -8, borderRadius: 30 }}
+      animate={{ opacity: 1, scale: 1, y: 0, borderRadius: 26, transition: reduce ? { duration: 0.15 } : {
+        opacity: { duration: 0.18, ease: "easeOut" }, default: spring } }}
+      exit={reduce ? { opacity: 0, transition: { duration: 0.1 } }
+        : { opacity: 0, scale: 0.96, transition: { duration: 0.14, ease: [0.4, 0, 1, 1] } }}
+      style={{ ...place.style, transformOrigin: place.above ? "50% 100%" : "50% 0%" }}
+      className={`hover-glass z-[45] flex cursor-pointer overflow-hidden ${place.above ? "flex-col-reverse" : "flex-col"}`}
       data-testid="hover-details"
       // The panel covers the cards below it (My List, genre grids), so a click on it must open this title's page,
       // except on its own buttons and links (rate, list, Why?, cast).
@@ -233,66 +243,76 @@ function HoverDetails({ item, source, anchor, body, onEnter, onLeave }: {
         navigate(`/movie/${m.id}`, { state: { source } });
       }}
     >
-      <Link to={`/movie/${m.id}`} state={{ source }} className="block truncate px-3 pt-3 text-sm font-bold hover:underline">{m.title}</Link>
-      <div className="flex items-center justify-between p-3 pb-2 pt-2">
+      {/* The capsule: title and actions in one row. It sits next to the card, above or below it. */}
+      <div className="flex min-h-[56px] items-center gap-2 py-2 pl-5 pr-2">
+        <Link to={`/movie/${m.id}`} state={{ source }} title={m.title}
+          className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] hover:underline">{m.title}</Link>
         {/* The film's own record (fresh) wins over the rail's copy, which may be older. */}
         <ActionButtons movieId={m.id} state={detail.data?.user_state ?? item.user_state} source={source} />
         <button
           onClick={() => openQuickView(item)}
-          className="grid h-8 w-8 place-items-center rounded-full border border-white/30 text-white hover:border-white"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white transition-colors hover:border-white/50 hover:bg-white/20"
           aria-label={`Quick view ${m.title}`}
           title="Quick View"
         >
           <Chevron />
         </button>
       </div>
-      <div ref={body} style={{ maxHeight: place.maxBody }} className="overflow-y-auto overscroll-contain px-3 pb-3"
-        tabIndex={0} aria-label={`${m.title} details`}>
-        <div className="text-xs text-muted">
-          {[m.genres.slice(0, 3).join(" · "), d?.runtime ? `${d.runtime} min` : null, d?.certification].filter(Boolean).join(" · ")}
-        </div>
-        {item.reasons[0] && (
-          <p className="mt-1.5 text-xs text-white/75">
-            {item.reasons[0].text}
-            {item.match_pct != null && (
-              <button onClick={() => openWhy(m.id)} className="ml-2 font-medium text-white underline underline-offset-2">Why?</button>
-            )}
-          </p>
-        )}
-        {(d?.overview ?? m.overview_short) && <p className="mt-2 text-xs leading-relaxed text-white/80">{d?.overview ?? m.overview_short}</p>}
-        {!d ? (
-          // Same size as the real rows, so nothing moves when the details arrive.
-          <div aria-hidden>
-            <div className="mt-2 h-4 w-40 animate-pulse rounded bg-white/10" />
-            <div className="mt-2 flex gap-2">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-12 shrink-0">
-                  <div className="mx-auto h-10 w-10 animate-pulse rounded-full bg-white/10" />
-                  <div className="mx-auto mt-1 h-[13px] w-10 animate-pulse rounded bg-white/10" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <>
-            {d.directors.length > 0 && (
-              <p className="mt-2 text-xs text-muted">Directed by <span className="text-white/85">{d.directors.map((x) => x.name).join(", ")}</span></p>
-            )}
-            {d.cast.length > 0 && (
+      <motion.div initial={reduce ? false : { height: 0 }} animate={{ height: "auto", transition: { ...spring, delay: reduce ? 0 : 0.07 } }}
+        className="overflow-hidden">
+        <div className={`mx-4 h-px bg-white/10 ${place.above ? "mt-3" : ""}`} aria-hidden />
+        <div ref={body} style={{ maxHeight: place.maxBody }} className="overflow-y-auto overscroll-contain px-4 pb-4 pt-3"
+          tabIndex={0} aria-label={`${m.title} details`}>
+          <motion.div {...reveal(0)} className="flex flex-wrap gap-1.5">
+            {[...m.genres.slice(0, 3), d?.runtime ? `${d.runtime} min` : null, d?.certification].filter(Boolean).map((t) => (
+              <span key={t} className="rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-0.5 text-[11px] text-white/80">{t}</span>
+            ))}
+          </motion.div>
+          {item.reasons[0] && (
+            <motion.p {...reveal(1)} className="mt-2.5 text-xs text-white/75">
+              {item.reasons[0].text}
+              {item.match_pct != null && (
+                <button onClick={() => openWhy(m.id)} className="ml-2 font-medium text-white underline underline-offset-2">Why?</button>
+              )}
+            </motion.p>
+          )}
+          {(d?.overview ?? m.overview_short) && (
+            <motion.p {...reveal(2)} className="mt-2 text-xs leading-relaxed text-white/85">{d?.overview ?? m.overview_short}</motion.p>
+          )}
+          {!d ? (
+            // Same size as the real rows, so nothing moves when the details arrive.
+            <div aria-hidden>
+              <div className="mt-2 h-4 w-40 animate-pulse rounded-full bg-white/10" />
               <div className="mt-2 flex gap-2">
-                {d.cast.slice(0, 5).map((c) => (
-                  <Link key={c.id} to={`/person/${c.id}`} className="group w-12 shrink-0 text-center" title={c.name}>
-                    <div className="mx-auto h-10 w-10 overflow-hidden rounded-full bg-surface-2 ring-1 ring-white/10 group-hover:ring-white/40">
-                      {c.profile_path && <FadeImg src={tmdbImage(c.profile_path, "w300")} />}
-                    </div>
-                    <div className="mt-1 truncate text-[10px] leading-tight text-white/70">{c.name}</div>
-                  </Link>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-12 shrink-0">
+                    <div className="mx-auto h-10 w-10 animate-pulse rounded-full bg-white/10" />
+                    <div className="mx-auto mt-1 h-[13px] w-10 animate-pulse rounded-full bg-white/10" />
+                  </div>
                 ))}
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+          ) : (
+            <motion.div {...reveal(3)}>
+              {d.directors.length > 0 && (
+                <p className="mt-2 text-xs text-muted">Directed by <span className="text-white/85">{d.directors.map((x) => x.name).join(", ")}</span></p>
+              )}
+              {d.cast.length > 0 && (
+                <div className="mt-2.5 flex gap-2">
+                  {d.cast.slice(0, 5).map((c) => (
+                    <Link key={c.id} to={`/person/${c.id}`} className="group w-12 shrink-0 text-center" title={c.name}>
+                      <div className="mx-auto h-10 w-10 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15 transition-shadow group-hover:ring-white/50">
+                        {c.profile_path && <FadeImg src={tmdbImage(c.profile_path, "w300")} />}
+                      </div>
+                      <div className="mt-1 truncate text-[10px] leading-tight text-white/70">{c.name}</div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -306,7 +326,9 @@ function FadeImg({ src }: { src?: string }) {
   );
 }
 
-/** Under the card when there is room; above it when the card sits near the bottom of the screen. */
+/** Under the card when there is room; above it when the card sits near the bottom of the screen. It floats a few
+ *  pixels off the card (the 120 ms leave grace covers the gap). */
+const GAP = 6;
 function placement(anchor: HTMLElement): { style: CSSProperties; maxBody: number; above: boolean } {
   const r = anchor.getBoundingClientRect();
   const below = window.innerHeight - r.bottom;
@@ -316,7 +338,7 @@ function placement(anchor: HTMLElement): { style: CSSProperties; maxBody: number
   return {
     above,
     maxBody: Math.max(120, Math.min(260, room)),
-    style: above ? { ...base, bottom: window.innerHeight - r.top - 4 } : { ...base, top: r.bottom - 4 },
+    style: above ? { ...base, bottom: window.innerHeight - r.top + GAP } : { ...base, top: r.bottom + GAP },
   };
 }
 

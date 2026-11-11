@@ -345,7 +345,7 @@ Home  Discover  Perfect Pick  Genres  My List  Activity
 - **Shape:** landscape 16:9 backdrop. Title drawn as text over a dark gradient at the bottom; TMDB title logo used where it exists.
 - **Density (Aryav's design decision, 2026-10-07):** large cards, about 2–3 visible per rail on desktop with the next card partly visible; about 2 on tablet; about 1–1.5 on phone.
 - **Normal state:** artwork, title, year, community rating, language, Match % on personal rails.
-- **Hover (desktop only):** scale about 1.05, lift 4 px, 150–250 ms, after a short hover-intent delay so moving across a rail doesn't flicker. Reveals Match %, genre, one-line synopsis, Like, Dislike, Add to List, and the Quick View chevron. Rails have vertical padding so enlarged cards are never clipped.
+- **Hover (desktop only):** scale about 1.05, lift 4 px, 150–250 ms, after a short hover-intent delay so moving across a rail doesn't flicker. Reveals Match %, genre, one-line synopsis, Like, Dislike, Add to List, and the Quick View chevron. (v6, 2026-11-11) The details are a dark glass capsule (title + round buttons) floating just under the card that grows on a spring into a large-radius box with genre pills, reason, synopsis and cast; reduced-motion users get a plain fade. Class `.hover-glass` in `index.css`. Rails have vertical padding so enlarged cards are never clipped.
 - **Touch:** no hover panel. Tap opens the movie page. The chevron is always visible.
 - **Rail arrows (v5):** dark-glass round buttons, always visible on every rail (desktop), hidden at the start and end of a rail, eased smooth scroll of about one screen. Card widths are a share of the space next to the sidebar.
 
