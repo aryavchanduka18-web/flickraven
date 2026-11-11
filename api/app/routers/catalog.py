@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import user_id_from
 from app.db import get_db
+from app.services import ai_similar
 from app.services import franchise as fr
 from app.services import search as sq
 from app.services import similar as similar_svc
@@ -68,9 +69,27 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
     if engine.cat.row_of.get(movie_id) is None:
         raise HTTPException(404, "Unknown movie")
     offset, limit = max(offset, 0), min(max(limit, 1), 40)
-    page, extra, total = similar_svc.similar_page(db, engine, movie_id, offset, limit)
+    row = engine.cat.row_of[movie_id]
+    kind = engine.cat.kind[row]
+    ai_ids = []
+    if kind in ("series", "anime"):
+        # Stored similarity is weak for TV (no viewing data): Gemini names similar series, we keep only those in the catalog.
+        year = engine.cat.year[row]
+        ai_ids = ai_similar.suggest(db, movie_id, engine.cat.titles[row], None if np.isnan(year) else int(year),
+                                    list(engine.cat.genres[row]), kind)
+        ai_ids = [i for i in ai_ids if i in engine.cat.row_of]     # titles the model has never seen cannot be scored or shown with it
+    if ai_ids:
+        _, extra_all, _ = similar_svc.similar_page(db, engine, movie_id, 0, 40)
+        order = ai_ids[:30] + [i for i in extra_all if i not in ai_ids]
+        total = len(order)
+        ids = order[offset:offset + limit]
+        extra = {i: extra_all.get(i, {"score": 0.0}) | ({"reasons": [{"code": "ai_similar", "text": "Similar series, picked with Google Gemini",
+                                                                       "source": "more_like_this", "share": 0.0, "anchor_movie_id": None}]} if i in ai_ids else {})
+                 for i in ids}
+    else:
+        page, extra, total = similar_svc.similar_page(db, engine, movie_id, offset, limit)
+        ids = list(extra)
     uid = user_id_from(request, db)
-    ids = list(extra)
     # Match % only where the models that the calibrator was fitted on can score the title (MovieLens films);
     # a number for the others would not mean what it says.
     known = [i for i in ids if engine.cat.universe_of_row[engine.cat.row_of[i]] >= 0]

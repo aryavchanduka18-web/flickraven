@@ -46,6 +46,10 @@ export function Privacy() {
           FlickRaven. On Google's free tier, prompts may be used by Google to improve its products, so do not type anything private.
           The assistant can be wrong, and the number of messages per day is limited.
         </p>
+        <p>
+          The "More like this" list on a TV series page also asks Gemini which series are similar. Only the series title, year and
+          genres are sent, never anything about you. We keep only the answers that exist in our own catalog.
+        </p>
       </section>
       <section>
         <h2>Cookies</h2>
