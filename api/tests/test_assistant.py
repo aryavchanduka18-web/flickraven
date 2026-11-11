@@ -192,3 +192,16 @@ def test_loosely_spelled_title_still_gets_its_catalog_facts(test_engine):
 def test_assistant_rules_forbid_catalog_talk_and_kind_switching():
     assert "never tell the person that FlickRaven does not have a title" in ai.SYSTEM
     assert "Never answer a series request with a film" in ai.SYSTEM
+
+
+def test_assistant_answers_freely_about_any_title_and_stays_on_topic():
+    assert "from your own knowledge" in ai.SYSTEM and "whether or not FlickRaven lists it" in ai.SYSTEM
+    assert "Stay on films, series, anime" in ai.SYSTEM
+    assert "never tell the person that FlickRaven does not" in ai.SYSTEM.replace("\\\n", "")
+    assert "||" in ai.SYSTEM                                     # spoilers stay hidden behind a tap
+
+
+def test_titles_outside_the_catalog_are_simply_not_linked(client):
+    from app.db import SessionLocal
+    with SessionLocal() as db:
+        assert ai.resolve_titles(db, "Try [[A Show That Does Not Exist At All (1999)]].") == []
