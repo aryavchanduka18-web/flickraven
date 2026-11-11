@@ -229,10 +229,10 @@ def title_fit(movie_id: int, user=Depends(current_user), db: Session = Depends(g
     v = dna.title_vectors(db, [movie_id]).get(movie_id)
     if prof.titles < 3 or not v:
         return {"reason": None, "traits": [], "known": v is not None}
-    _, because = dna.fit(prof, v)
-    clash = [k for k in prof.avoided() if v.get(k, 0) >= 0.5]
+    because, clash, mixed = dna.title_explanation(prof, v)
     return {"reason": dna.reason(because), "traits": [dna.TRAIT[k].label for k in because],
-            "clash": [dna.TRAIT[k].label for k in clash], "known": True}
+            "clash": [dna.TRAIT[k].label for k in clash],
+            "mixed": [dna.TRAIT[k].label for k in mixed], "known": True}
 
 
 @router.get("/me/taste-evolution")
