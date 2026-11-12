@@ -177,10 +177,27 @@ def test_feelgood_judges_tone_from_several_signals_not_one_dark_comedy_tag():
     assert tc.dark_in_tone(["dark comedy", "superhero"], ["Action", "Adventure", "Comedy"])      # Peacemaker
 
 
+SAKAMOTO = (["Animation", "Comedy", "Action", "Adventure"], ["assassin", "cheerful", "family", "hitman", "parody", "shounen"])
+KENSHIN = (["Action", "Adventure", "Animation", "Comedy"], ["assassin", "samurai", "romance", "meiji period"])
+WASABI = (["Drama", "Action", "Comedy"], ["hitman", "yakuza", "police brutality"])
+SCARY_MOVIE_2 = (["Comedy"], ["haunted house", "horror spoof", "parody", "spoof", "supernatural horror"])
+HXH = (["Animation", "Action", "Adventure"], ["gore", "friendship", "hopeful", "organized crime", "revenge", "parody"])
+POOR_THINGS = (["Science Fiction", "Romance", "Comedy"], ["body horror", "cruelty", "frankenstein"])
+
+
+def test_action_and_assassin_signals_never_disqualify_alone_but_heavy_content_does():
+    for g, k in (SAKAMOTO, KENSHIN, WASABI, SCARY_MOVIE_2):
+        assert not tc.dark_in_tone(k, g), k
+    assert tc.dark_in_tone(HXH[1], HXH[0])                  # "gore" is heavy (Chimera Ant arc)
+    assert tc.dark_in_tone(POOR_THINGS[1], POOR_THINGS[0])  # body horror, not a spoof
+    assert tc.dark_in_tone(["dark comedy", "hitman"], ["Action", "Comedy"])   # two different kinds of signal
+
+
 def test_feelgood_chip_sql_matches_the_python_rule(test_engine):
     from sqlalchemy import text
     cases = {"ad": ARRESTED_DEV, "fleabag": FLEABAG, "blackadder": BLACKADDER, "sweetpea": SWEETPEA, "w": W_SERIES,
-             "ginny": GINNY, "goodplace": GOOD_PLACE, "peacemaker": (["Action", "Comedy"], ["dark comedy", "superhero"])}
+             "ginny": GINNY, "goodplace": GOOD_PLACE, "peacemaker": (["Action", "Comedy"], ["dark comedy", "superhero"]),
+             "sakamoto": SAKAMOTO, "wasabi": WASABI, "scary2": SCARY_MOVIE_2, "hxh": HXH, "poor": POOR_THINGS}
     ids = {}
     with test_engine.begin() as conn:
         for n, (key, (gs, ks)) in enumerate(cases.items()):
@@ -200,8 +217,7 @@ def test_feelgood_chip_sql_matches_the_python_rule(test_engine):
         with test_engine.connect() as conn:
             got = set(conn.execute(text(f"SELECT m.id FROM movies m WHERE m.id = ANY(:ids) AND {sql}"),
                                    {"ids": list(ids.values()), **p}).scalars())
-        want = {ids[k] for k, (g, kw) in cases.items() if tc.dark_in_tone(kw, None if False else g) or
-                (set(kw) & tc.FEELGOOD_HEAVY)}
+        want = {ids[k] for k, (g, kw) in cases.items() if tc.dark_in_tone(kw, g)}
         assert got == want and ids["ad"] not in got and ids["sweetpea"] in got
     finally:
         with test_engine.begin() as conn:
