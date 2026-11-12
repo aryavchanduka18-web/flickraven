@@ -23,8 +23,9 @@ Checked on the catalogue (laptop movies_clean.parquet): against MyAnimeList's Ro
 precision 0.63 -> 0.72, recall 0.76 -> 0.80; live-action series with 300+ votes 180 -> 158 (Hannibal, Presumed
 Innocent, Lovecraft Country, Better Call Saul, WandaVision out). Perfect Pick's keyword Romance for series uses this too.
 
-Feel-good: on top of each surface's own genre rule, no dark keyword (dark comedy, gore, horror, serial killer, ...),
-unless the title is a lead romance.
+Feel-good: on top of each surface's own genre rule, not dark in tone: no heavy keyword (gore, serial killer, child
+abuse, ...) and under 3 tone points from keywords and genres together (one "dark comedy" tag is 1 point, never enough
+alone; light keywords such as sitcom or friendship subtract). A lead romance is exempt unless it has a heavy keyword.
 """
 from __future__ import annotations
 
@@ -52,9 +53,32 @@ ROMANCE_STRONG = frozenset({
 })
 ROMANCE_WEAK = frozenset({"love", "dating", "gothic romance", "slight romance", "psychological romance", "lovesickness"})
 
-FEELGOOD_DARK_KEYWORDS = frozenset({
-    "dark comedy", "black comedy", "gore", "horror", "slasher", "serial killer", "massacre", "psychopath",
-})    # not "death", "suicide", "zombie" or "torture": they drop Angel Beats!, Zombie Land Saga and The Good Place
+# Feel-good tone, from several signals together (2026-11-12, Aryav: "dark comedy" alone must not reject Arrested
+# Development, Fleabag or Blackadder). A title is dark in tone when it has a heavy keyword, or when its tone points reach
+# FEELGOOD_DARK_POINTS: violent keywords 2, other dark themes 1, each violent genre 1, +1 more for a dark comedy that is
+# also violent (an action genre, a violent keyword or a murder: Peacemaker, Sweetpea), minus 1 for each light keyword
+# (sitcom, friendship, slice of life, ...). So dark comedy as a genre never disqualifies on its own; a bleak tone (several
+# dark themes) or disturbing content (a heavy keyword, or violence) does.
+FEELGOOD_HEAVY = frozenset({
+    "gore", "slasher", "serial killer", "massacre", "psychopath", "horror", "body horror", "supernatural horror",
+    "folk horror", "survival horror", "splatter", "cannibalism", "child sexual abuse", "childhood sexual abuse",
+    "rape and revenge", "mass murder",
+})   # not "torture" (The Good Place), "child abuse" (Annie, Pinocchio, EverAfter: TMDB uses it for cruel stepparents),
+     # "cannibal" (The BFG), "death", "suicide" or "zombie" alone (Angel Beats!, Zombie Land Saga): those are themes
+FEELGOOD_VIOLENT = frozenset({"hitman", "assassin", "killing", "gun violence", "rape"})
+FEELGOOD_MILD = frozenset({
+    "dark comedy", "black comedy", "murder", "child abuse", "cannibal", "death", "grief", "suicide", "depression", "drugs", "drug dealer", "drug addiction",
+    "addiction", "trauma", "post-traumatic stress disorder (ptsd)", "revenge", "zombie", "zombie apocalypse", "cynical",
+    "cynicism", "violence", "prison", "organized crime", "dark fantasy", "nihilism", "war", "psychotic",
+})
+FEELGOOD_LIGHT = frozenset({
+    "sitcom", "slice of life", "friendship", "found family", "heart warming", "heartwarming", "iyashikei", "healing",
+    "family", "family relationships", "workplace comedy", "mockumentary", "feel-good", "wholesome", "cozy", "cosy",
+    "coming of age", "best friend",
+})
+FEELGOOD_DARK_GENRES = frozenset({"Action", "Action & Adventure", "Horror", "Thriller", "Crime", "War", "War & Politics"})
+FEELGOOD_DARK_POINTS = 3
+FEELGOOD_DARK_KEYWORDS = FEELGOOD_HEAVY | FEELGOOD_VIOLENT | FEELGOOD_MILD      # every keyword that counts toward dark
 
 
 def _kws(keywords) -> set[str]:
@@ -109,9 +133,24 @@ def clear_romance(genres, keywords, anime: bool = False) -> bool:
     return romance_tier(genres, keywords, anime) == LEAD
 
 
+def dark_points(keywords, genres=None) -> int:
+    """Tone points (see FEELGOOD_*): higher = darker. Heavy keywords are counted separately by dark_in_tone."""
+    k, g = _kws(keywords), set(genres) if genres is not None else set()
+    violent_genre = len(g & FEELGOOD_DARK_GENRES)
+    dark_comedy = bool(k & {"dark comedy", "black comedy"})
+    violent = violent_genre or k & (FEELGOOD_VIOLENT | {"murder"})
+    return (2 * len(k & FEELGOOD_VIOLENT) + len(k & FEELGOOD_MILD) + violent_genre
+            + (1 if dark_comedy and violent else 0) - len(k & FEELGOOD_LIGHT))
+
+
 def dark_in_tone(keywords, genres=None) -> bool:
-    """A dark keyword: never in a feel-good row. A clear romance tagged "dark comedy" (Queen of Tears) stays."""
-    if not _kws(keywords) & FEELGOOD_DARK_KEYWORDS:
+    """Never in a feel-good row: a heavy keyword (gore, serial killer, child abuse...), or tone points of 3 or more
+    from several signals together. One "dark comedy" tag is never enough on its own. A lead romance stays unless it
+    has a heavy keyword (Queen of Tears)."""
+    k = _kws(keywords)
+    if k & FEELGOOD_HEAVY:
+        return True
+    if dark_points(keywords, genres) < FEELGOOD_DARK_POINTS:
         return False
     return genres is None or not clear_romance(genres, keywords, anime=True)
 
@@ -138,6 +177,19 @@ def romance_sql(alias: str = "m") -> tuple[str, dict]:
 
 
 def dark_keyword_sql(alias: str = "m") -> tuple[str, dict]:
-    """SQL: the title has a dark keyword (used as NOT ... in the feel-good chip)."""
-    return (f"EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
-            f"WHERE mk.movie_id = {alias}.id AND lower(k.name) = ANY(:fg_dark))", {"fg_dark": sorted(FEELGOOD_DARK_KEYWORDS)})
+    """SQL twin of dark_in_tone without the romance exemption (the chip adds that): a heavy keyword, or tone points of
+    FEELGOOD_DARK_POINTS or more."""
+    kw = (f"(SELECT COALESCE(SUM(CASE WHEN lower(k.name) = ANY(:fg_violent) THEN 2 WHEN lower(k.name) = ANY(:fg_mild) THEN 1 "
+          f"WHEN lower(k.name) = ANY(:fg_light) THEN -1 ELSE 0 END), 0) "
+          f"FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = {alias}.id)")
+    gen = (f"(SELECT count(*) FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
+           f"WHERE mg.movie_id = {alias}.id AND g.name = ANY(:fg_dgen))")
+    dc = (f"EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
+          f"WHERE mk.movie_id = {alias}.id AND lower(k.name) IN ('dark comedy', 'black comedy'))")
+    heavy = (f"EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
+             f"WHERE mk.movie_id = {alias}.id AND lower(k.name) = ANY(:fg_heavy))")
+    vk = (f"EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
+          f"WHERE mk.movie_id = {alias}.id AND (lower(k.name) = ANY(:fg_violent) OR lower(k.name) = 'murder'))")
+    sql = (f"({heavy} OR ({kw} + {gen} + CASE WHEN {dc} AND ({gen} > 0 OR {vk}) THEN 1 ELSE 0 END) >= {FEELGOOD_DARK_POINTS})")
+    return sql, {"fg_heavy": sorted(FEELGOOD_HEAVY), "fg_violent": sorted(FEELGOOD_VIOLENT), "fg_mild": sorted(FEELGOOD_MILD),
+                 "fg_light": sorted(FEELGOOD_LIGHT), "fg_dgen": sorted(FEELGOOD_DARK_GENRES)}

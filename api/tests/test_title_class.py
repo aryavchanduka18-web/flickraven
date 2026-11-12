@@ -141,7 +141,7 @@ def test_numpy_arrays_from_the_catalog_work():
 def test_feelgood_keeps_a_romance_tagged_dark_comedy():
     queen_of_tears = (["Drama", "Comedy"], ["dark comedy", "romance", "contract marriage", "chaebol"])
     assert not tc.dark_in_tone(queen_of_tears[1], queen_of_tears[0])
-    assert tc.dark_in_tone(["dark comedy"], ["Comedy"])
+    assert not tc.dark_in_tone(["dark comedy"], ["Comedy"])                     # one tag is never enough
     assert not tc.dark_in_tone(["death", "zombie", "torture"], ["Comedy"])      # too broad to count
 
 
@@ -152,3 +152,57 @@ def test_perfect_pick_romance_uses_the_shared_rule():
     for g, k in (BRIDGERTON, HEARTSTOPPER, HEALER, MOONLIGHTING, SEX_AND_THE_CITY):
         assert "Romance" in pp.series_genres(g, k)[1], k
     assert pp.series_genres(["Crime"], ["serial killer"])[1] == {"Thriller"}      # other keyword genres unchanged
+
+
+# Real TMDB keywords (laptop catalogue, 2026-11-12)
+ARRESTED_DEV = (["Comedy"], ["dark comedy", "deadpan", "dysfunctional family", "fake documentary", "family conflict",
+                             "family relationships", "narration", "offbeat", "prison", "psychotic", "sexual humor", "sitcom"])
+FLEABAG = (["Comedy", "Drama"], ["breaking the fourth wall", "cynicism", "dark comedy", "death of best friend",
+                                 "dysfunctional family", "grief", "guilt", "london, england", "loneliness", "sitcom"])
+BLACKADDER = (["Comedy"], ["16th century", "absurd", "army", "civil war", "dark comedy", "england", "satire", "sitcom",
+                           "world war i"])
+SWEETPEA = (["Comedy", "Drama"], ["dark comedy", "murder"])
+LEGALLY_BLONDE = (["Comedy"], ["cynical", "murder", "law school"])
+ANNIE = (["Comedy", "Drama", "Family"], ["child abuse", "orphan", "musical"])
+W_SERIES = (["Drama", "Comedy"], ["murder", "gun violence", "revenge", "webtoon"])
+GINNY = (["Comedy", "Drama"], ["childhood sexual abuse", "mother daughter relationship"])
+GOOD_PLACE = (["Science Fiction", "Fantasy", "Comedy"], ["afterlife", "torture", "sitcom", "friendship"])
+
+
+def test_feelgood_judges_tone_from_several_signals_not_one_dark_comedy_tag():
+    for g, k in (ARRESTED_DEV, FLEABAG, BLACKADDER, GOOD_PLACE, LEGALLY_BLONDE, ANNIE):
+        assert not tc.dark_in_tone(k, g), k
+    for g, k in (SWEETPEA, W_SERIES, GINNY):
+        assert tc.dark_in_tone(k, g), k
+    assert tc.dark_in_tone(["dark comedy", "superhero"], ["Action", "Adventure", "Comedy"])      # Peacemaker
+
+
+def test_feelgood_chip_sql_matches_the_python_rule(test_engine):
+    from sqlalchemy import text
+    cases = {"ad": ARRESTED_DEV, "fleabag": FLEABAG, "blackadder": BLACKADDER, "sweetpea": SWEETPEA, "w": W_SERIES,
+             "ginny": GINNY, "goodplace": GOOD_PLACE, "peacemaker": (["Action", "Comedy"], ["dark comedy", "superhero"])}
+    ids = {}
+    with test_engine.begin() as conn:
+        for n, (key, (gs, ks)) in enumerate(cases.items()):
+            mid = conn.execute(text("""INSERT INTO movies (tmdb_id, title, year, original_language, countries, title_type)
+                VALUES (:t, :n, 2015, 'en', ARRAY['US'], 'series') RETURNING id"""), {"t": 992200 + n, "n": f"FG {key}"}).scalar()
+            ids[key] = mid
+            for g in gs:
+                gid = conn.execute(text("""INSERT INTO genres (name, slug) VALUES (:n, :s)
+                    ON CONFLICT (name) DO UPDATE SET slug = genres.slug RETURNING id"""), {"n": g, "s": g.lower()}).scalar()
+                conn.execute(text("INSERT INTO movie_genres (movie_id, genre_id) VALUES (:m, :g)"), {"m": mid, "g": gid})
+            for k in ks:
+                kid = conn.execute(text("""INSERT INTO keywords (name) VALUES (:n)
+                    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"""), {"n": k}).scalar()
+                conn.execute(text("INSERT INTO movie_keywords (movie_id, keyword_id) VALUES (:m, :k)"), {"m": mid, "k": kid})
+    try:
+        sql, p = tc.dark_keyword_sql("m")
+        with test_engine.connect() as conn:
+            got = set(conn.execute(text(f"SELECT m.id FROM movies m WHERE m.id = ANY(:ids) AND {sql}"),
+                                   {"ids": list(ids.values()), **p}).scalars())
+        want = {ids[k] for k, (g, kw) in cases.items() if tc.dark_in_tone(kw, None if False else g) or
+                (set(kw) & tc.FEELGOOD_HEAVY)}
+        assert got == want and ids["ad"] not in got and ids["sweetpea"] in got
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(text("DELETE FROM movies WHERE id = ANY(:i)"), {"i": list(ids.values())})
