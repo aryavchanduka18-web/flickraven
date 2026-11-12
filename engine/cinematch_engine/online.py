@@ -32,6 +32,12 @@ LANGUAGE_LIFT = {"cold": 1.2, "warming": 0.6, "established": 0.0}
 # this small score term is the measured reranking signal for established users.
 PERSISTENT_LANGUAGE_CANDIDATE_LIFT = 2.4
 PERSISTENT_LANGUAGE_RERANK_BOOST = 0.24
+# Films without MovieLens factors are placed on the MovieLens score scale by quantile (_quantile_unavailable). The cap
+# is the highest MovieLens quantile they can reach, per stage; set from the 2026-11-11 audit (400 held-out
+# MovieLens users, NDCG@10 vs the old probability map): cold 2 ratings +0.010, 5 onboarding picks +0.029, warming +0.001 with no
+# cap. Established: no cap -0.029 (34% of Top Picks without MovieLens factors), 0.999 -0.011, 0.997 +0.001 (1.7%), 0.99 +0.003
+# but none at all. 0.997 keeps them in reach without letting content-only scores crowd out what ALS knows.
+UNAVAILABLE_QUANTILE_CAP = {"cold": 1.0, "warming": 1.0, "established": 0.997}
 
 
 @dataclass
@@ -129,8 +135,13 @@ class OnlineEngine:
         for kind, row in dict.fromkeys(st.events):
             if kind in self.event_weights and kind != "rate" and kind not in WEAK_EVENTS:
                 w[row] = w.get(row, 0.0) + self.event_weights[kind]
+        # A rating is the confirmed tier: 7+ adds interest (as in offline training, sources.Profiles.implicit); anything
+        # lower means "not for me" and the title is no ALS positive at all, even if it was saved or marked watched.
         for row, r in st.ratings.items():
-            w[row] = w.get(row, 0.0) + self.event_weights.get("rate", 1.0) + max(r - 6, 0)
+            if r >= 7:
+                w[row] = w.get(row, 0.0) + self.event_weights.get("rate", 1.0) + (r - 6)
+            else:
+                w.pop(row, None)
         for row in st.picks | st.likes:
             w[row] = max(w.get(row, 0.0), 4.0)
         return {r: v for r, v in w.items() if v > 0 and r not in st.dislikes}
@@ -538,8 +549,17 @@ class OnlineEngine:
 
     def _score_unavailable(self, st: UserState, scores: dict, total: np.ndarray) -> np.ndarray:
         """Films without collaborative factors: average of the sources that can score them (not a sum with zeros),
-        mapped onto the MovieLens films' scale (cinematch_engine/availability.py)."""
+        put onto the MovieLens films' scale.
+
+        Default ("quantile", 2026-11-11 audit): a film at quantile q among the films without factors gets the score of
+        the MovieLens film at quantile q x UNAVAILABLE_QUANTILE_CAP[stage]. The old probability map
+        (availability_calibration.json, mapping "probability") was fitted on held-out MovieLens films that people chose
+        to rate (65% liked) and lifted half of these films above 90% of MovieLens films. The cap is the guard for users
+        whose MovieLens scores come from strong collaborative models: content-only scores are less reliable, so the
+        best of them stop below the best MovieLens films (measured offline in the 2026-11-11 audit, see docs/decisions-log.md)."""
         w = self.weights[st.stage]
+        if getattr(self, "unavailable_mapping", "quantile") == "quantile":
+            return self._quantile_unavailable(st, scores, total, w)
         pct = {}
         for s in SOURCES:
             v = scores[s]
@@ -551,6 +571,27 @@ class OnlineEngine:
         rows = self.unavailable_rows()
         total = total.copy()
         total[rows] = self.availability.map_unavailable(st.stage, renormalized(pct, w, rows))
+        return total
+
+    def _quantile_unavailable(self, st: UserState, scores: dict, total: np.ndarray, w: dict) -> np.ndarray:
+        pct = {}
+        for s in SOURCES:
+            v = scores[s]
+            ok = np.isfinite(v)
+            p = np.full(self.cat.n, np.nan, dtype=np.float32)
+            if ok.any():
+                p[ok] = (np.argsort(np.argsort(v[ok])) + 1) / ok.sum()
+            pct[s] = p
+        rows = self.unavailable_rows()
+        known = total[self.cat.universe_rows]
+        known = np.sort(known[np.isfinite(known)])
+        if not len(rows) or not len(known):
+            return total
+        renorm = renormalized(pct, w, rows)
+        q = (np.argsort(np.argsort(renorm, kind="stable")) + 0.5) / len(rows)
+        cap = UNAVAILABLE_QUANTILE_CAP.get(st.stage, 1.0)
+        total = total.copy()
+        total[rows] = np.quantile(known, q * cap).astype(np.float32)
         return total
 
     # ------------------------------------------------------------------ explanations
