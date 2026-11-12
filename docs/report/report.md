@@ -109,6 +109,10 @@ MMR lambda from 0.5 to 1.0 trades NDCG@10 for intra-list diversity. The Discover
 curve: Familiar 0.163 / 0.835, Balanced 0.162 / 0.844, Discover 0.159 / 0.855 (NDCG / diversity).
 
 ### 5.5 Calibration
+**Status since 2026-11-11: Match % is hidden on the site** (`api/app/services/match_display.py`) until it is refitted on
+the serving score after the scoring change for films without MovieLens factors. The shipped curves can only print 72-93%
+(75-88% for established users) and run 22 to 27 points high on the served score (below).
+
 Match % is a logistic calibration of the blend score per stage, fitted on validation. On test the
 expected calibration error is 0.013 (cold), 0.015 (warming) and 0.028 (established), all under the
 0.05 pass threshold, with Match % values mostly between 70% and 93%.

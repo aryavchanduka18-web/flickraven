@@ -53,6 +53,6 @@ def person_movies(person_id: int, request: Request, db: Session = Depends(get_db
     uid = user_id_from(request, db)
     match = rec.match_for(db, uid, ids)
     items = [{**c, **credits[c["movie"]["id"]]} for c in cards(db, ids, uid, match)]
-    recommended = sorted((i for i in items if i["match_pct"] is not None and not i["user_state"]["rating"]),
+    recommended = sorted((i for i in items if i["score"] is not None and not i["user_state"]["rating"]),
                          key=lambda i: -i["score"])[:RECOMMENDED]
     return {"items": items, "recommended": recommended}
