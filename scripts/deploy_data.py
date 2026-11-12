@@ -111,6 +111,16 @@ def export() -> None:
         counts = {t: conn.execute(text(f"SELECT count(*) FROM {t}")).scalar() for t in CATALOG_TABLES}
     (OUT / "demo_user.json").write_text(json.dumps({t: [dict(r) for r in rows] for t, rows in demo.items()}, default=str), encoding="utf-8")
 
+    # Catalogue snapshot: shipped inside the bundle so the hosted server need not read the whole catalogue from the
+    # database on every start (that was ~7 MB of Neon network transfer each time). Built from the same local
+    # database as catalog.dump, so the two always match.
+    sys.path.insert(0, str(ROOT / "api"))
+    from sqlalchemy.orm import Session
+    from app.services.recommender import SNAPSHOT, build_snapshot
+    with Session(engine) as session:
+        n_snap = build_snapshot(session, ROOT / "artifacts" / "models" / SNAPSHOT)
+    print(f"  catalog snapshot  {n_snap:,} titles")
+
     bundle = OUT / "artifacts.tar.gz"
     with tarfile.open(bundle, "w:gz", compresslevel=9) as tar:
         for d in ARTIFACT_DIRS:

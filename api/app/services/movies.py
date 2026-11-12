@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.services import match_display
 
 SITE_PRIOR = 20          # community rating: popularity_score acts as 20 prior votes, site ratings add to it
 
@@ -80,7 +81,7 @@ def cards(db: Session, ids: list[int], user_id: int | None = None, extra: dict[i
                       **imdb(r),
                       "dominant_color": r["dominant_color"], "overview_short": short(r["overview"]),
                       "catalog_part": r["catalog_part"], "title_type": r["title_type"]},
-            "score": e.get("score"), "match_pct": e.get("match_pct"), "reasons": e.get("reasons", []),
+            "score": e.get("score"), "match_pct": match_display.shown(e.get("match_pct")), "reasons": e.get("reasons", []),
             "agreement": e.get("agreement"),
             "user_state": states[i],
         })

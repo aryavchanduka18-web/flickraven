@@ -1,4 +1,5 @@
 """Recommendations: home page plan, rails, For Tonight, Surprise Me, explanations."""
+import time
 import uuid
 
 import numpy as np
@@ -11,10 +12,13 @@ from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
 from app.services import daily
+from app.services import match_display
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
 from app.services import rec_feedback
+from app.services import recent_row
 from app.services import series_rails as series_rails_service
+from app.services import title_class as tc
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
 from cinematch_engine.tonight import Request as TonightRequest
@@ -41,6 +45,34 @@ def log_shown(db, uid, request_id, page_id, surface, mode, items):
                    {"r": request_id, "u": uid, "s": surface, "m": it["movie"]["id"], "k": rank, "f": it.get("score"),
                     "p": it.get("match_pct"), "c": __import__("json").dumps(it.get("components") or {}),
                     "rc": it["reasons"][0]["code"] if it.get("reasons") else None, "mo": mode, "pg": page_id})
+
+
+_SERIES_FACTS: dict = {"at": 0.0, "rows": []}
+SERIES_FACTS_TTL = 6 * 3600
+
+
+def _series_facts(db: Session) -> list[dict]:
+    """Static facts about every series (genres, keywords, seasons...) for the Home series rails. The query reads all
+    ~4,300 series with their keywords, about 0.5 MB from the hosted database, so it ran on every Home load and was a
+    large share of the database's network transfer. The facts only change when the catalogue is refreshed (which
+    needs a deploy), so they are kept for six hours. Callers get copies, so a request can never change the cache."""
+    now = time.monotonic()
+    if not _SERIES_FACTS["rows"] or now - _SERIES_FACTS["at"] > SERIES_FACTS_TTL:
+        _SERIES_FACTS["rows"] = [
+            {"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
+             "keywords": list(r["keywords"] or []),
+             "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
+             "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
+             "has_art": r["backdrop_path"] is not None}
+            for r in db.execute(text("""
+                SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
+                       m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
+                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres,
+                       ARRAY(SELECT k.name FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = m.id) AS keywords
+                FROM movies m WHERE m.title_type = 'series'""")).mappings()]
+        _SERIES_FACTS["at"] = now
+    return [{**r, "genres": list(r["genres"]), "keywords": list(r["keywords"]), "countries": list(r["countries"])}
+            for r in _SERIES_FACTS["rows"]]
 
 
 @router.get("/kind/{kind}")
@@ -86,17 +118,7 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     not_interested = set(rec_feedback.hidden_titles(db, uid))
     ranked = [int(cat.movie_ids[r]) for r in rows]
     ranked_series_rows = set(rows.tolist())
-    series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
-               "keywords": list(r["keywords"] or []),
-               "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
-               "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
-               "has_art": r["backdrop_path"] is not None}
-              for r in db.execute(text("""
-                SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
-                       m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
-                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres,
-                       ARRAY(SELECT k.name FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = m.id) AS keywords
-                FROM movies m WHERE m.title_type = 'series'""")).mappings()]
+    series = _series_facts(db)
     engaged = {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
     interest = series_rails_service.affinity([cat.language[r] for r in engaged], list(st.languages))
     shown_series = set(ranked[:24])       # Home's main Series row requests 24 titles.
@@ -129,10 +151,11 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     hits = [i for i, r in sorted(anime_list, key=lambda t: -cat.fame_pct[t[1]]) if cat.popularity[anime_ids[i]] >= 7.3][:60]
     anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
     anime_rails.append(("anime_romance", "Romantic anime", "Love stories and romantic comedies in anime form.",
-                        [i for i, r in anime_list if "Romance" in cat.genres[r] or any("romance" in k or "love" in k for k in cat.keywords[r])]))
+                        tc.evidence_first([i for i, r in anime_list if tc.is_romantic(cat.genres[r], cat.keywords[r], anime=True)],
+                                          {i: tc.romance_tier(cat.genres[r], cat.keywords[r], anime=True) for i, r in anime_list})))
     anime_rails.append(("anime_feelgood", "Feel-good anime", "Light, funny and warm anime.",
                         [i for i, r in anime_list if {"Comedy", "Family"} & set(cat.genres[r]) and not {"Horror", "Crime"} & set(cat.genres[r])
-                         and cat.popularity[r] >= 7.0]))
+                         and not tc.dark_in_tone(cat.keywords[r], cat.genres[r]) and cat.popularity[r] >= 7.0]))
     from cinematch_engine.rerank import refresh
     lead = []
     for key, title, sub, ids in anime_rails:
@@ -297,7 +320,11 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     hidden_rows = rec_feedback.hidden_rows(db, uid)
     hero_entries, skip = rec_feedback.hero_without_hidden(plan, skip)
     hero = scored_items(hero_entries)
-    shown = [r for r in plan["rails"] if rec_feedback.base_key(f"rail:{r['key']}") not in hidden_rows]
+    # A separate row of recent films (services/recent_row.py); built last so it never takes a title from another row.
+    on_page = {e["row"] for e in hero_entries} | {row for r in plan["rails"] for row in r["rows"]}
+    recent = recent_row.recent_rail(cat, plan["rail_scores"], on_page, skip, daily.today().year)
+    shown = [r for r in recent_row.insert_after_top_picks(plan["rails"], recent)
+             if rec_feedback.base_key(f"rail:{r['key']}") not in hidden_rows]
     order, learned = rec_feedback.reorder([rec_feedback.base_key(f"rail:{r['key']}") for r in shown],
                                           rec_feedback.row_stats(db, uid))
     rails = []
@@ -422,7 +449,7 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
         extra = {}
         for c, misses in chosen:
             it = by_id[c.id]
-            mp = engine.match(st.stage, it.rec) if it.kind == "movie" else None
+            mp = match_display.shown(engine.match(st.stage, it.rec)) if it.kind == "movie" else None
             extra[c.id] = {"score": it.rec, **({"match_pct": mp} if mp is not None else {}),
                            "reasons": pp.reasons_v2(it, c.role, pf, misses, matches_mood, rule, mp)}
         cards_out = cards(db, [c.id for c, _ in chosen], user["id"], extra)
@@ -473,6 +500,6 @@ def explain(movie_id: int, user=Depends(current_user), db: Session = Depends(get
     logged = db.execute(text("SELECT count(*) FROM interactions WHERE user_id = :u"), {"u": user["id"]}).scalar() or 0
     return {"movie_id": movie_id, "stage": st.stage, "behavioral_count": st.behavioral_count,
             "logged_interactions": int(logged), "onboarding_count": len(st.picks), "shares": shares,
-            "match_pct": engine.match(st.stage, s) if np.isfinite(s) else None,
+            "match_pct": match_display.shown(engine.match(st.stage, s) if np.isfinite(s) else None),
             "reasons": engine.reasons(st, row, shares), "weights": engine.weights[st.stage],
-            "confidence": confidence(engine, st, row, engine.match(st.stage, s) if np.isfinite(s) else None)}
+            "confidence": confidence(engine, st, row, match_display.shown(engine.match(st.stage, s) if np.isfinite(s) else None))}
