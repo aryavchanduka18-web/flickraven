@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 from app.auth import user_id_from
 from app.db import get_db
 from app.services import ai_similar
+from app.services import title_class as tc
 from app.services import anime_tags as anime_tags_mod
 from app.services import franchise as fr
+from app.services import match_display
 from app.services import search as sq
 from app.services import similar as similar_svc
 from app.services.confidence import confidence
@@ -32,16 +34,17 @@ def movie(movie_id: int, request: Request, db: Session = Depends(get_db)) -> dic
             source_scores = engine.scores(st)
             scores = engine.rail_scores(st, source_scores)
             raw = float(scores[row]) if np.isfinite(scores[row]) else None
-            d["match_pct"] = engine.match(st.stage, raw) if raw is not None else None
+            mp = engine.match(st.stage, raw) if raw is not None else None
+            d["match_pct"] = match_display.shown(mp)
             us = d["user_state"]
-            if d["match_pct"] is None and (us["rating"] is not None or us["reaction"] != 0):
+            if mp is None and (us["rating"] is not None or us["reaction"] != 0):
                 # Already rated, liked or disliked: part of the user's profile, not recommended back to them,
                 # so no "why you're seeing this" and no confidence card (the page says so instead).
                 d["in_profile"] = True
             else:
                 shares = _shares(engine, st, row, source_scores)
                 d["why"] = engine.reasons(st, row, shares)
-                d["confidence"] = confidence(engine, st, row, d["match_pct"], source_scores)
+                d["confidence"] = confidence(engine, st, row, match_display.shown(mp), source_scores)
     return d
 
 
@@ -162,6 +165,11 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     """Browse the catalog. `type` is movie (the default), series, anime or all. Extra filters: `year_min`/`year_max`
     (release period), `min_imdb` (IMDb score), `provider` (a TMDB provider id that streams it for free or on subscription
     in the stored region) and `min_match` (Match %, needs a personal sort and a signed-in user)."""
+    if not match_display.MATCH_VISIBLE:
+        # Match % is hidden until it is recalibrated, so it must not filter or order lists either (old links still work).
+        min_match = None
+        if sort == "match":
+            sort = "recommended"
     where, p = ["true"], {}
     kinds = media_kinds(type, genre)
     where.append("m.title_type = ANY(:kinds)"); p["kinds"] = kinds
@@ -231,6 +239,8 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
 
 
 PERSONAL_SORTS = {"recommended", "match", "hidden", "novel"}
+# "Recommended for you" on Discover: list length at which the novelty and Tune bonuses keep their full size (personal_order).
+BONUS_REFERENCE_LIST = 1000
 
 # `type` on /movies: movie (default), show (TV series and anime TV), series, anime, all (films and shows).
 MEDIA_KINDS = {"movie": ["movie"], "series": ["series"], "anime": ["anime"], "show": ["series", "anime"],
@@ -244,16 +254,18 @@ DARK_GENRES = ["Horror", "Crime", "War", "Thriller", "War & Politics", "Mystery"
 
 def vibe_where(vibe: str | None) -> tuple[str | None, dict]:
     """SQL for a mood chip that works on any genre page or Discover list, for films AND shows.
-    feelgood: a light genre (comedy, romance, family, animation, music) and no dark one, decently rated.
-    romance: the Romance genre, or (TV has no Romance genre) a romance/love keyword or the Soap genre."""
+    feelgood: a light genre (comedy, romance, family, animation, music), no dark genre and no dark keyword, decently rated.
+    romance: the shared romantic rule (app/services/title_class.py): Romance or Soap genre, or exact romance keywords
+    (TV has no Romance genre) with a supporting genre, and more evidence for crime, mystery and horror titles."""
     if vibe == "feelgood":
+        dark_kw, p = tc.dark_keyword_sql("m")
+        rom, rp = tc.romance_sql("m")          # a romance tagged "dark comedy" stays, as on Home
         return ("EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name = ANY(:vg)) "
                 "AND NOT EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name = ANY(:vdark)) "
-                "AND m.popularity_score >= 6.5", {"vg": FEEL_GOOD_GENRES, "vdark": DARK_GENRES})
+                f"AND NOT ({dark_kw} AND NOT {rom}) AND m.popularity_score >= 6.5",
+                {"vg": FEEL_GOOD_GENRES, "vdark": DARK_GENRES, **p, **rp})
     if vibe == "romance":
-        return ("(EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name IN ('Romance', 'Soap')) "
-                "OR EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
-                "WHERE mk.movie_id = m.id AND (k.name ILIKE '%romance%' OR k.name = 'love')))", {})
+        return tc.romance_sql("m")
     return None, {}
 
 
@@ -311,7 +323,8 @@ def discover_options(db: Session = Depends(get_db)) -> dict:
 
 def personal_order(db: Session, uid: int, ids: list[int], sort: str):
     """Discover sorts that need the engine (the filtered films, best first):
-    recommended: hybrid percentile, re-ranked with the user's Tune sliders (novelty and the slider boosts);
+    recommended: hybrid percentile, re-ranked with the user's Tune sliders (novelty and the slider boosts), whose
+    reach is capped at what it is on a 1,000-film list (BONUS_REFERENCE_LIST) so on long lists taste still leads;
     match: hybrid score only; hidden: hybrid percentile x (1 - fame percentile), i.e. high match, little known;
     novel: films whose genres the user has not liked before come first, then by hybrid score.
     Films the engine excludes (rated, disliked) go last, in the filter's popularity order."""
@@ -330,7 +343,11 @@ def personal_order(db: Session, uid: int, ids: list[int], sort: str):
         key = pct
     elif sort == "recommended":
         tuning = rec.user_tuning(db, uid)
-        key = pct + (0.05 + 0.15 * tuning.shift("hidden")) * engine.cat.novelty[r] + engine._tuning_boost(r, tuning)
+        bonus = (0.05 + 0.15 * tuning.shift("hidden")) * engine.cat.novelty[r] + engine._tuning_boost(r, tuning)
+        # The bonus is on the percentile scale, so its reach grows with the list: +0.05 is 60 places on a 1,200-film
+        # genre list but 1,350 places over all 27,000 films, where it beat taste and filled the top with little-known
+        # (mostly non-MovieLens, often Hindi) films. Keep its reach in places as on a 1,000-film list.
+        key = pct + bonus * min(1.0, BONUS_REFERENCE_LIST / max(int(ok.sum()), 1))
     elif sort == "hidden":
         key = pct * (1 - engine.cat.fame_pct[r] / 100)
     else:

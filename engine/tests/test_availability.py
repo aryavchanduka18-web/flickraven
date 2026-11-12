@@ -1,5 +1,6 @@
 """Films without collaborative factors: "unavailable" is not "low" (cinematch_engine/availability.py)."""
 import numpy as np
+import pytest
 
 from cinematch_engine.availability import AvailabilityMap, renormalized
 
@@ -40,16 +41,20 @@ def test_missing_stage_falls_back_to_warming():
     assert abs(out[0] - 0.5) < 1e-6
 
 
-def test_engine_scores_film_without_factors_by_available_sources():
+@pytest.mark.parametrize("mapping", ["quantile", "probability"])
+def test_engine_scores_film_without_factors_by_available_sources(mapping):
     """An established user, a film MovieLens never rated with a strong content match: scored on the MovieLens scale
-    by content, not 0.1 (content weight x percentile)."""
+    by content, not 0.1 (content weight x percentile). Both the quantile mapping (default) and the old probability map."""
     from types import SimpleNamespace
     from cinematch_engine.online import OnlineEngine, UserState
     from tests.test_kind_rank import cat
     c = cat(["movie"] * 4, [5, 5, 5, 5])
     c.universe_of_row = np.array([0, 1, -1, -1])
-    e = SimpleNamespace(cat=c, weights={"established": W}, availability=AvailabilityMap(curves()))
+    c.universe_rows = np.array([0, 1])
+    e = SimpleNamespace(cat=c, weights={"established": W}, availability=AvailabilityMap(curves()),
+                        unavailable_mapping=mapping)
     e.unavailable_rows = lambda: OnlineEngine.unavailable_rows(e)
+    e._quantile_unavailable = lambda *a: OnlineEngine._quantile_unavailable(e, *a)
     e.excluded = lambda st: np.array([], dtype=np.int64)
     n = c.n
     scores = {s: np.full(n, -np.inf, np.float32) for s in ("popularity", "content", "item_cf", "user_cf", "svd", "als")}

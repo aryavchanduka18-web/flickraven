@@ -133,12 +133,17 @@ def micro_breakdown(items: pd.DataFrame, by: str, hit: str = "in_pool", min_n: i
 
 # ----------------------------------------------------------------------------- engine instrumentation (in memory only)
 @contextlib.contextmanager
-def instrumented(engine, per_source: int):
+def instrumented(engine, per_source: int, inject=None):
     """Run the real top_picks with `per_source` films per source, recording the pool it builds.
 
     Yields a dict that a top_picks call fills: the base pool from candidate_pool, then the rows added by
     _add_unavailable_candidates (first call: films without MovieLens factors; a second call, only when a tail channel is
-    on: the long-tail channel). Both get `per_source`. Everything is restored on exit."""
+    on: the long-tail channel). Both get `per_source`. Everything is restored on exit.
+
+    inject (experiments, pipeline/candidate_experiments.py): optional fn(st, scores, excl, pool) -> catalog rows. After the
+    films without MovieLens data are added, those rows are added too, through the engine's own
+    _add_unavailable_candidates (same availability-aware score, same isotonic map onto the pool's scale), so an
+    experiment changes only WHICH films enter the pool, never how they are scored. Recorded as rec["arm_extra"]."""
     from cinematch_engine import online
     rec: dict = {}
     orig_cp = online.candidate_pool
@@ -159,6 +164,12 @@ def instrumented(engine, per_source: int):
             rec["base_final"] = np.asarray(final).copy()
         p2, n2, f2 = orig_add(st, scores, excl, pool, norm, final, w, per_source=per_source, rows=rows)
         rec["non_movielens_extra" if first else "tail_channel"] = set(np.asarray(p2[n0:]).tolist())
+        if first and inject is not None:
+            extra = np.asarray(inject(st, scores, excl, p2), dtype=np.int64)
+            n1 = len(p2)
+            if len(extra):
+                p2, n2, f2 = orig_add(st, scores, excl, p2, n2, f2, w, per_source=len(extra), rows=extra)
+            rec["arm_extra"] = set(np.asarray(p2[n1:]).tolist())
         if first:
             rec["pool"], rec["final"] = np.asarray(p2), np.asarray(f2)
         rec["calls"] = rec.get("calls", 0) + 1
@@ -184,10 +195,10 @@ def run_picks(engine, st, scores, mode: str, tail=None):
         rerank.MODES[mode]["tail_share"] = saved
 
 
-def pool_and_picks(engine, st, scores, per_source: int, mode="familiar", tail=0.0):
+def pool_and_picks(engine, st, scores, per_source: int, mode="familiar", tail=0.0, inject=None):
     """One real top_picks call at this pool size: (ranked pool, per-source proposals, top-10 rows)."""
     from cinematch_engine.sources import SOURCES
-    with instrumented(engine, per_source) as rec:
+    with instrumented(engine, per_source, inject) as rec:
         picks = run_picks(engine, st, scores, mode, tail)
     if "pool" in rec:
         pool, final = rec["pool"], rec["final"]
@@ -197,12 +208,13 @@ def pool_and_picks(engine, st, scores, per_source: int, mode="familiar", tail=0.
     norm[:, :rec["base_norm"].shape[1]] = rec["base_norm"]
     ranked, proposed = ranked_pool(pool, norm, final, SOURCES)
     proposed["non_movielens_extra"] = rec.get("non_movielens_extra", set())
+    proposed["arm"] = rec.get("arm_extra", set())
     return ranked, proposed, picks
 
 
-def run_picks_sized(engine, st, scores, mode, per_source):
+def run_picks_sized(engine, st, scores, mode, per_source, inject=None):
     """Top 10 of a shipped mode (with its own tail channel) at this pool size."""
-    with instrumented(engine, per_source):
+    with instrumented(engine, per_source, inject):
         return run_picks(engine, st, scores, mode)
 
 
