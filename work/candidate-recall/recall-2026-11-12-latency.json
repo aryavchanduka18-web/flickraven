@@ -1,0 +1,1209 @@
+{
+ "date": "2026-11-12",
+ "users_sampled": 100,
+ "seed": 11,
+ "sizes": [
+  50,
+  100,
+  200
+ ],
+ "overlap_by_n_sources": {
+  "cold": {
+   "50": {
+    "0": 0.7858,
+    "1": 0.1311,
+    "2": 0.06,
+    "3": 0.0171,
+    "4": 0.0056,
+    "6": 0.0004
+   },
+   "100": {
+    "0": 0.6773,
+    "1": 0.1744,
+    "2": 0.0898,
+    "3": 0.0432,
+    "4": 0.0127,
+    "5": 0.0019,
+    "6": 0.0007
+   },
+   "200": {
+    "0": 0.5432,
+    "1": 0.2157,
+    "2": 0.1248,
+    "3": 0.0816,
+    "4": 0.0287,
+    "5": 0.0052,
+    "6": 0.0007
+   }
+  },
+  "warming": {
+   "50": {
+    "0": 0.7455,
+    "1": 0.1434,
+    "2": 0.0686,
+    "3": 0.0291,
+    "4": 0.0089,
+    "5": 0.0037,
+    "6": 0.0007
+   },
+   "100": {
+    "0": 0.6382,
+    "1": 0.1699,
+    "2": 0.1084,
+    "3": 0.0514,
+    "4": 0.0231,
+    "5": 0.0071,
+    "6": 0.0019
+   },
+   "200": {
+    "0": 0.4993,
+    "1": 0.2109,
+    "2": 0.1386,
+    "3": 0.0864,
+    "4": 0.0451,
+    "5": 0.0153,
+    "6": 0.0045
+   }
+  },
+  "established": {
+   "50": {
+    "0": 0.6651,
+    "1": 0.1542,
+    "2": 0.0741,
+    "3": 0.063,
+    "4": 0.035,
+    "5": 0.0078,
+    "6": 0.0007
+   },
+   "100": {
+    "0": 0.5328,
+    "1": 0.1844,
+    "2": 0.0961,
+    "3": 0.0946,
+    "4": 0.0727,
+    "5": 0.0183,
+    "6": 0.0011
+   },
+   "200": {
+    "0": 0.4001,
+    "1": 0.2094,
+    "2": 0.1066,
+    "3": 0.1211,
+    "4": 0.1203,
+    "5": 0.0384,
+    "6": 0.0041
+   }
+  }
+ },
+ "sweep": {
+  "cold": {
+   "50": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 273.0,
+    "pool_recall": 0.3127,
+    "recall@50": 0.1321,
+    "recall@100": 0.1861,
+    "recall@200": 0.2922,
+    "familiar": {
+     "ndcg@10": 0.0482,
+     "ndcg_vs_50": 0.0,
+     "se_diff": 0.0,
+     "ild": 0.826,
+     "long_tail_share": 0.0,
+     "distinct_films": 72
+    },
+    "top_picks_traced_peak_mb_max": 2.0,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.074,
+    "top_picks_seconds_p95": 0.126,
+    "timed_calls": 100
+   },
+   "100": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 533.6,
+    "pool_recall": 0.4352,
+    "recall@50": 0.1389,
+    "recall@100": 0.2028,
+    "recall@200": 0.2652,
+    "familiar": {
+     "ndcg@10": 0.0487,
+     "ndcg_vs_50": 0.0006,
+     "se_diff": 0.0041,
+     "ild": 0.829,
+     "long_tail_share": 0.0,
+     "distinct_films": 99
+    },
+    "top_picks_traced_peak_mb_max": 1.8,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.076,
+    "top_picks_seconds_p95": 0.175,
+    "timed_calls": 100
+   },
+   "200": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 1042.7,
+    "pool_recall": 0.5651,
+    "recall@50": 0.1259,
+    "recall@100": 0.2145,
+    "recall@200": 0.3062,
+    "familiar": {
+     "ndcg@10": 0.053,
+     "ndcg_vs_50": 0.0048,
+     "se_diff": 0.0076,
+     "ild": 0.833,
+     "long_tail_share": 0.0,
+     "distinct_films": 136
+    },
+    "top_picks_traced_peak_mb_max": 1.9,
+    "top_picks_traced_peak_mb_mean": 1.9,
+    "top_picks_seconds_mean": 0.072,
+    "top_picks_seconds_p95": 0.147,
+    "timed_calls": 100
+   }
+  },
+  "warming": {
+   "50": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 274.0,
+    "pool_recall": 0.363,
+    "recall@50": 0.1236,
+    "recall@100": 0.1977,
+    "recall@200": 0.3196,
+    "familiar": {
+     "ndcg@10": 0.0737,
+     "ndcg_vs_50": 0.0,
+     "se_diff": 0.0,
+     "ild": 0.824,
+     "long_tail_share": 0.002,
+     "distinct_films": 163
+    },
+    "top_picks_traced_peak_mb_max": 1.8,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.089,
+    "top_picks_seconds_p95": 0.17,
+    "timed_calls": 100
+   },
+   "100": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 535.6,
+    "pool_recall": 0.4731,
+    "recall@50": 0.1597,
+    "recall@100": 0.2022,
+    "recall@200": 0.2918,
+    "familiar": {
+     "ndcg@10": 0.0822,
+     "ndcg_vs_50": 0.0085,
+     "se_diff": 0.0044,
+     "ild": 0.826,
+     "long_tail_share": 0.002,
+     "distinct_films": 196
+    },
+    "top_picks_traced_peak_mb_max": 1.8,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.093,
+    "top_picks_seconds_p95": 0.204,
+    "timed_calls": 100
+   },
+   "200": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 1055.3,
+    "pool_recall": 0.6097,
+    "recall@50": 0.1671,
+    "recall@100": 0.2386,
+    "recall@200": 0.2952,
+    "familiar": {
+     "ndcg@10": 0.0802,
+     "ndcg_vs_50": 0.0065,
+     "se_diff": 0.0079,
+     "ild": 0.823,
+     "long_tail_share": 0.004,
+     "distinct_films": 250
+    },
+    "top_picks_traced_peak_mb_max": 1.9,
+    "top_picks_traced_peak_mb_mean": 1.9,
+    "top_picks_seconds_mean": 0.093,
+    "top_picks_seconds_p95": 0.215,
+    "timed_calls": 100
+   }
+  },
+  "established": {
+   "50": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 260.4,
+    "pool_recall": 0.4334,
+    "recall@50": 0.2526,
+    "recall@100": 0.2961,
+    "recall@200": 0.4146,
+    "familiar": {
+     "ndcg@10": 0.1695,
+     "ndcg_vs_50": 0.0,
+     "se_diff": 0.0,
+     "ild": 0.84,
+     "long_tail_share": 0.006,
+     "distinct_films": 418
+    },
+    "top_picks_traced_peak_mb_max": 1.8,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.071,
+    "top_picks_seconds_p95": 0.167,
+    "timed_calls": 100
+   },
+   "100": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 503.6,
+    "pool_recall": 0.559,
+    "recall@50": 0.2833,
+    "recall@100": 0.3549,
+    "recall@200": 0.4077,
+    "familiar": {
+     "ndcg@10": 0.1779,
+     "ndcg_vs_50": 0.0084,
+     "se_diff": 0.0067,
+     "ild": 0.843,
+     "long_tail_share": 0.011,
+     "distinct_films": 378
+    },
+    "top_picks_traced_peak_mb_max": 1.8,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.069,
+    "top_picks_seconds_p95": 0.13,
+    "timed_calls": 100
+   },
+   "200": {
+    "users": 100,
+    "mean_relevant": 26.8,
+    "mean_pool_size": 987.3,
+    "pool_recall": 0.6752,
+    "recall@50": 0.2866,
+    "recall@100": 0.3959,
+    "recall@200": 0.4577,
+    "familiar": {
+     "ndcg@10": 0.1758,
+     "ndcg_vs_50": 0.0063,
+     "se_diff": 0.0103,
+     "ild": 0.842,
+     "long_tail_share": 0.007,
+     "distinct_films": 362
+    },
+    "top_picks_traced_peak_mb_max": 1.9,
+    "top_picks_traced_peak_mb_mean": 1.8,
+    "top_picks_seconds_mean": 0.072,
+    "top_picks_seconds_p95": 0.122,
+    "timed_calls": 100
+   }
+  }
+ },
+ "sources": {
+  "cold": {
+   "50": {
+    "popularity": {
+     "recall": 0.0775,
+     "only_this_source": 0.0279
+    },
+    "content": {
+     "recall": 0.0209,
+     "only_this_source": 0.0093
+    },
+    "item_cf": {
+     "recall": 0.0224,
+     "only_this_source": 0.0082
+    },
+    "user_cf": {
+     "recall": 0.0823,
+     "only_this_source": 0.022
+    },
+    "svd": {
+     "recall": 0.0238,
+     "only_this_source": 0.0056
+    },
+    "als": {
+     "recall": 0.0879,
+     "only_this_source": 0.0458
+    },
+    "non_movielens_extra": {
+     "recall": 0.0123,
+     "only_this_source": 0.0123
+    }
+   },
+   "100": {
+    "popularity": {
+     "recall": 0.1408,
+     "only_this_source": 0.0387
+    },
+    "content": {
+     "recall": 0.0294,
+     "only_this_source": 0.0119
+    },
+    "item_cf": {
+     "recall": 0.0376,
+     "only_this_source": 0.0115
+    },
+    "user_cf": {
+     "recall": 0.1416,
+     "only_this_source": 0.0276
+    },
+    "svd": {
+     "recall": 0.038,
+     "only_this_source": 0.0041
+    },
+    "als": {
+     "recall": 0.1434,
+     "only_this_source": 0.0633
+    },
+    "non_movielens_extra": {
+     "recall": 0.0171,
+     "only_this_source": 0.0171
+    }
+   },
+   "200": {
+    "popularity": {
+     "recall": 0.2213,
+     "only_this_source": 0.0447
+    },
+    "content": {
+     "recall": 0.0432,
+     "only_this_source": 0.0108
+    },
+    "item_cf": {
+     "recall": 0.06,
+     "only_this_source": 0.013
+    },
+    "user_cf": {
+     "recall": 0.2288,
+     "only_this_source": 0.0335
+    },
+    "svd": {
+     "recall": 0.0581,
+     "only_this_source": 0.0067
+    },
+    "als": {
+     "recall": 0.2232,
+     "only_this_source": 0.0861
+    },
+    "non_movielens_extra": {
+     "recall": 0.0209,
+     "only_this_source": 0.0209
+    }
+   }
+  },
+  "warming": {
+   "50": {
+    "popularity": {
+     "recall": 0.0775,
+     "only_this_source": 0.0212
+    },
+    "content": {
+     "recall": 0.0306,
+     "only_this_source": 0.0115
+    },
+    "item_cf": {
+     "recall": 0.0741,
+     "only_this_source": 0.0227
+    },
+    "user_cf": {
+     "recall": 0.089,
+     "only_this_source": 0.0168
+    },
+    "svd": {
+     "recall": 0.0302,
+     "only_this_source": 0.0075
+    },
+    "als": {
+     "recall": 0.1144,
+     "only_this_source": 0.0529
+    },
+    "non_movielens_extra": {
+     "recall": 0.0108,
+     "only_this_source": 0.0108
+    }
+   },
+   "100": {
+    "popularity": {
+     "recall": 0.1412,
+     "only_this_source": 0.0279
+    },
+    "content": {
+     "recall": 0.0466,
+     "only_this_source": 0.0168
+    },
+    "item_cf": {
+     "recall": 0.1025,
+     "only_this_source": 0.022
+    },
+    "user_cf": {
+     "recall": 0.1479,
+     "only_this_source": 0.0145
+    },
+    "svd": {
+     "recall": 0.0492,
+     "only_this_source": 0.0067
+    },
+    "als": {
+     "recall": 0.1822,
+     "only_this_source": 0.0715
+    },
+    "non_movielens_extra": {
+     "recall": 0.0104,
+     "only_this_source": 0.0104
+    }
+   },
+   "200": {
+    "popularity": {
+     "recall": 0.2213,
+     "only_this_source": 0.0339
+    },
+    "content": {
+     "recall": 0.0648,
+     "only_this_source": 0.0156
+    },
+    "item_cf": {
+     "recall": 0.1438,
+     "only_this_source": 0.0197
+    },
+    "user_cf": {
+     "recall": 0.237,
+     "only_this_source": 0.025
+    },
+    "svd": {
+     "recall": 0.0768,
+     "only_this_source": 0.0127
+    },
+    "als": {
+     "recall": 0.2776,
+     "only_this_source": 0.0943
+    },
+    "non_movielens_extra": {
+     "recall": 0.0097,
+     "only_this_source": 0.0097
+    }
+   }
+  },
+  "established": {
+   "50": {
+    "popularity": {
+     "recall": 0.1066,
+     "only_this_source": 0.0108
+    },
+    "content": {
+     "recall": 0.0324,
+     "only_this_source": 0.0123
+    },
+    "item_cf": {
+     "recall": 0.1472,
+     "only_this_source": 0.013
+    },
+    "user_cf": {
+     "recall": 0.1483,
+     "only_this_source": 0.0156
+    },
+    "svd": {
+     "recall": 0.044,
+     "only_this_source": 0.0112
+    },
+    "als": {
+     "recall": 0.193,
+     "only_this_source": 0.0876
+    },
+    "non_movielens_extra": {
+     "recall": 0.0037,
+     "only_this_source": 0.0037
+    }
+   },
+   "100": {
+    "popularity": {
+     "recall": 0.1699,
+     "only_this_source": 0.0108
+    },
+    "content": {
+     "recall": 0.0425,
+     "only_this_source": 0.0115
+    },
+    "item_cf": {
+     "recall": 0.231,
+     "only_this_source": 0.013
+    },
+    "user_cf": {
+     "recall": 0.2232,
+     "only_this_source": 0.0153
+    },
+    "svd": {
+     "recall": 0.076,
+     "only_this_source": 0.0175
+    },
+    "als": {
+     "recall": 0.3037,
+     "only_this_source": 0.1133
+    },
+    "non_movielens_extra": {
+     "recall": 0.003,
+     "only_this_source": 0.003
+    }
+   },
+   "200": {
+    "popularity": {
+     "recall": 0.25,
+     "only_this_source": 0.0168
+    },
+    "content": {
+     "recall": 0.0544,
+     "only_this_source": 0.0123
+    },
+    "item_cf": {
+     "recall": 0.3245,
+     "only_this_source": 0.0156
+    },
+    "user_cf": {
+     "recall": 0.307,
+     "only_this_source": 0.013
+    },
+    "svd": {
+     "recall": 0.1166,
+     "only_this_source": 0.0156
+    },
+    "als": {
+     "recall": 0.4259,
+     "only_this_source": 0.1308
+    },
+    "non_movielens_extra": {
+     "recall": 0.0052,
+     "only_this_source": 0.0052
+    }
+   }
+  }
+ },
+ "breakdowns": {
+  "cold": {
+   "language": {
+    "en": {
+     "relevant": 2467,
+     "pool_recall_50": 0.2161,
+     "recall@100_at_50": 0.1216,
+     "pool_recall_200": 0.4601
+    },
+    "other": {
+     "relevant": 126,
+     "pool_recall_50": 0.1349,
+     "recall@100_at_50": 0.0238,
+     "pool_recall_200": 0.3413
+    },
+    "ja": {
+     "relevant": 46,
+     "pool_recall_50": 0.2609,
+     "recall@100_at_50": 0.1304,
+     "pool_recall_200": 0.6304
+    },
+    "fr": {
+     "relevant": 45,
+     "pool_recall_50": 0.2889,
+     "recall@100_at_50": 0.1556,
+     "pool_recall_200": 0.4222
+    }
+   },
+   "decade": {
+    "2000s": {
+     "relevant": 829,
+     "pool_recall_50": 0.1725,
+     "recall@100_at_50": 0.0736,
+     "pool_recall_200": 0.4222
+    },
+    "1990s": {
+     "relevant": 676,
+     "pool_recall_50": 0.2944,
+     "recall@100_at_50": 0.1849,
+     "pool_recall_200": 0.5104
+    },
+    "2010s": {
+     "relevant": 422,
+     "pool_recall_50": 0.1161,
+     "recall@100_at_50": 0.0474,
+     "pool_recall_200": 0.3175
+    },
+    "1980s": {
+     "relevant": 367,
+     "pool_recall_50": 0.218,
+     "recall@100_at_50": 0.1199,
+     "pool_recall_200": 0.5232
+    },
+    "1970s": {
+     "relevant": 157,
+     "pool_recall_50": 0.3758,
+     "recall@100_at_50": 0.2739,
+     "pool_recall_200": 0.6051
+    },
+    "1960s": {
+     "relevant": 92,
+     "pool_recall_50": 0.1413,
+     "recall@100_at_50": 0.0652,
+     "pool_recall_200": 0.4891
+    },
+    "1950s": {
+     "relevant": 63,
+     "pool_recall_50": 0.3016,
+     "recall@100_at_50": 0.127,
+     "pool_recall_200": 0.6032
+    },
+    "1940s": {
+     "relevant": 40,
+     "pool_recall_50": 0.225,
+     "recall@100_at_50": 0.175,
+     "pool_recall_200": 0.475
+    },
+    "other": {
+     "relevant": 38,
+     "pool_recall_50": 0.1053,
+     "recall@100_at_50": 0.0526,
+     "pool_recall_200": 0.2105
+    }
+   },
+   "primary_genre": {
+    "Drama": {
+     "relevant": 630,
+     "pool_recall_50": 0.2508,
+     "recall@100_at_50": 0.1508,
+     "pool_recall_200": 0.4556
+    },
+    "Comedy": {
+     "relevant": 455,
+     "pool_recall_50": 0.0989,
+     "recall@100_at_50": 0.0462,
+     "pool_recall_200": 0.3099
+    },
+    "Action": {
+     "relevant": 368,
+     "pool_recall_50": 0.2147,
+     "recall@100_at_50": 0.1304,
+     "pool_recall_200": 0.481
+    },
+    "Adventure": {
+     "relevant": 282,
+     "pool_recall_50": 0.305,
+     "recall@100_at_50": 0.1844,
+     "pool_recall_200": 0.5177
+    },
+    "Crime": {
+     "relevant": 167,
+     "pool_recall_50": 0.3234,
+     "recall@100_at_50": 0.1796,
+     "pool_recall_200": 0.6048
+    },
+    "Horror": {
+     "relevant": 138,
+     "pool_recall_50": 0.2246,
+     "recall@100_at_50": 0.1159,
+     "pool_recall_200": 0.3913
+    },
+    "Science Fiction": {
+     "relevant": 120,
+     "pool_recall_50": 0.25,
+     "recall@100_at_50": 0.1333,
+     "pool_recall_200": 0.5917
+    },
+    "Thriller": {
+     "relevant": 108,
+     "pool_recall_50": 0.1481,
+     "recall@100_at_50": 0.0556,
+     "pool_recall_200": 0.3981
+    },
+    "Animation": {
+     "relevant": 99,
+     "pool_recall_50": 0.202,
+     "recall@100_at_50": 0.0808,
+     "pool_recall_200": 0.6768
+    },
+    "other": {
+     "relevant": 91,
+     "pool_recall_50": 0.1758,
+     "recall@100_at_50": 0.0989,
+     "pool_recall_200": 0.3516
+    },
+    "Fantasy": {
+     "relevant": 91,
+     "pool_recall_50": 0.1429,
+     "recall@100_at_50": 0.033,
+     "pool_recall_200": 0.4615
+    },
+    "Romance": {
+     "relevant": 60,
+     "pool_recall_50": 0.2167,
+     "recall@100_at_50": 0.0333,
+     "pool_recall_200": 0.5333
+    },
+    "Mystery": {
+     "relevant": 45,
+     "pool_recall_50": 0.2667,
+     "recall@100_at_50": 0.2222,
+     "pool_recall_200": 0.5333
+    },
+    "Documentary": {
+     "relevant": 30,
+     "pool_recall_50": 0.0667,
+     "recall@100_at_50": 0.0,
+     "pool_recall_200": 0.3
+    }
+   },
+   "popularity": {
+    "head": {
+     "relevant": 1462,
+     "pool_recall_50": 0.3256,
+     "recall@100_at_50": 0.1915,
+     "pool_recall_200": 0.6375
+    },
+    "torso": {
+     "relevant": 895,
+     "pool_recall_50": 0.095,
+     "recall@100_at_50": 0.0391,
+     "pool_recall_200": 0.286
+    },
+    "long_tail": {
+     "relevant": 327,
+     "pool_recall_50": 0.0428,
+     "recall@100_at_50": 0.0031,
+     "pool_recall_200": 0.1162
+    }
+   },
+   "movielens_linked": {
+    "True": {
+     "relevant": 2535,
+     "pool_recall_50": 0.2103,
+     "recall@100_at_50": 0.112,
+     "pool_recall_200": 0.4517
+    },
+    "False": {
+     "relevant": 149,
+     "pool_recall_50": 0.2819,
+     "recall@100_at_50": 0.2148,
+     "pool_recall_200": 0.5436
+    }
+   }
+  },
+  "warming": {
+   "language": {
+    "en": {
+     "relevant": 2467,
+     "pool_recall_50": 0.2574,
+     "recall@100_at_50": 0.1301,
+     "pool_recall_200": 0.503
+    },
+    "other": {
+     "relevant": 126,
+     "pool_recall_50": 0.1111,
+     "recall@100_at_50": 0.0556,
+     "pool_recall_200": 0.3968
+    },
+    "ja": {
+     "relevant": 46,
+     "pool_recall_50": 0.413,
+     "recall@100_at_50": 0.1957,
+     "pool_recall_200": 0.6522
+    },
+    "fr": {
+     "relevant": 45,
+     "pool_recall_50": 0.3333,
+     "recall@100_at_50": 0.2,
+     "pool_recall_200": 0.5111
+    }
+   },
+   "decade": {
+    "2000s": {
+     "relevant": 829,
+     "pool_recall_50": 0.199,
+     "recall@100_at_50": 0.0989,
+     "pool_recall_200": 0.4717
+    },
+    "1990s": {
+     "relevant": 676,
+     "pool_recall_50": 0.3388,
+     "recall@100_at_50": 0.1731,
+     "pool_recall_200": 0.5399
+    },
+    "2010s": {
+     "relevant": 422,
+     "pool_recall_50": 0.173,
+     "recall@100_at_50": 0.0758,
+     "pool_recall_200": 0.4052
+    },
+    "1980s": {
+     "relevant": 367,
+     "pool_recall_50": 0.2698,
+     "recall@100_at_50": 0.139,
+     "pool_recall_200": 0.5504
+    },
+    "1970s": {
+     "relevant": 157,
+     "pool_recall_50": 0.3503,
+     "recall@100_at_50": 0.2102,
+     "pool_recall_200": 0.6242
+    },
+    "1960s": {
+     "relevant": 92,
+     "pool_recall_50": 0.2283,
+     "recall@100_at_50": 0.1196,
+     "pool_recall_200": 0.5
+    },
+    "1950s": {
+     "relevant": 63,
+     "pool_recall_50": 0.3016,
+     "recall@100_at_50": 0.1746,
+     "pool_recall_200": 0.619
+    },
+    "1940s": {
+     "relevant": 40,
+     "pool_recall_50": 0.35,
+     "recall@100_at_50": 0.175,
+     "pool_recall_200": 0.5
+    },
+    "other": {
+     "relevant": 38,
+     "pool_recall_50": 0.2105,
+     "recall@100_at_50": 0.0526,
+     "pool_recall_200": 0.3158
+    }
+   },
+   "primary_genre": {
+    "Drama": {
+     "relevant": 630,
+     "pool_recall_50": 0.2698,
+     "recall@100_at_50": 0.1571,
+     "pool_recall_200": 0.5
+    },
+    "Comedy": {
+     "relevant": 455,
+     "pool_recall_50": 0.1582,
+     "recall@100_at_50": 0.0484,
+     "pool_recall_200": 0.3714
+    },
+    "Action": {
+     "relevant": 368,
+     "pool_recall_50": 0.2554,
+     "recall@100_at_50": 0.1386,
+     "pool_recall_200": 0.5136
+    },
+    "Adventure": {
+     "relevant": 282,
+     "pool_recall_50": 0.3475,
+     "recall@100_at_50": 0.1809,
+     "pool_recall_200": 0.5745
+    },
+    "Crime": {
+     "relevant": 167,
+     "pool_recall_50": 0.3234,
+     "recall@100_at_50": 0.1856,
+     "pool_recall_200": 0.5928
+    },
+    "Horror": {
+     "relevant": 138,
+     "pool_recall_50": 0.2681,
+     "recall@100_at_50": 0.1304,
+     "pool_recall_200": 0.4638
+    },
+    "Science Fiction": {
+     "relevant": 120,
+     "pool_recall_50": 0.3083,
+     "recall@100_at_50": 0.1667,
+     "pool_recall_200": 0.575
+    },
+    "Thriller": {
+     "relevant": 108,
+     "pool_recall_50": 0.1759,
+     "recall@100_at_50": 0.1111,
+     "pool_recall_200": 0.463
+    },
+    "Animation": {
+     "relevant": 99,
+     "pool_recall_50": 0.2525,
+     "recall@100_at_50": 0.1111,
+     "pool_recall_200": 0.6263
+    },
+    "other": {
+     "relevant": 91,
+     "pool_recall_50": 0.2198,
+     "recall@100_at_50": 0.0659,
+     "pool_recall_200": 0.4066
+    },
+    "Fantasy": {
+     "relevant": 91,
+     "pool_recall_50": 0.2857,
+     "recall@100_at_50": 0.1319,
+     "pool_recall_200": 0.6264
+    },
+    "Romance": {
+     "relevant": 60,
+     "pool_recall_50": 0.25,
+     "recall@100_at_50": 0.1167,
+     "pool_recall_200": 0.55
+    },
+    "Mystery": {
+     "relevant": 45,
+     "pool_recall_50": 0.2667,
+     "recall@100_at_50": 0.1111,
+     "pool_recall_200": 0.5556
+    },
+    "Documentary": {
+     "relevant": 30,
+     "pool_recall_50": 0.1333,
+     "recall@100_at_50": 0.0333,
+     "pool_recall_200": 0.4333
+    }
+   },
+   "popularity": {
+    "head": {
+     "relevant": 1462,
+     "pool_recall_50": 0.3735,
+     "recall@100_at_50": 0.2011,
+     "pool_recall_200": 0.6758
+    },
+    "torso": {
+     "relevant": 895,
+     "pool_recall_50": 0.133,
+     "recall@100_at_50": 0.0547,
+     "pool_recall_200": 0.333
+    },
+    "long_tail": {
+     "relevant": 327,
+     "pool_recall_50": 0.055,
+     "recall@100_at_50": 0.0092,
+     "pool_recall_200": 0.1774
+    }
+   },
+   "movielens_linked": {
+    "True": {
+     "relevant": 2535,
+     "pool_recall_50": 0.2548,
+     "recall@100_at_50": 0.125,
+     "pool_recall_200": 0.5101
+    },
+    "False": {
+     "relevant": 149,
+     "pool_recall_50": 0.2483,
+     "recall@100_at_50": 0.1946,
+     "pool_recall_200": 0.3423
+    }
+   }
+  },
+  "established": {
+   "language": {
+    "en": {
+     "relevant": 2467,
+     "pool_recall_50": 0.3393,
+     "recall@100_at_50": 0.2156,
+     "pool_recall_200": 0.6003
+    },
+    "other": {
+     "relevant": 126,
+     "pool_recall_50": 0.2857,
+     "recall@100_at_50": 0.1032,
+     "pool_recall_200": 0.5635
+    },
+    "ja": {
+     "relevant": 46,
+     "pool_recall_50": 0.2826,
+     "recall@100_at_50": 0.1522,
+     "pool_recall_200": 0.6739
+    },
+    "fr": {
+     "relevant": 45,
+     "pool_recall_50": 0.2889,
+     "recall@100_at_50": 0.1556,
+     "pool_recall_200": 0.6
+    }
+   },
+   "decade": {
+    "2000s": {
+     "relevant": 829,
+     "pool_recall_50": 0.2871,
+     "recall@100_at_50": 0.1882,
+     "pool_recall_200": 0.5464
+    },
+    "1990s": {
+     "relevant": 676,
+     "pool_recall_50": 0.4068,
+     "recall@100_at_50": 0.2825,
+     "pool_recall_200": 0.6642
+    },
+    "2010s": {
+     "relevant": 422,
+     "pool_recall_50": 0.2441,
+     "recall@100_at_50": 0.154,
+     "pool_recall_200": 0.5261
+    },
+    "1980s": {
+     "relevant": 367,
+     "pool_recall_50": 0.3706,
+     "recall@100_at_50": 0.2071,
+     "pool_recall_200": 0.6349
+    },
+    "1970s": {
+     "relevant": 157,
+     "pool_recall_50": 0.4268,
+     "recall@100_at_50": 0.2548,
+     "pool_recall_200": 0.6624
+    },
+    "1960s": {
+     "relevant": 92,
+     "pool_recall_50": 0.3261,
+     "recall@100_at_50": 0.1413,
+     "pool_recall_200": 0.6087
+    },
+    "1950s": {
+     "relevant": 63,
+     "pool_recall_50": 0.3968,
+     "recall@100_at_50": 0.1746,
+     "pool_recall_200": 0.7778
+    },
+    "1940s": {
+     "relevant": 40,
+     "pool_recall_50": 0.45,
+     "recall@100_at_50": 0.125,
+     "pool_recall_200": 0.7
+    },
+    "other": {
+     "relevant": 38,
+     "pool_recall_50": 0.1842,
+     "recall@100_at_50": 0.0526,
+     "pool_recall_200": 0.4211
+    }
+   },
+   "primary_genre": {
+    "Drama": {
+     "relevant": 630,
+     "pool_recall_50": 0.3571,
+     "recall@100_at_50": 0.2048,
+     "pool_recall_200": 0.5952
+    },
+    "Comedy": {
+     "relevant": 455,
+     "pool_recall_50": 0.233,
+     "recall@100_at_50": 0.1341,
+     "pool_recall_200": 0.5143
+    },
+    "Action": {
+     "relevant": 368,
+     "pool_recall_50": 0.3859,
+     "recall@100_at_50": 0.2337,
+     "pool_recall_200": 0.6114
+    },
+    "Adventure": {
+     "relevant": 282,
+     "pool_recall_50": 0.3901,
+     "recall@100_at_50": 0.2801,
+     "pool_recall_200": 0.6773
+    },
+    "Crime": {
+     "relevant": 167,
+     "pool_recall_50": 0.4132,
+     "recall@100_at_50": 0.2814,
+     "pool_recall_200": 0.7186
+    },
+    "Horror": {
+     "relevant": 138,
+     "pool_recall_50": 0.2391,
+     "recall@100_at_50": 0.1087,
+     "pool_recall_200": 0.4928
+    },
+    "Science Fiction": {
+     "relevant": 120,
+     "pool_recall_50": 0.3583,
+     "recall@100_at_50": 0.2417,
+     "pool_recall_200": 0.6583
+    },
+    "Thriller": {
+     "relevant": 108,
+     "pool_recall_50": 0.25,
+     "recall@100_at_50": 0.1852,
+     "pool_recall_200": 0.4815
+    },
+    "Animation": {
+     "relevant": 99,
+     "pool_recall_50": 0.404,
+     "recall@100_at_50": 0.2626,
+     "pool_recall_200": 0.6869
+    },
+    "other": {
+     "relevant": 91,
+     "pool_recall_50": 0.2967,
+     "recall@100_at_50": 0.1429,
+     "pool_recall_200": 0.5934
+    },
+    "Fantasy": {
+     "relevant": 91,
+     "pool_recall_50": 0.4066,
+     "recall@100_at_50": 0.2857,
+     "pool_recall_200": 0.7033
+    },
+    "Romance": {
+     "relevant": 60,
+     "pool_recall_50": 0.3667,
+     "recall@100_at_50": 0.25,
+     "pool_recall_200": 0.6167
+    },
+    "Mystery": {
+     "relevant": 45,
+     "pool_recall_50": 0.3333,
+     "recall@100_at_50": 0.2222,
+     "pool_recall_200": 0.6667
+    },
+    "Documentary": {
+     "relevant": 30,
+     "pool_recall_50": 0.1,
+     "recall@100_at_50": 0.1,
+     "pool_recall_200": 0.4333
+    }
+   },
+   "popularity": {
+    "head": {
+     "relevant": 1462,
+     "pool_recall_50": 0.4938,
+     "recall@100_at_50": 0.3181,
+     "pool_recall_200": 0.7784
+    },
+    "torso": {
+     "relevant": 895,
+     "pool_recall_50": 0.1721,
+     "recall@100_at_50": 0.0972,
+     "pool_recall_200": 0.4402
+    },
+    "long_tail": {
+     "relevant": 327,
+     "pool_recall_50": 0.0703,
+     "recall@100_at_50": 0.0214,
+     "pool_recall_200": 0.2385
+    }
+   },
+   "movielens_linked": {
+    "True": {
+     "relevant": 2535,
+     "pool_recall_50": 0.3456,
+     "recall@100_at_50": 0.2166,
+     "pool_recall_200": 0.6174
+    },
+    "False": {
+     "relevant": 149,
+     "pool_recall_50": 0.1544,
+     "recall@100_at_50": 0.0671,
+     "pool_recall_200": 0.302
+    }
+   }
+  }
+ },
+ "stage_check": {
+  "cold": {
+   "cold": 300
+  },
+  "warming": {
+   "warming": 300
+  },
+  "established": {
+   "established": 300
+  }
+ },
+ "process_peak_rss_mb": 580,
+ "seconds": 214
+}
