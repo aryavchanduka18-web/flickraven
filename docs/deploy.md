@@ -209,44 +209,16 @@ Use `/api/ping`, **not** `/api/health`. `/api/health` runs a database query, so 
 would keep the Neon database awake all month and use up Neon's free compute hours. `/api/ping` never
 touches the database; Neon still sleeps between real visitors.
 
-## Hosting on Hugging Face Spaces (instead of Render)
+## Other hosts that were considered
 
-A free Hugging Face **Docker Space** runs the same `Dockerfile` with 2 CPUs and 16 GB of memory (Render
-free: a fraction of one CPU and 512 MB), and sleeps only after **48 hours** without visitors (Render: 15
-minutes). The database stays on Neon and the model bundle stays in the private GitHub release; only the
-server moves. Vercel cannot host it: its Python functions are capped at 250 MB, the server's libraries
-alone are larger, and the model would be reloaded on every cold start.
+FlickRaven stays on Render. Checked 2026-11-13:
 
-One trade-off: Neon `flickraven-2` is in Singapore and Spaces run in the US or Europe, so every database
-query travels further than from Render (also Singapore). Compare page speed on both before switching.
+- **Vercel** cannot host the server: its Python functions are capped at 250 MB, the server's
+  numpy/scipy/pandas/scikit-learn/pyarrow are larger, and the model would reload on every cold start.
+- **Hugging Face Spaces**: since July 2026, Docker and Gradio Spaces on the free CPU Basic hardware
+  need a PRO subscription (about $9 a month, more than Render Starter). Only static Spaces are free.
 
-Setup (once):
-
-1. Sign up at <https://huggingface.co> and choose **New Space**: name `flickraven`, SDK **Docker**,
-   template **Blank**, hardware **CPU basic (free)**, **Public** (the code is already public on GitHub;
-   no secret is in the files).
-2. In the Space, **Settings > Variables and secrets**, add as **Secrets** the same values Render has:
-   `DATABASE_URL` (Neon `flickraven-2`, pooled), `JWT_SECRET`, `ARTIFACT_BUNDLE_URL`,
-   `ARTIFACT_BUNDLE_TOKEN`, `ADMIN_EMAILS`, `GEMINI_API_KEY`, `TMDB_API_KEY` (if Render has it); and as
-   **Variables**: `COOKIE_SECURE` = `true`, `WEB_ORIGIN` = `https://<your-hf-name>-flickraven.hf.space`.
-   Reusing Render's `JWT_SECRET` keeps people signed in when you switch.
-3. Hugging Face **Settings > Access Tokens > Create new token**, type **Fine-grained**, permission
-   **Write** on the `flickraven` Space only. Copy it.
-4. GitHub repository **Settings > Secrets and variables > Actions**: secret `HF_TOKEN` = that token;
-   **Variables** tab: `HF_SPACE` = `<your-hf-name>/flickraven`.
-5. GitHub **Actions > Deploy to Hugging Face > Run workflow**. It uploads `Dockerfile`, `api/`, `engine/`,
-   `web/` and `deploy/` (plus `deploy/hf/README.md` as the Space's settings file); the Space then builds
-   (about 10 minutes the first time) and starts.
-6. Open `https://<your-hf-name>-flickraven.hf.space` (the direct address, not the huggingface.co page:
-   sign-in cookies do not work inside that page's frame). The Space's **Logs** should show
-   `artifact bundle fetched from ARTIFACT_BUNDLE_URL`.
-
-Updating later: merge to `main`, then run the workflow again (it is manual, like Render's deploys).
-
-When the Space works, suspend the Render service (Render > Settings > Suspend) so only one server
-uses the database, and point the UptimeRobot monitor (if any) at the new `/api/ping` address. Both
-servers run the same migrations on start, so never run two different `main` versions against the
-database at once.
+To stop the site sleeping, use the free UptimeRobot monitor above, or Render Starter (about $7 a month).
 
 ## Database on Neon
 
