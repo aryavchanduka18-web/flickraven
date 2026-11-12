@@ -2,7 +2,7 @@
 # upload them to the live site. Takes about 15 to 30 minutes. Run from the cinematch folder:
 #   scripts\monthly_refresh.ps1
 # Needs: Docker Desktop running, the local database started (scripts\db.ps1), TMDB_API_KEY and
-# NEON_DATABASE_URL in .env. Afterwards: Render, flickraven service, Manual Deploy > Restart service.
+# NEON_DATABASE_URL in .env. Afterwards: Render, flickraven service, Manual Deploy > Deploy latest commit (a restart does not pick up new code).
 . "$PSScriptRoot\_common.ps1"
 
 $url = Get-EnvValue "NEON_DATABASE_URL"
@@ -33,5 +33,5 @@ try {
     finally { Remove-Item Env:TARGET_DATABASE_URL -ErrorAction SilentlyContinue }
     $report = Get-Content (Join-Path $Root "data\processed\new_releases_report.json") | ConvertFrom-Json
     Write-Host "`nDone. New films this month: $($report.new_this_run)." -ForegroundColor Green
-    Write-Host "Last step: Render > flickraven > Manual Deploy > Restart service." -ForegroundColor Yellow
+    Write-Host "Last step: Render > flickraven > Manual Deploy > Deploy latest commit (a restart does not pick up new code)." -ForegroundColor Yellow
 } finally { Pop-Location }

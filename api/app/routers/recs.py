@@ -1,4 +1,5 @@
 """Recommendations: home page plan, rails, For Tonight, Surprise Me, explanations."""
+import time
 import uuid
 
 import numpy as np
@@ -46,6 +47,34 @@ def log_shown(db, uid, request_id, page_id, surface, mode, items):
                     "rc": it["reasons"][0]["code"] if it.get("reasons") else None, "mo": mode, "pg": page_id})
 
 
+_SERIES_FACTS: dict = {"at": 0.0, "rows": []}
+SERIES_FACTS_TTL = 6 * 3600
+
+
+def _series_facts(db: Session) -> list[dict]:
+    """Static facts about every series (genres, keywords, seasons...) for the Home series rails. The query reads all
+    ~4,300 series with their keywords, about 0.5 MB from the hosted database, so it ran on every Home load and was a
+    large share of the database's network transfer. The facts only change when the catalogue is refreshed (which
+    needs a deploy), so they are kept for six hours. Callers get copies, so a request can never change the cache."""
+    now = time.monotonic()
+    if not _SERIES_FACTS["rows"] or now - _SERIES_FACTS["at"] > SERIES_FACTS_TTL:
+        _SERIES_FACTS["rows"] = [
+            {"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
+             "keywords": list(r["keywords"] or []),
+             "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
+             "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
+             "has_art": r["backdrop_path"] is not None}
+            for r in db.execute(text("""
+                SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
+                       m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
+                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres,
+                       ARRAY(SELECT k.name FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = m.id) AS keywords
+                FROM movies m WHERE m.title_type = 'series'""")).mappings()]
+        _SERIES_FACTS["at"] = now
+    return [{**r, "genres": list(r["genres"]), "keywords": list(r["keywords"]), "countries": list(r["countries"])}
+            for r in _SERIES_FACTS["rows"]]
+
+
 @router.get("/kind/{kind}")
 def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_user),
               db: Session = Depends(get_db)) -> dict:
@@ -89,17 +118,7 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     not_interested = set(rec_feedback.hidden_titles(db, uid))
     ranked = [int(cat.movie_ids[r]) for r in rows]
     ranked_series_rows = set(rows.tolist())
-    series = [{"id": r["id"], "lang": r["original_language"], "countries": r["countries"] or [], "seasons": r["seasons"],
-               "keywords": list(r["keywords"] or []),
-               "episodes": r["episodes"], "runtime": r["runtime_min"], "status": r["series_status"],
-               "genres": list(r["genres"]), "popularity": float(r["popularity_score"] or 0), "votes": r["tmdb_vote_count"] or 0,
-               "has_art": r["backdrop_path"] is not None}
-              for r in db.execute(text("""
-                SELECT m.id, m.original_language, m.countries, m.seasons, m.episodes, m.runtime_min, m.series_status,
-                       m.popularity_score, m.tmdb_vote_count, m.backdrop_path,
-                       ARRAY(SELECT g.name FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id) AS genres,
-                       ARRAY(SELECT k.name FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = m.id) AS keywords
-                FROM movies m WHERE m.title_type = 'series'""")).mappings()]
+    series = _series_facts(db)
     engaged = {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
     interest = series_rails_service.affinity([cat.language[r] for r in engaged], list(st.languages))
     shown_series = set(ranked[:24])       # Home's main Series row requests 24 titles.

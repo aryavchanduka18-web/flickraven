@@ -114,6 +114,60 @@ def _similar_table(tmdb_ids: list[int]) -> dict | None:
     return {"rows": rows, "scores": scores, "comps": comps, "stored": [str(s) for s in f["stored"]]}
 
 
+SNAPSHOT = "catalog_snapshot.parquet"
+SNAPSHOT_COLUMNS = ["tmdb_id", "title", "original_language", "runtime_min", "year", "catalog_part", "title_type",
+                    "genres", "keywords", "has_award"]
+
+
+def _catalog_from_sql(db: Session) -> pd.DataFrame:
+    """The whole catalogue from the database: one big query, about 7 MB over the wire."""
+    return pd.DataFrame(db.execute(text("""
+        SELECT m.id, m.tmdb_id, m.title, m.original_language, m.runtime_min, m.year, m.catalog_part, m.title_type,
+               coalesce(m.popularity_score, 0) AS popularity, coalesce(m.tmdb_vote_count, 0) AS votes,
+               coalesce(array_agg(DISTINCT g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
+               coalesce(array_agg(DISTINCT k.name) FILTER (WHERE k.name IS NOT NULL), '{}') AS keywords,
+               bool_or(a.id IS NOT NULL AND a.award NOT ILIKE 'Golden Raspberry%') AS has_award
+        FROM movies m
+        LEFT JOIN movie_genres mg ON mg.movie_id = m.id LEFT JOIN genres g ON g.id = mg.genre_id
+        LEFT JOIN movie_keywords mk ON mk.movie_id = m.id LEFT JOIN keywords k ON k.id = mk.keyword_id
+        LEFT JOIN movie_awards a ON a.movie_id = m.id
+        GROUP BY m.id
+    """)).mappings().all())
+
+
+def _catalog_frame(db: Session) -> pd.DataFrame:
+    """Catalogue rows for the engine. When the model bundle carries a snapshot (scripts/deploy_data.py export writes
+    artifacts/models/catalog_snapshot.parquet) only ids and the two moving counts are read from the database, a small
+    fraction of the big query, so every start and wake costs the hosted database far less network transfer. The
+    snapshot is used only when its title set is exactly the database's; otherwise (catalogue refreshed without a
+    new bundle) the full query runs, so the engine never mixes old text with new rows."""
+    path = MODELS / SNAPSHOT
+    if path.exists():
+        try:
+            snap = pd.read_parquet(path)
+            light = pd.DataFrame(db.execute(text("""
+                SELECT id, tmdb_id, coalesce(popularity_score, 0) AS popularity, coalesce(tmdb_vote_count, 0) AS votes
+                FROM movies""")).mappings().all())
+            if set(snap["tmdb_id"]) == set(light["tmdb_id"]) and len(snap) == len(light):
+                return light.merge(snap[SNAPSHOT_COLUMNS], on="tmdb_id", how="inner")
+            log.warning("catalog snapshot does not match the database (%d vs %d titles); using the full query",
+                        len(snap), len(light))
+        except Exception:
+            log.exception("catalog snapshot could not be used; using the full query")
+    return _catalog_from_sql(db)
+
+
+def build_snapshot(db: Session, path: Path) -> int:
+    """Write the snapshot from the database in `db` (used by scripts/deploy_data.py export). Returns the row count."""
+    df = _catalog_from_sql(db)[["tmdb_id", "title", "original_language", "runtime_min", "year", "catalog_part",
+                                 "title_type", "genres", "keywords", "has_award"]].copy()
+    df["genres"] = df["genres"].map(list)
+    df["keywords"] = df["keywords"].map(list)
+    df["has_award"] = df["has_award"].fillna(False).astype(bool)
+    df.to_parquet(path, index=False)
+    return len(df)
+
+
 def load_engine(db: Session) -> OnlineEngine:
     global _engine
     with _lock:
@@ -121,18 +175,7 @@ def load_engine(db: Session) -> OnlineEngine:
             return _engine
         rows = pd.read_parquet(MODELS / "content_rows.parquet")
         content = sp.load_npz(MODELS / "content_matrix.npz").tocsr()
-        movies = pd.DataFrame(db.execute(text("""
-            SELECT m.id, m.tmdb_id, m.title, m.original_language, m.runtime_min, m.year, m.catalog_part, m.title_type,
-                   coalesce(m.popularity_score, 0) AS popularity, coalesce(m.tmdb_vote_count, 0) AS votes,
-                   coalesce(array_agg(DISTINCT g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
-                   coalesce(array_agg(DISTINCT k.name) FILTER (WHERE k.name IS NOT NULL), '{}') AS keywords,
-                   bool_or(a.id IS NOT NULL AND a.award NOT ILIKE 'Golden Raspberry%') AS has_award
-            FROM movies m
-            LEFT JOIN movie_genres mg ON mg.movie_id = m.id LEFT JOIN genres g ON g.id = mg.genre_id
-            LEFT JOIN movie_keywords mk ON mk.movie_id = m.id LEFT JOIN keywords k ON k.id = mk.keyword_id
-            LEFT JOIN movie_awards a ON a.movie_id = m.id
-            GROUP BY m.id
-        """)).mappings().all())
+        movies = _catalog_frame(db)
         movies = rows.merge(movies, on="tmdb_id", how="inner").sort_values("row")
         if movies.empty:   # a hosted database before the catalog is restored: do not cache an empty engine
             raise HTTPException(503, "The film catalog is not loaded yet")
