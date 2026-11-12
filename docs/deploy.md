@@ -74,7 +74,7 @@ already there, and finishes a bundle upload that stopped half way.
 
 ## Updating the site later
 
-- **Code changes**: merge into `main`. Render rebuilds and redeploys by itself (`autoDeploy`).
+- **Code changes**: merge into `main`, then in Render click **Manual Deploy > Deploy latest commit**. Auto-deploy is off on purpose (`autoDeploy: false`): on the free plan each build spends build minutes and each start spends Neon transfer. Batch several merges into one deploy. If the service was created before this change, also turn **Settings > Build & Deploy > Auto-Deploy** to **Off** in the Render dashboard.
   Database changes (Alembic migrations) run automatically when the new version starts.
 - **New models**: run the pipeline on the laptop, then `deploy_data.py export` and `upload` again, then
   **Restart service**.
@@ -189,6 +189,15 @@ database is. Everyone else gets "Page not found". It shows totals only, never on
   **Neon** (free plan, no expiry, 1 GB per project; FlickRaven uses about 240 MB). See "Database on Neon" below.
 - Sign-in lockout counters are kept in the server's memory, so a restart clears them.
 - There is no email service, so the site cannot send password reset or verification emails.
+
+## If Render says a free limit is reached
+
+Render's free plan has two monthly limits. Check **Account > Billing / Usage** to see which one:
+
+- **Free instance hours (750 a month for all free web services together).** One service kept awake all month uses about 720 to 744, so a second running service (for example the old `cinematch` service) pushes you over. Suspend or delete every FlickRaven service except the live one (`flickraven`). If the limit is still hit, pause the UptimeRobot monitor overnight (UptimeRobot > monitor > Pause, or a maintenance window), which lets the app sleep and saves about a quarter of the hours.
+- **Build minutes.** Each deploy builds the Docker image (5 to 10 minutes). Deploy less: auto-deploy is off, so deploy by hand once after several merges.
+
+The limits reset on the 1st. A paid web service (Starter, about $7 a month) has no hours limit and does not sleep.
 
 ## Keep the site awake (UptimeRobot)
 
