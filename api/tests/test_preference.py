@@ -8,38 +8,34 @@ from app.services import preference as pf
 from app.services.preference import Label, State, Title
 
 T0 = datetime(2026, 1, 1)
-CROSSES = [("Crime", "dark"), ("Crime", "humour")]
 
 
-def mk(i, genres, dark=0.1, humour=0.1, lang="en", year=2010, runtime=110, known=True):
-    traits = {"dark": dark, "humour": humour, "fast": 0.3, "emotional": 0.3} if known else None
-    return Title(i, genres, traits, lang, year, runtime)
+def mk(i, genres, lang="en", year=2010, runtime=110):
+    return Title(i, genres, lang, year, runtime)
 
 
 def catalogue():
-    """A catalogue of 600 titles with a spread of genres and tones, plus the three kinds of crime film we test with."""
-    rng = np.random.default_rng(0)
+    """A catalogue of 600 titles with a spread of genres, plus the three kinds of crime film we test with."""
     gs = ["Drama", "Comedy", "Action", "Crime", "Romance", "Thriller"]
     out = []
     for i in range(600):
         g = [gs[i % 6]] + ([gs[(i * 7 + 1) % 6]] if i % 3 == 0 else [])
-        out.append(mk(i, sorted(set(g)), dark=float(rng.random()), humour=float(rng.random()),
-                      lang=["en", "hi", "ko"][i % 3], year=1980 + (i * 3) % 45, runtime=70 + (i * 11) % 90))
+        out.append(mk(i, sorted(set(g)), lang=["en", "hi", "ko"][i % 3], year=1980 + (i * 3) % 45, runtime=70 + (i * 11) % 90))
     return out
 
 
 @pytest.fixture(scope="module")
 def world():
     titles = catalogue()
-    return titles, pf.fit_space(titles, CROSSES)
+    return titles, pf.fit_space(titles)
 
 
 def serious_crime(i):
-    return mk(10_000 + i, ["Crime", "Thriller"], dark=0.9, humour=0.05)
+    return mk(10_000 + i, ["Crime", "Thriller"])
 
 
 def crime_comedy(i):
-    return mk(20_000 + i, ["Crime", "Comedy"], dark=0.1, humour=0.9)
+    return mk(20_000 + i, ["Crime", "Comedy"])
 
 
 # ---- labels --------------------------------------------------------------------------------------
@@ -97,14 +93,14 @@ def learn(world, liked, rejected, extra=None):
 
 def test_learns_serious_crime_yes_crime_comedy_no(world):
     """The motivating case: likes serious crime thrillers, rejects crime comedies. Held-out films of each kind must be
-    ranked the right way round, which a single 'likes Crime' weight could not do."""
+    ranked the right way round (Thriller up, Comedy down), which a single 'likes Crime' weight could not do."""
     _, space = world
     prof = learn(world, [serious_crime(i) for i in range(6)], [crime_comedy(i) for i in range(6)])
     held_dark, held_comedy = serious_crime(50), crime_comedy(50)
     assert pf.score(prof, held_dark) > 0 > pf.score(prof, held_comedy)
     assert pf.score(prof, held_dark) - pf.score(prof, held_comedy) > 0.5
     names = {f["feature"]: f for f in pf.top_features(prof, 40)}
-    assert any(k in names for k in ("x:Crime*dark", "x:Crime*humour", "t:dark", "t:humour"))
+    assert any(k in names for k in ("g:Thriller", "g:Comedy"))      # told apart by their genres alone
 
 
 def test_no_effect_below_three_distinct_films(world):
@@ -118,17 +114,6 @@ def test_repeated_actions_on_one_film_do_not_build_confidence(world):
     labels = pf.effective_labels([State(10_000, rating=10, rating_at=T0, reaction="like", reaction_at=T0, in_list=True, list_at=T0)])
     prof = pf.fit(labels, {10_000: serious_crime(0)}, world[1])
     assert prof.films == 1 and (pf.effect(prof) == 0).all()
-
-
-def test_unknown_traits_are_not_a_dislike(world):
-    prof = learn(world, [serious_crime(i) for i in range(6)], [crime_comedy(i) for i in range(6)])
-    base = mk(77, ["Drama"], known=False)
-    s = pf.score(prof, base)
-    assert np.isfinite(s)
-    # a title with unknown traits only gets credit or blame from what we do know (genre, language, era, length)
-    x, _ = pf.encode(base, world[1])
-    trait_cols = [i for i, n in enumerate(world[1].names) if n.startswith(("t:", "x:"))]
-    assert (x[trait_cols] == 0).all()
 
 
 def test_adjustment_is_bounded_and_grows_with_evidence(world):
@@ -146,12 +131,12 @@ def test_same_events_same_profile(world):
     assert np.array_equal(a.theta, b.theta)
 
 
-def test_that_is_not_me_zeroes_a_trait(world):
+def test_that_is_not_me_zeroes_a_feature(world):
     prof = learn(world, [serious_crime(i) for i in range(6)], [crime_comedy(i) for i in range(6)])
     before = pf.score(prof, serious_crime(50))
     prof2 = pf.fit({}, {}, world[1])
     assert pf.score(prof2, serious_crime(50)) == 0.0               # nothing learned = no effect
-    zeroed = pf.Profile(prof.space, prof.theta, prof.n, prof.films, {n for n in prof.space.names if n.startswith(("t:", "x:"))})
+    zeroed = pf.Profile(prof.space, prof.theta, prof.n, prof.films, {n for n in prof.space.names if n.startswith("g:")})
     assert abs(pf.score(zeroed, serious_crime(50))) < abs(before)
 
 
@@ -171,7 +156,7 @@ def test_genre_only_label_touches_genre_features_only(world):
 def test_rare_feature_cannot_dominate(world):
     titles, space = world
     assert (space.scale >= pf.MIN_SCALE).all()
-    rare = Title(99_999, ["Drama"], {"dark": 0.5, "humour": 0.5, "fast": 0.3, "emotional": 0.3}, "xx", 1900, 70)
+    rare = Title(99_999, ["Drama"], "xx", 1900, 70)
     labels = {99_999: Label(99_999, 1, 1.0, "like")}
     prof = pf.fit(labels, {99_999: rare}, space)
     assert abs(pf.score(prof, rare)) < 1e-9                         # one film = no effect, whatever its tags

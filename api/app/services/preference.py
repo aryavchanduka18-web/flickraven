@@ -3,15 +3,15 @@
 Nothing here is connected to the ranker. Step C of the plan builds and tests the maths; shadow logging and any ranking
 change come later, and a ranking change only after the offline replay passes.
 
-What it learns: a weight per feature (genre, Taste DNA trait, language, era, length, and a few crosses such as
-Crime x dark), from the films a person has clearly liked or disliked. "Liked serious crime, rejected crime comedy"
-becomes a positive Crime x dark weight and a negative Crime x humour weight, not a single "likes Crime" number.
+What it learns: a weight per feature (genre, language, era, length), from the films a person has clearly liked or
+disliked. Taste DNA traits and genre x trait crosses were removed on 2026-11-12: on 500 fresh users they added no
+measurable gain over genre alone (full minus genre-only: +0.0001 NDCG at warming, -0.0006 at established, intervals
+include zero) and raised genre repetition.
 
 Rules that matter (all from design v2):
 - One label per person and film. The latest explicit opinion (rating, like, dislike) wins. A My List add counts as
   weak "interest" only when there is no explicit opinion. Watched, Not interested and page views are never taste.
 - Evidence is counted in DISTINCT films, never in events. A feature has no effect below MIN_FILMS films.
-- An unknown trait (too little keyword data) is unknown: it contributes zero. It is never read as "absent".
 - Context rejections (wrong mood, language, length, already seen) are not examples. Only "wrong genre" (genre
   features only) and "not my taste" (weak) reach the weights.
 - Only feedback after `reset_at` counts, and nothing counts while learning is off.
@@ -30,7 +30,6 @@ FULL_AT = 20             # distinct labelled films at which the adjustment reach
 MIN_SCALE = 0.2          # floor on a feature's catalogue spread, so one rare tag cannot dominate
 MIN_KNOWN = 30           # a feature needs this many titles with known values to be in the model
 BASE_LAMBDA = 2.0        # regularisation; larger = slower to move. Tuned in the offline replay, not by hand.
-CROSS_LAMBDA = 3.0       # crosses move only with real evidence
 RARE_LAMBDA = 2.0        # extra for features present on under 2% of titles
 CAP_SHARE = 0.25         # adjustment cap as a share of the pool's score spread (90th minus 10th percentile)
 
@@ -43,10 +42,9 @@ ALPHA_WRONG_GENRE, ALPHA_NOT_MY_TASTE = 0.5, 0.3
 # ---------------------------------------------------------------- features
 @dataclass
 class Title:
-    """What the model needs to know about one title. traits is None when unknown (too little keyword data)."""
+    """What the model needs to know about one title."""
     id: int
     genres: list[str] = field(default_factory=list)
-    traits: dict[str, float] | None = None
     language: str | None = None
     year: int | None = None
     runtime: int | None = None
@@ -58,13 +56,9 @@ def runtime_bucket(minutes: int | None) -> str | None:
     return "short" if minutes < 90 else "medium" if minutes <= 135 else "long"
 
 
-def raw_features(t: Title, crosses: list[tuple[str, str]]) -> dict[str, float]:
+def raw_features(t: Title) -> dict[str, float]:
     """Raw value of every feature we KNOW for this title. A feature missing from the result is unknown."""
     f: dict[str, float] = {f"g:{g}": 1.0 for g in t.genres}
-    if t.traits is not None:
-        f.update({f"t:{k}": float(v) for k, v in t.traits.items()})
-        for g, trait in crosses:
-            f[f"x:{g}*{trait}"] = (1.0 if g in t.genres else 0.0) * float(t.traits.get(trait, 0.0))
     if t.language:
         f[f"lang:{t.language}"] = 1.0
     if t.year:
@@ -82,7 +76,6 @@ class Space:
     mean: np.ndarray
     scale: np.ndarray
     prevalence: np.ndarray
-    crosses: list[tuple[str, str]]
     index: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -93,22 +86,19 @@ class Space:
         return len(self.names)
 
 
-def _known_families(titles: list[Title], crosses: list[tuple[str, str]]) -> tuple[dict[str, list[float]], dict[str, int]]:
+def _known_families(titles: list[Title]) -> tuple[dict[str, list[float]], dict[str, int]]:
     """For each feature: values over the titles where it is KNOWN (a binary feature that is absent counts as 0,
     but only for titles whose genre/language/year/length are known at all)."""
     values: dict[str, list[float]] = {}
     for t in titles:
-        raw = raw_features(t, crosses)
+        raw = raw_features(t)
         for k, v in raw.items():
             values.setdefault(k, []).append(v)
-    # absent binary features are known zeros for every title; trait and cross features are unknown without traits
+    # absent binary features are known zeros for every title
     n_all = len(titles)
-    n_traits = sum(1 for t in titles if t.traits is not None)
     known_n: dict[str, int] = {}
     for k in values:
-        if k.startswith(("t:", "x:")):
-            known_n[k] = n_traits
-        elif k.startswith("g:"):
+        if k.startswith("g:"):
             known_n[k] = n_all
         elif k.startswith("lang:"):
             known_n[k] = sum(1 for t in titles if t.language)
@@ -119,10 +109,9 @@ def _known_families(titles: list[Title], crosses: list[tuple[str, str]]) -> tupl
     return values, known_n
 
 
-def fit_space(titles: list[Title], crosses: list[tuple[str, str]] | None = None) -> Space:
+def fit_space(titles: list[Title]) -> Space:
     """Catalogue statistics. mean and spread are taken over the titles where a feature is known."""
-    crosses = list(crosses or [])
-    values, known_n = _known_families(titles, crosses)
+    values, known_n = _known_families(titles)
     names, means, scales, prev = [], [], [], []
     for k in sorted(values):
         n = known_n[k]
@@ -135,13 +124,12 @@ def fit_space(titles: list[Title], crosses: list[tuple[str, str]] | None = None)
         means.append(float(arr.mean()))
         scales.append(max(float(arr.std()), MIN_SCALE))
         prev.append(float((arr > 0).mean()))
-    return Space(names, np.asarray(means), np.asarray(scales), np.asarray(prev), crosses)
+    return Space(names, np.asarray(means), np.asarray(scales), np.asarray(prev))
 
 
 def centre(raw: dict[str, float], space: Space) -> np.ndarray:
     """Centred, scaled vector. Unknown features are 0 (no information). A genre, language, era or length feature that
-    is simply absent from a title whose other values in that family are known is a real zero, centred like any value.
-    Trait and cross features are unknown unless the title has traits."""
+    is simply absent from a title whose other values in that family are known is a real zero, centred like any value."""
     x = np.zeros(space.d)
     families = {k.split(":", 1)[0] for k in raw}
     for i, name in enumerate(space.names):
@@ -153,12 +141,12 @@ def centre(raw: dict[str, float], space: Space) -> np.ndarray:
 
 
 def encode(t: Title, space: Space) -> tuple[np.ndarray, dict[str, float]]:
-    raw = raw_features(t, space.crosses)
+    raw = raw_features(t)
     return centre(raw, space), raw
 
 
 def _present(name: str, value: float) -> bool:
-    return value >= 0.5 if name.startswith(("t:", "x:")) else value > 0
+    return value > 0
 
 
 # ---------------------------------------------------------------- labels
@@ -263,8 +251,6 @@ class Profile:
 def _lambdas(space: Space) -> np.ndarray:
     lam = np.full(space.d, BASE_LAMBDA)
     for i, name in enumerate(space.names):
-        if name.startswith("x:"):
-            lam[i] *= CROSS_LAMBDA
         if space.prevalence[i] < 0.02:
             lam[i] += RARE_LAMBDA
     return lam
