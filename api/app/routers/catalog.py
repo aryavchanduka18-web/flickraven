@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import user_id_from
 from app.db import get_db
 from app.services import ai_similar
+from app.services import anime_tags as anime_tags_mod
 from app.services import franchise as fr
 from app.services import search as sq
 from app.services import similar as similar_svc
@@ -96,6 +97,12 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
             kept = {i for i, k in zip(pool, keep) if k}
             seen = getattr(st, "watched", set())      # watched titles never show just because Gemini named them
             kept -= {i for i in pool[:len(ai_ids[:30])] if engine.cat.row_of[i] in seen}
+            if kind == "movie":
+                # Films: a disliked genre is a hard rule (personal_fit only bends it). The one exception is a genre the
+                # page's own film is in: someone who opened a Drama still gets a list although they dislike Drama.
+                bad = set(getattr(st, "disliked_genres", ())) - set(engine.cat.genres[row])
+                if bad:
+                    kept -= {i for i in pool if bad & set(engine.cat.genres[engine.cat.row_of[i]])}
             n_ai = len(ai_ids[:30])
             score = {i: 0.4 * (1 - n / max(n_ai, 1)) + 0.6 * fit[n] for n, i in enumerate(pool[:n_ai])}
             ai_ids = sorted((i for i in pool[:n_ai] if i in kept), key=lambda i: -score[i])
@@ -150,6 +157,7 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
              sort: str = "popular", page: int = 1, type: str | None = None,
              year_min: int | None = None, year_max: int | None = None, min_imdb: float | None = None,
              provider: int | None = None, min_match: int | None = None, vibe: str | None = None,
+             anime_tags: str | None = None, anime_avoid: str | None = None,
              db: Session = Depends(get_db)) -> dict:
     """Browse the catalog. `type` is movie (the default), series, anime or all. Extra filters: `year_min`/`year_max`
     (release period), `min_imdb` (IMDb score), `provider` (a TMDB provider id that streams it for free or on subscription
@@ -167,6 +175,10 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
     vw, vp = vibe_where(vibe)
     if vw:
         where.append(vw); p.update(vp)
+    if genre == ANIME_SLUG:
+        # Anime genres, themes and avoided tags: any chosen tag (OR), none of the avoided ones; AND with everything else.
+        aw, ap = anime_tags_mod.where(anime_tags_mod.parse(anime_tags), anime_tags_mod.parse(anime_avoid))
+        where.extend(aw); p.update(ap)
     if lang:
         where.append("m.original_language = :lang"); p["lang"] = lang
     if decade:
@@ -388,7 +400,8 @@ def genres(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/genres/{slug}/movies")
-def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", vibe: str | None = None, db: Session = Depends(get_db)) -> dict:
+def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", vibe: str | None = None,
+                 anime_tags: str | None = None, anime_avoid: str | None = None, db: Session = Depends(get_db)) -> dict:
     """A genre page lists films AND shows (type=all, the default), only films (movie) or only shows (show), ranked for
     this user: films by the hybrid, shows by taste similarity, woven together by relative position. Anime is Japanese
     animation (TV anime and animated films); Animation is the rest."""
@@ -401,4 +414,11 @@ def genre_movies(slug: str, request: Request, page: int = 1, type: str = "all", 
         name = g[1]
     if type not in ("all", "movie", "show"):
         type = "all"
-    return discover(request, genre=slug, sort="recommended", page=page, type=type, vibe=vibe, db=db) | {"genre": name}
+    return discover(request, genre=slug, sort="recommended", page=page, type=type, vibe=vibe,
+                    anime_tags=anime_tags, anime_avoid=anime_avoid, db=db) | {"genre": name}
+
+
+@router.get("/genres/anime/tags")
+def anime_tag_options(db: Session = Depends(get_db)) -> dict:
+    """The anime genre, theme and mature filters that have enough titles in the catalog, with live counts."""
+    return {"tags": anime_tags_mod.counts(db, ANIMATION_IDS), "min_titles": anime_tags_mod.MIN_TITLES}

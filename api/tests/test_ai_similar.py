@@ -260,3 +260,35 @@ def test_film_page_drops_disliked_and_watched_gemini_picks(test_engine, titles, 
     got = [i["movie"]["id"] for i in items]
     assert got == [fi]                        # disliked f and watched o are gone; Gemini naming them changes nothing
     assert items[0]["reasons"][0]["text"] == "Similar film, picked with Google Gemini"
+
+
+def test_film_page_disliked_genre_is_a_hard_rule_except_the_pages_own_genre(test_engine, titles, monkeypatch):
+    a, f, o, fi = titles["AIS Anchor"], titles["AIS Friend"], titles["AIS Other"], titles["AIS Film"]
+
+    def run(anchor_genres, disliked):
+        class Cat:
+            row_of = {a: 0, f: 1, o: 2, fi: 3}
+            kind = ["movie"] * 4; titles = ["a", "f", "o", "fi"]; year = np.array([2020.0] * 4)
+            genres = [anchor_genres, ["Horror"], ["Comedy"], ["Horror", "Comedy"]]
+            universe_of_row = [-1] * 4
+
+        class State:
+            watched = set(); disliked_genres = disliked
+
+        class Engine:
+            cat = Cat()
+            def personal_fit(self, st, rows):      # the softer rule lets everything through
+                return np.ones(len(rows), dtype=bool), np.full(len(rows), 0.5), True
+
+        monkeypatch.setattr(catalog_router.rec, "artifacts_ready", lambda: True)
+        monkeypatch.setattr(catalog_router.rec, "load_engine", lambda db: Engine())
+        monkeypatch.setattr(catalog_router.rec, "user_state", lambda db, uid, e: State())
+        monkeypatch.setattr(catalog_router.rec, "match_for", lambda db, uid, ids: {})
+        monkeypatch.setattr(catalog_router, "user_id_from", lambda request, db: 1)
+        monkeypatch.setattr(catalog_router.similar_svc, "similar_page", lambda db, e, mid, off, lim: ([], {}, 0))
+        monkeypatch.setattr(catalog_router.ai_similar, "suggest", lambda *a_, **k: [f, o, fi])
+        with TestClient(app) as c:
+            return sorted(i["movie"]["id"] for i in c.get(f"/api/movies/{a}/similar").json()["items"])
+
+    assert run(["Drama"], ["Horror"]) == sorted([o])               # f (Horror) and fi (Horror, Comedy) are gone
+    assert run(["Horror"], ["Horror"]) == sorted([f, o, fi])       # the page itself is Horror: the rule is not applied to it
