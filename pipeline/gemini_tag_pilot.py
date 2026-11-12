@@ -208,7 +208,8 @@ def missing_batches(tags: dict, rows: list) -> set:
 
 
 def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: float = 6.0, resume: bool = False,
-        retry_pause: float | None = None, stop_after_failures: int | None = None) -> dict:
+        retry_pause: float | None = None, stop_after_failures: int | None = None,
+        max_requests: int | None = None) -> dict:
     """RUNS x ceil(n / PER_CALL) calls; a failed batch is retried once, never more. resume=True keeps earlier answers
     and calls, and asks only for the batches that have no answer yet (same budget: one call + one retry each)."""
     raw_dir = out / "raw"
@@ -222,6 +223,11 @@ def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: fl
     todo = missing_batches(tags, rows)
     streak = 0                                     # consecutive failed requests (e.g. HTTP 503 overload)
     stopped = False
+    sent = 0
+
+    def save():                                    # after every batch, so a crash cannot lose the call log
+        (out / "tags.json").write_text(json.dumps(tags, ensure_ascii=False, indent=1), encoding="utf-8")
+        (out / "calls.json").write_text(json.dumps(calls, indent=1), encoding="utf-8")
     for r in range(1, RUNS + 1):
         for b in range(0, len(rows), PER_CALL):
             if (r, b) not in todo or stopped:
@@ -231,6 +237,10 @@ def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: fl
                     "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4000,
                                          "responseMimeType": "application/json"}}
             for attempt in (1, 2):
+                if max_requests is not None and sent >= max_requests:      # hard request budget
+                    stopped = True
+                    break
+                sent += 1
                 rec = {"run": r, "batch": b // PER_CALL + 1, "attempt": attempt,
                        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                        "prompt_version": PROMPT_VERSION, "vocab_version": vocab_version(),
@@ -263,7 +273,8 @@ def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: fl
             if stopped:
                 for x in batch:
                     tags[f"run{r}"].setdefault(x["blind_id"], clean(None))
-            if pause:
+            save()
+            if pause and not stopped:
                 time.sleep(pause)
     (out / "tags.json").write_text(json.dumps(tags, ensure_ascii=False, indent=1), encoding="utf-8")
     (out / "calls.json").write_text(json.dumps(calls, indent=1), encoding="utf-8")
@@ -394,6 +405,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("step", choices=["sample", "run", "evaluate"])
     ap.add_argument("--resume", action="store_true", help="run: ask only for batches that have no answer yet")
+    ap.add_argument("--max-requests", type=int, default=None, help="run --resume: hard cap on HTTP requests")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     if a.step == "sample":
@@ -414,7 +426,7 @@ def main() -> None:
             raise SystemExit("tags.json exists: the pilot already ran. Use --resume (approved reruns only) for missing batches.")
         if a.resume:     # approved rerun: space requests minutes apart, stop after 3 failures in a row
             res = run(pd.read_json(OUT / "sample.json"), key, resume=True, pause=90, retry_pause=300,
-                      stop_after_failures=3)
+                      stop_after_failures=3, max_requests=a.max_requests)
         else:
             res = run(pd.read_json(OUT / "sample.json"), key)
         print(json.dumps({**cost(res["calls"]), "stopped_early": res["stopped_early"],

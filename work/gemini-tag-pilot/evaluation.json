@@ -1,0 +1,335 @@
+{
+ "prompt_version": "tags-only-v1",
+ "vocab_version": "ai_similar_films:fb082399be",
+ "films": 60,
+ "repeatability": {
+  "mood": {
+   "exact_set": 0.517,
+   "jaccard": 0.758
+  },
+  "tone": {
+   "exact": 0.883
+  },
+  "pacing": {
+   "exact": 0.917
+  },
+  "themes": {
+   "exact_set": 0.583,
+   "jaccard": 0.751
+  }
+ },
+ "abstention_run1": {
+  "mood": 0.017,
+  "tone": 0.0,
+  "pacing": 0.0,
+  "themes": 0.067
+ },
+ "abstention_run2": {
+  "mood": 0.017,
+  "tone": 0.017,
+  "pacing": 0.0,
+  "themes": 0.033
+ },
+ "gap_rate_run1": 0.367,
+ "gaps_run1": {
+  "P11": "inner beauty versus superficial appearance",
+  "P12": "bond between human and Pokémon",
+  "P13": "female independence in modern urban India",
+  "P14": "deception within secret friendships",
+  "P15": "exploitation of mute servants",
+  "P16": "childhood cruelty and imagination",
+  "P17": "obsession with cursed media",
+  "P18": "becoming an accidental hero",
+  "P19": "childish mischief and local superstition",
+  "P20": "celebration of circus arts",
+  "P30": "moral ambiguity",
+  "P31": "religious riots and communal conflict",
+  "P32": "mad science and medical ethics",
+  "P35": "time loop and desperate rescue",
+  "P36": "breakup consultancy business",
+  "P37": "film score composition legacy",
+  "P38": "nuclear anxiety and atomic destruction",
+  "P39": "apocalyptic survival",
+  "P40": "ghost hunting brothers",
+  "P44": "Obsessive toxic desire",
+  "P49": "Short-term memory loss comedy",
+  "P50": "Psychedelic musical journey"
+ },
+ "gaps_run2": {
+  "P04": "Healing and justice after a child's trauma",
+  "P07": "The moral toll of relentless vengeance",
+  "P11": "Inner beauty versus outward appearance",
+  "P16": "Childhood cruelty and imagination",
+  "P20": "The fading art of circus clowns",
+  "P21": "Forbidden historical romance and societal resistance",
+  "P22": "Afterlife battle against the god of death",
+  "P23": "Animal rights and corporate greed rebellion",
+  "P24": "Finding lost community and viral documentary fame",
+  "P25": "One day chief minister political reform challenge",
+  "P26": "Chaotic funeral chaos in coastal village",
+  "P28": "World War II frontline love triangle",
+  "P29": "Catering business life-changing unexpected event",
+  "P30": "Moral dilemma in child kidnapping case",
+  "P31": "religious riots and communal conflict",
+  "P32": "mad science and unethical experimentation",
+  "P33": "cultural clashes between different social classes",
+  "P35": "time loop and desperate rescue",
+  "P36": "professional break-up service",
+  "P37": "film scoring legacy",
+  "P38": "nuclear anxiety and atomic destruction",
+  "P39": "apocalyptic survival by valley girls",
+  "P40": "ghost hunters facing supernatural reality",
+  "P41": "surviving extinction against impossible odds",
+  "P42": "overcoming adversity through kindness and hope",
+  "P44": "obsessive desire and sensory distortion",
+  "P46": "bridging the generational technological divide",
+  "P47": "desperate descent into economic violence",
+  "P49": "short-term memory loss during wedding preparations",
+  "P50": "restoring color and music to the world",
+  "P59": "social media addiction"
+ },
+ "dropped_words": {
+  "run1": 0,
+  "run2": 1
+ },
+ "unanswered": {
+  "run1": 0,
+  "run2": 0
+ },
+ "taste_dna_consistency_run1": {
+  "dark": {
+   "taste_dna_says_yes": 5,
+   "pilot_agrees": 1.0,
+   "taste_dna_silent": 55,
+   "pilot_claims_anyway": 0.327
+  },
+  "slow_burn": {
+   "taste_dna_says_yes": 1,
+   "pilot_agrees": 1.0,
+   "taste_dna_silent": 59,
+   "pilot_claims_anyway": 0.169
+  },
+  "fast": {
+   "taste_dna_says_yes": 1,
+   "pilot_agrees": 1.0,
+   "taste_dna_silent": 59,
+   "pilot_claims_anyway": 0.119
+  },
+  "humour": {
+   "taste_dna_says_yes": 24,
+   "pilot_agrees": 0.708,
+   "taste_dna_silent": 36,
+   "pilot_claims_anyway": 0.167
+  }
+ },
+ "historical_hindi_vs_run1": {
+  "films": 12,
+  "mood": {
+   "exact_set": 0.083,
+   "jaccard": 0.472
+  },
+  "tone": {
+   "exact": 0.833
+  },
+  "pacing": {
+   "exact": 0.833
+  },
+  "themes": {
+   "exact_set": 0.333,
+   "jaccard": 0.625
+  }
+ },
+ "by_group": {
+  "english": {
+   "films": 14,
+   "repeatability": {
+    "mood": {
+     "exact_set": 0.286,
+     "jaccard": 0.583
+    },
+    "tone": {
+     "exact": 0.857
+    },
+    "pacing": {
+     "exact": 0.929
+    },
+    "themes": {
+     "exact_set": 0.5,
+     "jaccard": 0.714
+    }
+   },
+   "abstention_run1": {
+    "mood": 0.0,
+    "tone": 0.0,
+    "pacing": 0.0,
+    "themes": 0.143
+   },
+   "gap_rate_run1": 0.357
+  },
+  "hindi_control": {
+   "films": 12,
+   "repeatability": {
+    "mood": {
+     "exact_set": 0.667,
+     "jaccard": 0.826
+    },
+    "tone": {
+     "exact": 0.833
+    },
+    "pacing": {
+     "exact": 0.917
+    },
+    "themes": {
+     "exact_set": 0.75,
+     "jaccard": 0.864
+    }
+   },
+   "abstention_run1": {
+    "mood": 0.0,
+    "tone": 0.0,
+    "pacing": 0.0,
+    "themes": 0.0
+   },
+   "gap_rate_run1": 0.417
+  },
+  "japanese": {
+   "films": 6,
+   "repeatability": {
+    "mood": {
+     "exact_set": 0.333,
+     "jaccard": 0.639
+    },
+    "tone": {
+     "exact": 1.0
+    },
+    "pacing": {
+     "exact": 1.0
+    },
+    "themes": {
+     "exact_set": 0.5,
+     "jaccard": 0.667
+    }
+   },
+   "abstention_run1": {
+    "mood": 0.167,
+    "tone": 0.0,
+    "pacing": 0.0,
+    "themes": 0.167
+   },
+   "gap_rate_run1": 0.5
+  },
+  "korean": {
+   "films": 8,
+   "repeatability": {
+    "mood": {
+     "exact_set": 0.75,
+     "jaccard": 0.896
+    },
+    "tone": {
+     "exact": 1.0
+    },
+    "pacing": {
+     "exact": 0.875
+    },
+    "themes": {
+     "exact_set": 0.75,
+     "jaccard": 0.875
+    }
+   },
+   "abstention_run1": {
+    "mood": 0.0,
+    "tone": 0.0,
+    "pacing": 0.0,
+    "themes": 0.0
+   },
+   "gap_rate_run1": 0.25
+  },
+  "other_indian": {
+   "films": 10,
+   "repeatability": {
+    "mood": {
+     "exact_set": 0.4,
+     "jaccard": 0.758
+    },
+    "tone": {
+     "exact": 0.8
+    },
+    "pacing": {
+     "exact": 0.9
+    },
+    "themes": {
+     "exact_set": 0.5,
+     "jaccard": 0.75
+    }
+   },
+   "abstention_run1": {
+    "mood": 0.0,
+    "tone": 0.0,
+    "pacing": 0.0,
+    "themes": 0.0
+   },
+   "gap_rate_run1": 0.3
+  },
+  "world": {
+   "films": 10,
+   "repeatability": {
+    "mood": {
+     "exact_set": 0.7,
+     "jaccard": 0.883
+    },
+    "tone": {
+     "exact": 0.9
+    },
+    "pacing": {
+     "exact": 0.9
+    },
+    "themes": {
+     "exact_set": 0.5,
+     "jaccard": 0.617
+    }
+   },
+   "abstention_run1": {
+    "mood": 0.0,
+    "tone": 0.0,
+    "pacing": 0.0,
+    "themes": 0.1
+   },
+   "gap_rate_run1": 0.4
+  }
+ },
+ "cost": {
+  "input_tokens": 11474,
+  "output_tokens": 9412,
+  "usd_if_paid_list_price": 0.027,
+  "calls_ok": 12,
+  "calls_failed": 17,
+  "models": [
+   "gemini-3.5-flash-lite"
+  ]
+ },
+ "hard_cases": {
+  "films": 16,
+  "repeatability": {
+   "mood": {
+    "exact_set": 0.438,
+    "jaccard": 0.781
+   },
+   "tone": {
+    "exact": 0.688
+   },
+   "pacing": {
+    "exact": 0.938
+   },
+   "themes": {
+    "exact_set": 0.438,
+    "jaccard": 0.698
+   }
+  },
+  "abstention_run1": {
+   "mood": 0.0,
+   "tone": 0.0,
+   "pacing": 0.0,
+   "themes": 0.125
+  }
+ }
+}
