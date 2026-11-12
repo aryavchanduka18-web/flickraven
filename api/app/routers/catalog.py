@@ -231,6 +231,8 @@ def discover(request: Request, genre: str | None = None, lang: str | None = None
 
 
 PERSONAL_SORTS = {"recommended", "match", "hidden", "novel"}
+# "Recommended for you" on Discover: list length at which the novelty and Tune bonuses keep their full size (personal_order).
+BONUS_REFERENCE_LIST = 1000
 
 # `type` on /movies: movie (default), show (TV series and anime TV), series, anime, all (films and shows).
 MEDIA_KINDS = {"movie": ["movie"], "series": ["series"], "anime": ["anime"], "show": ["series", "anime"],
@@ -311,7 +313,8 @@ def discover_options(db: Session = Depends(get_db)) -> dict:
 
 def personal_order(db: Session, uid: int, ids: list[int], sort: str):
     """Discover sorts that need the engine (the filtered films, best first):
-    recommended: hybrid percentile, re-ranked with the user's Tune sliders (novelty and the slider boosts);
+    recommended: hybrid percentile, re-ranked with the user's Tune sliders (novelty and the slider boosts), whose
+    reach is capped at what it is on a 1,000-film list (BONUS_REFERENCE_LIST) so on long lists taste still leads;
     match: hybrid score only; hidden: hybrid percentile x (1 - fame percentile), i.e. high match, little known;
     novel: films whose genres the user has not liked before come first, then by hybrid score.
     Films the engine excludes (rated, disliked) go last, in the filter's popularity order."""
@@ -330,7 +333,11 @@ def personal_order(db: Session, uid: int, ids: list[int], sort: str):
         key = pct
     elif sort == "recommended":
         tuning = rec.user_tuning(db, uid)
-        key = pct + (0.05 + 0.15 * tuning.shift("hidden")) * engine.cat.novelty[r] + engine._tuning_boost(r, tuning)
+        bonus = (0.05 + 0.15 * tuning.shift("hidden")) * engine.cat.novelty[r] + engine._tuning_boost(r, tuning)
+        # The bonus is on the percentile scale, so its reach grows with the list: +0.05 is 60 places on a 1,200-film
+        # genre list but 1,350 places over all 27,000 films, where it beat taste and filled the top with little-known
+        # (mostly non-MovieLens, often Hindi) films. Keep its reach in places as on a 1,000-film list.
+        key = pct + bonus * min(1.0, BONUS_REFERENCE_LIST / max(int(ok.sum()), 1))
     elif sort == "hidden":
         key = pct * (1 - engine.cat.fame_pct[r] / 100)
     else:
