@@ -59,3 +59,11 @@ def _fresh_traffic_limits():
     for limiter in (GUEST, IMPORT, EVENTS):
         limiter.clear()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_series_facts():
+    """The Home series rails keep the series facts for hours; tests change the catalogue between runs."""
+    from app.routers import recs
+    recs._SERIES_FACTS.update(at=0.0, rows=[])
+    yield
