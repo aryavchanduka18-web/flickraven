@@ -123,6 +123,35 @@ the family that suffers on mixed-tone films, as expected.
   (a word that does not repeat is treated as unknown).
 - **60 titles is a pilot gate, not proof** that the tags are reliable across languages.
 
+## Claude review (stand-in, at Aryav's request: NOT human and NOT blind)
+
+Aryav asked Claude to do the review itself (`review-sheet-claude.csv`, scored into `review-results-claude.md`). Two
+limits:
+- Claude had already seen the language mapping, so the review is not blind.
+- It is an AI judging another AI's tags.
+
+Films Claude did not know well (P14, P17, P29, and parts of others) were marked unsure and left out of correctness.
+
+| Family | Right | Wrong | Unsure | Correctness (95% CI) | Repeatability | Gate |
+|---|---|---|---|---|---|---|
+| Mood | 54 | 0 | 6 | 100% [93, 100] | 0.76 | **fail (repeatability)** |
+| Tone | 54 | 2 | 4 | 96% [88, 99] | 0.88 | pass |
+| Pacing | 51 | 0 | 9 | 100% [93, 100] | 0.92 | pass |
+| Themes | 51 | 4 | 5 | 93% [83, 97] | 0.75 | **fail (repeatability)** |
+
+The tags that were judged are mostly accurate:
+- **Tone errors:** Sholay tagged "serious" when it mixes in a lot of comedy; No Other Choice tagged "serious" when it is
+  a dark satire.
+- **Theme errors:** "ambition" used three times where it does not fit, and "history" for Fellini's The Clowns.
+
+Pacing was the family Claude was least sure of (9 unsure), mostly slow-burn vs steady on dramas.
+
+So on this stand-in review:
+- **Tone and pacing pass** both halves of the gate.
+- **Mood and themes** describe the films well but fail on repeatability: run 2 swaps a word.
+
+A genuine blind human review is still needed before any decision. The blank `review-sheet.csv` is unchanged for that.
+
 ## Next step
 
 Aryav's blind review (about 20 minutes) of `review-sheet.csv`. Fill `mood_ok`, `tone_ok`, `pacing_ok` and `themes_ok`

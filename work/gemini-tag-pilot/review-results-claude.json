@@ -1,0 +1,343 @@
+{
+ "families": {
+  "mood": {
+   "right": 54,
+   "wrong": 0,
+   "unsure": 6,
+   "not_reviewed": 0,
+   "correctness": 1.0,
+   "ci95": [
+    0.934,
+    1.0
+   ],
+   "repeatability": 0.758,
+   "passes_gate": false
+  },
+  "tone": {
+   "right": 54,
+   "wrong": 2,
+   "unsure": 4,
+   "not_reviewed": 0,
+   "correctness": 0.964,
+   "ci95": [
+    0.879,
+    0.99
+   ],
+   "repeatability": 0.883,
+   "passes_gate": true
+  },
+  "pacing": {
+   "right": 51,
+   "wrong": 0,
+   "unsure": 9,
+   "not_reviewed": 0,
+   "correctness": 1.0,
+   "ci95": [
+    0.93,
+    1.0
+   ],
+   "repeatability": 0.917,
+   "passes_gate": true
+  },
+  "themes": {
+   "right": 51,
+   "wrong": 4,
+   "unsure": 5,
+   "not_reviewed": 0,
+   "correctness": 0.927,
+   "ci95": [
+    0.827,
+    0.971
+   ],
+   "repeatability": 0.751,
+   "passes_gate": false
+  }
+ },
+ "by_group": {
+  "english": {
+   "films": 14,
+   "mood": {
+    "right": 14,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.785,
+     1.0
+    ]
+   },
+   "tone": {
+    "right": 13,
+    "wrong": 0,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.772,
+     1.0
+    ]
+   },
+   "pacing": {
+    "right": 13,
+    "wrong": 0,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.772,
+     1.0
+    ]
+   },
+   "themes": {
+    "right": 12,
+    "wrong": 1,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 0.923,
+    "ci95": [
+     0.667,
+     0.986
+    ]
+   }
+  },
+  "hindi_control": {
+   "films": 12,
+   "mood": {
+    "right": 12,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.757,
+     1.0
+    ]
+   },
+   "tone": {
+    "right": 11,
+    "wrong": 1,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 0.917,
+    "ci95": [
+     0.646,
+     0.985
+    ]
+   },
+   "pacing": {
+    "right": 11,
+    "wrong": 0,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.741,
+     1.0
+    ]
+   },
+   "themes": {
+    "right": 12,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.757,
+     1.0
+    ]
+   }
+  },
+  "japanese": {
+   "films": 6,
+   "mood": {
+    "right": 5,
+    "wrong": 0,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.566,
+     1.0
+    ]
+   },
+   "tone": {
+    "right": 6,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.61,
+     1.0
+    ]
+   },
+   "pacing": {
+    "right": 6,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.61,
+     1.0
+    ]
+   },
+   "themes": {
+    "right": 5,
+    "wrong": 0,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.566,
+     1.0
+    ]
+   }
+  },
+  "korean": {
+   "films": 8,
+   "mood": {
+    "right": 6,
+    "wrong": 0,
+    "unsure": 2,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.61,
+     1.0
+    ]
+   },
+   "tone": {
+    "right": 6,
+    "wrong": 1,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 0.857,
+    "ci95": [
+     0.487,
+     0.974
+    ]
+   },
+   "pacing": {
+    "right": 6,
+    "wrong": 0,
+    "unsure": 2,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.61,
+     1.0
+    ]
+   },
+   "themes": {
+    "right": 6,
+    "wrong": 1,
+    "unsure": 1,
+    "not_reviewed": 0,
+    "correctness": 0.857,
+    "ci95": [
+     0.487,
+     0.974
+    ]
+   }
+  },
+  "other_indian": {
+   "films": 10,
+   "mood": {
+    "right": 10,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.722,
+     1.0
+    ]
+   },
+   "tone": {
+    "right": 10,
+    "wrong": 0,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.722,
+     1.0
+    ]
+   },
+   "pacing": {
+    "right": 8,
+    "wrong": 0,
+    "unsure": 2,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.676,
+     1.0
+    ]
+   },
+   "themes": {
+    "right": 9,
+    "wrong": 1,
+    "unsure": 0,
+    "not_reviewed": 0,
+    "correctness": 0.9,
+    "ci95": [
+     0.596,
+     0.982
+    ]
+   }
+  },
+  "world": {
+   "films": 10,
+   "mood": {
+    "right": 7,
+    "wrong": 0,
+    "unsure": 3,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.646,
+     1.0
+    ]
+   },
+   "tone": {
+    "right": 8,
+    "wrong": 0,
+    "unsure": 2,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.676,
+     1.0
+    ]
+   },
+   "pacing": {
+    "right": 7,
+    "wrong": 0,
+    "unsure": 3,
+    "not_reviewed": 0,
+    "correctness": 1.0,
+    "ci95": [
+     0.646,
+     1.0
+    ]
+   },
+   "themes": {
+    "right": 7,
+    "wrong": 1,
+    "unsure": 2,
+    "not_reviewed": 0,
+    "correctness": 0.875,
+    "ci95": [
+     0.529,
+     0.978
+    ]
+   }
+  }
+ },
+ "gate": 0.8,
+ "note": "60 titles is a pilot gate, not proof of multilingual reliability.",
+ "all_families_pass": false
+}

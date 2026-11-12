@@ -93,14 +93,20 @@ def to_markdown(res: dict) -> str:
 
 
 def main() -> None:
-    with (DIR / "review-sheet.csv").open(encoding="utf-8-sig") as fh:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sheet", default="review-sheet.csv", help="filled sheet inside work/gemini-tag-pilot/")
+    ap.add_argument("--name", default="", help="suffix for the result files, e.g. 'claude'")
+    a = ap.parse_args()
+    with (DIR / a.sheet).open(encoding="utf-8-sig") as fh:
         sheet = list(csv.DictReader(fh))
     with (DIR / "mapping-HIDDEN-until-review.csv").open(encoding="utf-8") as fh:
         mapping = {r["blind_id"]: r for r in csv.DictReader(fh)}
     evaluation = json.loads((DIR / "evaluation.json").read_text(encoding="utf-8"))
     res = score(sheet, mapping, evaluation)
-    (DIR / "review-results.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
-    (DIR / "review-results.md").write_text(to_markdown(res), encoding="utf-8")
+    suffix = f"-{a.name}" if a.name else ""
+    (DIR / f"review-results{suffix}.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
+    (DIR / f"review-results{suffix}.md").write_text(to_markdown(res), encoding="utf-8")
     print(to_markdown(res))
 
 
