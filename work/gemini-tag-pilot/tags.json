@@ -1707,5 +1707,156 @@
    "gap": null,
    "dropped": 0
   }
+ },
+ "run3": {
+  "P01": {
+   "mood": [
+    "gritty",
+    "thrilling",
+    "epic"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "revenge",
+    "crime and the underworld",
+    "friendship"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P02": {
+   "mood": [
+    "emotional",
+    "inspiring"
+   ],
+   "tone": "realistic",
+   "pacing": "steady",
+   "themes": [
+    "class and caste",
+    "ambition",
+    "music and performance"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P03": {
+   "mood": [
+    "emotional",
+    "funny",
+    "quirky"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "journey"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P04": {
+   "mood": [
+    "dark",
+    "melancholic",
+    "emotional"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "family",
+    "grief and loss",
+    "social issues"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P05": {
+   "mood": [
+    "gritty",
+    "tense",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "war and patriotism"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P06": {
+   "mood": [
+    "gritty",
+    "tense",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "politics"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P07": {
+   "mood": [
+    "dark",
+    "suspenseful",
+    "gritty"
+   ],
+   "tone": "serious",
+   "pacing": "fast",
+   "themes": [
+    "revenge",
+    "grief and loss"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P08": {
+   "mood": [
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "journey"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P09": {
+   "mood": [
+    "romantic",
+    "thrilling"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "politics"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P10": {
+   "mood": [
+    "emotional",
+    "epic",
+    "inspiring"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "revenge",
+    "war and patriotism",
+    "love"
+   ],
+   "gap": null,
+   "dropped": 0
+  }
  }
 }
