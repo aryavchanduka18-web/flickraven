@@ -9,6 +9,8 @@ from dataclasses import dataclass
 
 from cinematch_engine.rerank import refresh
 
+from app.services import title_class as tc
+
 INDIAN_LANGUAGES = {"hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "gu", "ur"}
 ANGLO_COUNTRIES = {"US", "GB"}
 # Language groups behind the "... for you" rows, used to put the rows a user has shown interest in first.
@@ -84,10 +86,9 @@ def in_theme(key: str, s: dict) -> bool:
     genres = set(s.get("genres") or [])
     if key == "feelgood":
         return (live_action and bool(genres & {"Comedy", "Family"}) and not genres & {"Crime", "War & Politics", "Mystery"}
-                and pop >= 7.2 and (s.get("votes") or 0) >= 300)
-    if key == "romance":
-        kws = " ".join(s.get("keywords") or []).lower()
-        return live_action and ("romance" in kws or "love" in kws or "Soap" in genres) and pop >= 7.0 and (s.get("votes") or 0) >= 300
+                and not tc.dark_in_tone(s.get("keywords"), genres) and pop >= 7.2 and (s.get("votes") or 0) >= 300)
+    if key == "romance":       # shared rule, see app/services/title_class.py
+        return live_action and tc.is_romantic(genres, s.get("keywords")) and pop >= 7.0 and (s.get("votes") or 0) >= 300
     if key == "rewatch":
         return s.get("status") == "Ended" and seasons >= 4 and pop >= 7.5
     return False
@@ -122,6 +123,8 @@ def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | 
     used = set(exclude_ids or ())
     for theme in themes:
         ids = [i for i in ranked_ids if i not in used and i in by_id and by_id[i].get("has_art") and in_theme(theme.key, by_id[i])]
+        if theme.key == "romance":           # clear romances lead; a borderline one never heads the row
+            ids = tc.evidence_first(ids, {i for i in ids if tc.clear_romance(by_id[i].get("genres"), by_id[i].get("keywords"))})
         ids = refresh(ids, ROW_SIZE, rng) if rng is not None else ids[:ROW_SIZE]
         if len(ids) >= MIN_ROW:
             out.append({"key": theme.key, "title": theme.title, "subtitle": theme.subtitle, "ids": ids})

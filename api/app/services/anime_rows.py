@@ -8,6 +8,8 @@ only cuts those two lists into rows with plain rules, keeps live-action out, and
 """
 from dataclasses import dataclass, field
 
+from app.services import title_class as tc
+
 MIN_ROW = 6          # a row with fewer titles than this is left out
 ROW_SIZE = 20
 
@@ -34,12 +36,13 @@ DARK = {"Mystery", "Thriller", "Crime", "Horror"}
 
 
 def romantic(t: Title) -> bool:
-    # TMDB's TV genres have no Romance, so TV anime also count when a keyword says it.
-    return "Romance" in t.genres or any("romance" in k or "love" in k for k in t.keywords)
+    # Shared rule (app/services/title_class.py): Romance genre (films), or exact romance keywords (TMDB TV has no Romance).
+    return tc.is_romantic(t.genres, t.keywords, anime=True)
 
 
 def feelgood(t: Title) -> bool:
-    return bool({"Comedy", "Family"} & set(t.genres)) and not (DARK & set(t.genres)) and t.quality >= 7.0
+    return (bool({"Comedy", "Family"} & set(t.genres)) and not (DARK & set(t.genres)) and not tc.dark_in_tone(t.keywords, t.genres)
+            and t.quality >= 7.0)
 
 
 THEMES = [
