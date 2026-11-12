@@ -432,5 +432,5 @@ def reasons_v2(it: Item, role: str, pf: Prefs, misses: list[str], matches, mood_
     elif match_pct is not None:
         out.append(r("pp_taste", f"{match_pct}% match with your taste"))
     else:
-        out.append(r("pp_taste", "High in your own ranking of series"))
+        out.append(r("pp_taste", f"High in your own ranking of {'series' if it.kind == 'series' else 'films'}"))
     return out[:5]
