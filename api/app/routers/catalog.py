@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import user_id_from
 from app.db import get_db
 from app.services import ai_similar
+from app.services import title_class as tc
 from app.services import anime_tags as anime_tags_mod
 from app.services import franchise as fr
 from app.services import match_display
@@ -253,16 +254,18 @@ DARK_GENRES = ["Horror", "Crime", "War", "Thriller", "War & Politics", "Mystery"
 
 def vibe_where(vibe: str | None) -> tuple[str | None, dict]:
     """SQL for a mood chip that works on any genre page or Discover list, for films AND shows.
-    feelgood: a light genre (comedy, romance, family, animation, music) and no dark one, decently rated.
-    romance: the Romance genre, or (TV has no Romance genre) a romance/love keyword or the Soap genre."""
+    feelgood: a light genre (comedy, romance, family, animation, music), no dark genre and no dark keyword, decently rated.
+    romance: the shared romantic rule (app/services/title_class.py): Romance or Soap genre, or exact romance keywords
+    (TV has no Romance genre) with a supporting genre, and more evidence for crime, mystery and horror titles."""
     if vibe == "feelgood":
+        dark_kw, p = tc.dark_keyword_sql("m")
+        rom, rp = tc.romance_sql("m")          # a romance tagged "dark comedy" stays, as on Home
         return ("EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name = ANY(:vg)) "
                 "AND NOT EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name = ANY(:vdark)) "
-                "AND m.popularity_score >= 6.5", {"vg": FEEL_GOOD_GENRES, "vdark": DARK_GENRES})
+                f"AND NOT ({dark_kw} AND NOT {rom}) AND m.popularity_score >= 6.5",
+                {"vg": FEEL_GOOD_GENRES, "vdark": DARK_GENRES, **p, **rp})
     if vibe == "romance":
-        return ("(EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id WHERE mg.movie_id = m.id AND g.name IN ('Romance', 'Soap')) "
-                "OR EXISTS (SELECT 1 FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id "
-                "WHERE mk.movie_id = m.id AND (k.name ILIKE '%romance%' OR k.name = 'love')))", {})
+        return tc.romance_sql("m")
     return None, {}
 
 
