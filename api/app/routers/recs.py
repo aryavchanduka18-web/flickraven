@@ -11,6 +11,7 @@ from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
 from app.services import daily
+from app.services import match_display
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
 from app.services import rec_feedback
@@ -422,7 +423,7 @@ def perfect_pick(body: PerfectPickBody, user=Depends(current_user), db: Session 
         extra = {}
         for c, misses in chosen:
             it = by_id[c.id]
-            mp = engine.match(st.stage, it.rec) if it.kind == "movie" else None
+            mp = match_display.shown(engine.match(st.stage, it.rec)) if it.kind == "movie" else None
             extra[c.id] = {"score": it.rec, **({"match_pct": mp} if mp is not None else {}),
                            "reasons": pp.reasons_v2(it, c.role, pf, misses, matches_mood, rule, mp)}
         cards_out = cards(db, [c.id for c, _ in chosen], user["id"], extra)
@@ -473,6 +474,6 @@ def explain(movie_id: int, user=Depends(current_user), db: Session = Depends(get
     logged = db.execute(text("SELECT count(*) FROM interactions WHERE user_id = :u"), {"u": user["id"]}).scalar() or 0
     return {"movie_id": movie_id, "stage": st.stage, "behavioral_count": st.behavioral_count,
             "logged_interactions": int(logged), "onboarding_count": len(st.picks), "shares": shares,
-            "match_pct": engine.match(st.stage, s) if np.isfinite(s) else None,
+            "match_pct": match_display.shown(engine.match(st.stage, s) if np.isfinite(s) else None),
             "reasons": engine.reasons(st, row, shares), "weights": engine.weights[st.stage],
-            "confidence": confidence(engine, st, row, engine.match(st.stage, s) if np.isfinite(s) else None)}
+            "confidence": confidence(engine, st, row, match_display.shown(engine.match(st.stage, s) if np.isfinite(s) else None))}

@@ -44,17 +44,12 @@ describe("Discover filters", () => {
     expect(screen.getByRole("button", { name: /^Filters · 4/ })).toBeTruthy();
   });
 
-  it("offers a Match % filter only for films, and drops it when the type changes to shows", async () => {
+  it("has no Match % filter or Match sort while Match % is hidden (until it is recalibrated)", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
-    const match = screen.getByLabelText("Minimum match") as HTMLSelectElement;
-    expect(match.disabled).toBe(false);
-    fireEvent.change(match, { target: { value: "80" } });
-    await waitFor(() => expect(lastMovies()).toContain("min_match=80"));
-    fireEvent.click(screen.getByRole("tab", { name: "Shows" }));
-    await waitFor(() => expect(lastMovies()).toContain("type=show"));
-    expect(lastMovies()).not.toContain("min_match");
-    expect((screen.getByLabelText("Minimum match") as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.queryByLabelText("Minimum match")).toBeNull();
+    expect(screen.queryByRole("option", { name: "Highest match" })).toBeNull();
+    await waitFor(() => expect(lastMovies()).not.toContain("min_match"));
   });
 
   it("Movies and Shows pages are locked to one kind", async () => {
