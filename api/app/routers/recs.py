@@ -15,6 +15,7 @@ from app.services import match_display
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
 from app.services import rec_feedback
+from app.services import recent_row
 from app.services import series_rails as series_rails_service
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
@@ -298,7 +299,11 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     hidden_rows = rec_feedback.hidden_rows(db, uid)
     hero_entries, skip = rec_feedback.hero_without_hidden(plan, skip)
     hero = scored_items(hero_entries)
-    shown = [r for r in plan["rails"] if rec_feedback.base_key(f"rail:{r['key']}") not in hidden_rows]
+    # A separate row of recent films (services/recent_row.py); built last so it never takes a title from another row.
+    on_page = {e["row"] for e in hero_entries} | {row for r in plan["rails"] for row in r["rows"]}
+    recent = recent_row.recent_rail(cat, plan["rail_scores"], on_page, skip, daily.today().year)
+    shown = [r for r in recent_row.insert_after_top_picks(plan["rails"], recent)
+             if rec_feedback.base_key(f"rail:{r['key']}") not in hidden_rows]
     order, learned = rec_feedback.reorder([rec_feedback.base_key(f"rail:{r['key']}") for r in shown],
                                           rec_feedback.row_stats(db, uid))
     rails = []
