@@ -64,31 +64,36 @@ def blend_content(full, strong, w: float) -> np.ndarray:
     return out
 
 
-def groups_of(row: int, language, genres) -> set:
+def groups_of(row: int, language, genres, extra=None) -> set:
+    """Language group, Hindi/Korean/Japanese, primary genre; plus extra(row) groups when given (round 3: long tail,
+    rarely recommended)."""
     lang = language[row] or ""
     g = {"lang:en" if lang == "en" else "lang:non_en"}
     if lang in LANG_GROUPS:
         g.add(f"lang:{lang}")
     if len(genres[row]):
         g.add(f"genre:{genres[row][0]}")
+    if extra is not None:
+        g |= extra(row)
     return g
 
 
-def mix_guard(arm, base, ranked, language, genres, max_swaps: int = 10, max_candidates: int = 300) -> list:
+def mix_guard(arm, base, ranked, language, genres, max_swaps: int = 10, max_candidates: int = 300, extra=None) -> list:
     """Make `arm` keep at least the baseline top 10's count of every language group and primary genre.
 
     Candidates come from `ranked` (then `base`), tried in order of how many missing groups they cover, then rank. A
     candidate replaces the lowest-placed film whose groups would all keep their baseline count. Stops when no swap
     exists."""
+    G = lambda r: groups_of(int(r), language, genres, extra)
     out = [int(x) for x in arm]
     need: dict = {}
     for r in base:
-        for g in groups_of(int(r), language, genres):
+        for g in G(int(r)):
             need[g] = need.get(g, 0) + 1
     for _ in range(max_swaps):
         have: dict = {}
         for r in out:
-            for g in groups_of(r, language, genres):
+            for g in G(r):
                 have[g] = have.get(g, 0) + 1
         deficit = {g for g in need if have.get(g, 0) < need[g]}
         if not deficit:
@@ -100,14 +105,14 @@ def mix_guard(arm, base, ranked, language, genres, max_swaps: int = 10, max_cand
             if r in seen:
                 continue
             seen.add(r)
-            cover = len(groups_of(r, language, genres) & deficit)
+            cover = len(G(r) & deficit)
             if cover:
                 cands.append((cover, len(cands), r))
         for _, _, cand in sorted(cands, key=lambda c: (-c[0], c[1])):      # most deficits covered, then best-ranked
-            cg = groups_of(cand, language, genres)
+            cg = G(cand)
             for pos in range(len(out) - 1, -1, -1):
-                og = groups_of(out[pos], language, genres)
-                if all(x in cg or have.get(x, 0) - 1 >= need.get(x, 0) for x in og):
+                og = G(out[pos])
+                if not (og & deficit) and all(x in cg or have.get(x, 0) - 1 >= need.get(x, 0) for x in og):
                     out[pos] = cand
                     swapped = True
                     break

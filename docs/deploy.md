@@ -74,7 +74,7 @@ already there, and finishes a bundle upload that stopped half way.
 
 ## Updating the site later
 
-- **Code changes**: merge into `main`. Render rebuilds and redeploys by itself (`autoDeploy`).
+- **Code changes**: merge into `main`, then in Render click **Manual Deploy > Deploy latest commit**. Auto-deploy is off on purpose (`autoDeploy: false`): on the free plan each build spends build minutes and each start spends Neon transfer. Batch several merges into one deploy. If the service was created before this change, also turn **Settings > Build & Deploy > Auto-Deploy** to **Off** in the Render dashboard.
   Database changes (Alembic migrations) run automatically when the new version starts.
 - **New models**: run the pipeline on the laptop, then `deploy_data.py export` and `upload` again, then
   **Restart service**.
@@ -190,6 +190,15 @@ database is. Everyone else gets "Page not found". It shows totals only, never on
 - Sign-in lockout counters are kept in the server's memory, so a restart clears them.
 - There is no email service, so the site cannot send password reset or verification emails.
 
+## If Render says a free limit is reached
+
+Render's free plan has two monthly limits. Check **Account > Billing / Usage** to see which one:
+
+- **Free instance hours (750 a month for all free web services together).** One service kept awake all month uses about 720 to 744, so a second running service (for example the old `cinematch` service) pushes you over. Suspend or delete every FlickRaven service except the live one (`flickraven`). If the limit is still hit, pause the UptimeRobot monitor overnight (UptimeRobot > monitor > Pause, or a maintenance window), which lets the app sleep and saves about a quarter of the hours.
+- **Build minutes.** Each deploy builds the Docker image (5 to 10 minutes). Deploy less: auto-deploy is off, so deploy by hand once after several merges.
+
+The limits reset on the 1st. A paid web service (Starter, about $7 a month) has no hours limit and does not sleep.
+
 ## Keep the site awake (UptimeRobot)
 
 1. Sign up free at <https://uptimerobot.com>.
@@ -199,6 +208,45 @@ database is. Everyone else gets "Page not found". It shows totals only, never on
 Use `/api/ping`, **not** `/api/health`. `/api/health` runs a database query, so pinging it every 5 minutes
 would keep the Neon database awake all month and use up Neon's free compute hours. `/api/ping` never
 touches the database; Neon still sleeps between real visitors.
+
+## Hosting on Hugging Face Spaces (instead of Render)
+
+A free Hugging Face **Docker Space** runs the same `Dockerfile` with 2 CPUs and 16 GB of memory (Render
+free: a fraction of one CPU and 512 MB), and sleeps only after **48 hours** without visitors (Render: 15
+minutes). The database stays on Neon and the model bundle stays in the private GitHub release; only the
+server moves. Vercel cannot host it: its Python functions are capped at 250 MB, the server's libraries
+alone are larger, and the model would be reloaded on every cold start.
+
+One trade-off: Neon `flickraven-2` is in Singapore and Spaces run in the US or Europe, so every database
+query travels further than from Render (also Singapore). Compare page speed on both before switching.
+
+Setup (once):
+
+1. Sign up at <https://huggingface.co> and choose **New Space**: name `flickraven`, SDK **Docker**,
+   template **Blank**, hardware **CPU basic (free)**, **Public** (the code is already public on GitHub;
+   no secret is in the files).
+2. In the Space, **Settings > Variables and secrets**, add as **Secrets** the same values Render has:
+   `DATABASE_URL` (Neon `flickraven-2`, pooled), `JWT_SECRET`, `ARTIFACT_BUNDLE_URL`,
+   `ARTIFACT_BUNDLE_TOKEN`, `ADMIN_EMAILS`, `GEMINI_API_KEY`, `TMDB_API_KEY` (if Render has it); and as
+   **Variables**: `COOKIE_SECURE` = `true`, `WEB_ORIGIN` = `https://<your-hf-name>-flickraven.hf.space`.
+   Reusing Render's `JWT_SECRET` keeps people signed in when you switch.
+3. Hugging Face **Settings > Access Tokens > Create new token**, type **Fine-grained**, permission
+   **Write** on the `flickraven` Space only. Copy it.
+4. GitHub repository **Settings > Secrets and variables > Actions**: secret `HF_TOKEN` = that token;
+   **Variables** tab: `HF_SPACE` = `<your-hf-name>/flickraven`.
+5. GitHub **Actions > Deploy to Hugging Face > Run workflow**. It uploads `Dockerfile`, `api/`, `engine/`,
+   `web/` and `deploy/` (plus `deploy/hf/README.md` as the Space's settings file); the Space then builds
+   (about 10 minutes the first time) and starts.
+6. Open `https://<your-hf-name>-flickraven.hf.space` (the direct address, not the huggingface.co page:
+   sign-in cookies do not work inside that page's frame). The Space's **Logs** should show
+   `artifact bundle fetched from ARTIFACT_BUNDLE_URL`.
+
+Updating later: merge to `main`, then run the workflow again (it is manual, like Render's deploys).
+
+When the Space works, suspend the Render service (Render > Settings > Suspend) so only one server
+uses the database, and point the UptimeRobot monitor (if any) at the new `/api/ping` address. Both
+servers run the same migrations on start, so never run two different `main` versions against the
+database at once.
 
 ## Database on Neon
 

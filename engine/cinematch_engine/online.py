@@ -26,6 +26,9 @@ POPCORN_GENRES = {"Action", "Adventure", "Comedy", "Animation", "Science Fiction
 FEEL_GOOD_GENRES = {"Comedy", "Romance", "Family", "Animation", "Music"}      # the For Tonight "Feel-good" rule
 # "Indian and English" end of the International tuning slider.
 LOCAL_LANGUAGES = {"en", "hi", "ta", "te", "ml", "kn", "bn", "mr"}
+# Hindi cold-start short-list backfill: appended films must score at or above this percentile of the pool (see backfill_short_list).
+BACKFILL_PERCENTILE = 90
+
 # Popularity points (1-10 scale) added to films in the user's onboarding languages, by stage (language_lift).
 LANGUAGE_LIFT = {"cold": 1.2, "warming": 0.6, "established": 0.0}
 # Explicit language preferences persist after onboarding. The candidate lift only helps retrieval;
@@ -326,7 +329,7 @@ class OnlineEngine:
         return outside if self.cat.n - len(outside) >= 200 else np.array([], dtype=np.int64)
 
     def top_picks(self, st: UserState, mode: str = "balanced", k: int = 20, extra_exclude=(), scores=None,
-                  tuning: "Tuning | None" = None):
+                  tuning: "Tuning | None" = None, no_tail: bool = False):
         scores = scores or self.scores(st)
         excl = np.union1d(self.excluded(st), np.asarray(list(extra_exclude), dtype=np.int64))
         excl = np.union1d(excl, self.onboarding_constraint(st))
@@ -341,7 +344,7 @@ class OnlineEngine:
         if self.availability is not None:
             pool, norm, final = self._add_unavailable_candidates(st, scores, excl, pool, norm, final, w)
         cfg = MODES[mode]
-        t = tail_slots(k, cfg.get("tail_share", 0.0))
+        t = 0 if no_tail else tail_slots(k, cfg.get("tail_share", 0.0))
         if t:
             pool, norm, final = self._add_unavailable_candidates(st, scores, excl, pool, norm, final, w,
                                                                  rows=self.tail_rows())
@@ -387,7 +390,32 @@ class OnlineEngine:
                 share["language_preference"] = float(preference_share[pos])
             out.append({"row": int(row), "score": float(sc), "match_pct": int(self.match(st.stage, float(catalog[row]))),
                         "shares": share, "reranked": blend_rank[int(row)] > pos + 3})
+        if not no_tail and len(out) < k and self.hindi_cold_backfill_applies(st, mode):
+            out = self.backfill_short_list(st, mode, k, out, extra_exclude, scores, tuning)
         return out
+
+    def hindi_cold_backfill_applies(self, st: UserState, mode: str) -> bool:
+        """The short-list backfill is limited to Balanced Top Picks for cold users who picked Hindi in onboarding."""
+        return mode == "balanced" and st.stage == "cold" and "hi" in (st.languages or [])
+
+    def backfill_short_list(self, st: UserState, mode: str, k: int, out: list, extra_exclude, scores, tuning):
+        """Hindi cold start, Balanced mode: the reserved long-tail slots can leave the list short (a Hindi language lift
+        fills the candidate pool with films that count as long-tail, so the main slots find nothing to take; measured
+        2026-11-12: 83% of 2-like Hindi lists had fewer than 10 films, mean 4.7). When that happens, films from the same
+        candidate pool are appended after the existing list. The existing films and their order never change.
+
+        A film is appended only if its blend score (the same `score` Top Picks ranks by, taken from a second pass over the
+        pool with no tail slots) is at or above the 90th percentile of that pass's scores (numpy percentile, linear
+        interpolation, over the up-to-100 pool films), the film is not already listed, and the list stays within k. If too
+        few films pass, the list stays short: weak films are never added just to reach 10. Hard exclusions (rated,
+        disliked, disliked genres, non-movies, the onboarding genre constraint) are applied by the same pass."""
+        full = self.top_picks(st, mode, k=100, extra_exclude=extra_exclude, scores=scores, tuning=tuning, no_tail=True)
+        if not full:
+            return out
+        threshold = float(np.percentile([p["score"] for p in full], BACKFILL_PERCENTILE))
+        have = {p["row"] for p in out}
+        extra = [p for p in full if p["row"] not in have and p["score"] >= threshold]
+        return out + extra[: k - len(out)]
 
     def tail_rows(self) -> np.ndarray:
         """Films outside the 20% most-voted films of the catalog (the long-tail channel's candidates)."""

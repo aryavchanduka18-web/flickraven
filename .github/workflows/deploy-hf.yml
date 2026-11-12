@@ -1,0 +1,59 @@
+# Copy the files the Docker image needs to the Hugging Face Space; the Space then rebuilds and restarts.
+# Manual, like Render (autoDeploy is off): Actions > "Deploy to Hugging Face" > Run workflow.
+# Needs repository secret HF_TOKEN (Hugging Face token with write access to the Space) and
+# repository variable HF_SPACE (e.g. your-name/flickraven). Setup: docs/deploy.md, "Hosting on Hugging Face Spaces".
+name: Deploy to Hugging Face
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hf
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check setup
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
+            echo "::error::Set the HF_TOKEN secret and the HF_SPACE variable first (docs/deploy.md)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Upload to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          pip install --quiet "huggingface_hub>=0.25"
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space = os.environ["HF_SPACE"]
+          # Only what the Dockerfile copies. Everything else in the repo stays on GitHub.
+          parts = ["api/**", "engine/**", "web/**", "deploy/**"]
+          api.upload_folder(
+              repo_id=space, repo_type="space", folder_path=".",
+              allow_patterns=["Dockerfile", ".dockerignore", *parts],
+              ignore_patterns=["**/node_modules/**", "**/__pycache__/**", "**/*.egg-info/**", "web/dist/**"],
+              delete_patterns=parts,          # files removed from the repo are removed from the Space too
+              commit_message=f"Deploy {os.environ.get('GITHUB_SHA', '')[:7]} from GitHub",
+          )
+          # The Space's README carries its settings (Docker, port 8000).
+          api.upload_file(repo_id=space, repo_type="space", path_or_fileobj="deploy/hf/README.md",
+                          path_in_repo="README.md", commit_message="Space settings")
+          print(f"Uploaded. Build log: https://huggingface.co/spaces/{space}?logs=build")
+          PY
