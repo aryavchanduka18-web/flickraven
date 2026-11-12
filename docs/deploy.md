@@ -116,6 +116,38 @@ The refresh also updates **Where to watch** on film pages (step 3b): TMDB's list
 purchase services for each film, data by JustWatch. India is shown; a film with nothing listed in India
 shows the US instead, and a film with nothing in either says so. Only links out; the page credits JustWatch.
 
+## Model bundle outside the database (saves Neon transfer)
+
+Every start of the free web service unpacks the model bundle (`artifacts.tar.gz`, about 52 MB). By default
+it comes from the database, and Neon's free plan allows only 5 GB of transfer a month. About 100 starts
+(deploys, restarts, wake-ups) used it all in November 2026 and Neon suspended the database until Dec 1.
+
+So keep the bundle on a free file host and let the server download it from there. The database still
+stores the bundle and says which one is current (by checksum). If the download fails or is an older
+bundle, the server falls back to the database copy, so the site never breaks because of this.
+
+The repository is public and the bundle is built from MovieLens ratings, which may not be shared, so
+the file host must be **private**. A private GitHub repository works and costs nothing:
+
+1. On GitHub, create a **private** repository, for example `flickraven-artifacts` (empty is fine).
+2. **Releases > Create a new release**, tag `bundle`, and attach `deploy-out\artifacts.tar.gz`. Publish.
+3. Find the asset's API address. In PowerShell (replace OWNER):
+
+   ```powershell
+   (Invoke-RestMethod -Headers @{Authorization="Bearer <token>"} https://api.github.com/repos/OWNER/flickraven-artifacts/releases/tags/bundle).assets | Select-Object name, url
+   ```
+
+   The `url` looks like `https://api.github.com/repos/OWNER/flickraven-artifacts/releases/assets/123456`.
+4. Make a token: GitHub **Settings > Developer settings > Fine-grained tokens > Generate**. Only the
+   `flickraven-artifacts` repository, permission **Contents: Read-only**. Treat it like a password.
+5. In Render, **Environment**, add `ARTIFACT_BUNDLE_URL` = the asset `url` from step 3 and
+   `ARTIFACT_BUNDLE_TOKEN` = the token. Save.
+6. The log line `artifact bundle fetched from ARTIFACT_BUNDLE_URL` on the next start confirms it.
+
+**Every time you run `deploy_data.py upload` with a new bundle, upload the same `artifacts.tar.gz` to the
+release again** (delete the old asset, attach the new one; the asset `url` changes, so update
+`ARTIFACT_BUNDLE_URL`). Until you do, the server sees the checksum differs and uses the database copy.
+
 ## Back up and restore
 
 `scripts\backup.ps1` saves the live database to `backups\flickraven-<date>.dump` on the laptop and keeps

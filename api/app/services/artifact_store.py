@@ -45,30 +45,69 @@ def _extract(data: bytes) -> None:
         tar.extractall(ROOT, filter="data")      # "data" refuses absolute paths, links out and ../
 
 
+def _download(url: str, token: str, timeout: float = 120.0) -> bytes | None:
+    """The bundle from ARTIFACT_BUNDLE_URL, or None. GitHub release assets need the API asset URL with
+    Accept: application/octet-stream; GitHub then redirects to a signed storage URL, and httpx drops the
+    Authorization header on a redirect to another host."""
+    import httpx
+    headers = {"Accept": "application/octet-stream", "User-Agent": "flickraven-server"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        r = httpx.get(url, headers=headers, follow_redirects=True, timeout=timeout)
+        r.raise_for_status()
+        return r.content
+    except Exception as exc:          # never take the site down; the caller falls back to the database
+        log.warning("artifact bundle download failed (%s); using the database copy", type(exc).__name__)
+        return None
+
+
+def _from_database(conn, sha: str, chunks: int | None) -> bytes | None:
+    if chunks:          # chunked upload: join the parts in order
+        parts = conn.execute(text("""SELECT data FROM deploy_artifact_chunks WHERE name = :n AND sha256 = :s
+            ORDER BY seq"""), {"n": BUNDLE, "s": sha}).scalars().all()
+        if len(parts) != chunks:
+            log.error("artifact bundle has %d of %d chunks; not unpacking", len(parts), chunks)
+            return None
+        return b"".join(bytes(x) for x in parts)
+    return bytes(conn.execute(text("SELECT data FROM deploy_artifacts WHERE name = :n"),
+                              {"n": BUNDLE}).scalar_one())
+
+
 def sync(force: bool = False) -> bool:
-    """Unpack the uploaded bundle if it is newer than what is on disk. True if something was unpacked."""
+    """Unpack the uploaded bundle if it is newer than what is on disk. True if something was unpacked.
+
+    The deploy_artifacts row (a few bytes) says which bundle is current. The bundle itself comes from
+    ARTIFACT_BUNDLE_URL when that is set and its checksum matches, otherwise from the database."""
+    from app.config import get_settings
     from app.db import engine
+    settings = get_settings()
     with engine.connect() as conn:
         if conn.execute(text("SELECT to_regclass('deploy_artifacts')")).scalar() is None:
             return False
         chunked = conn.execute(text("""SELECT 1 FROM information_schema.columns
             WHERE table_name = 'deploy_artifacts' AND column_name = 'chunks'""")).first() is not None
-        row = conn.execute(text(f"SELECT sha256, data, {'chunks' if chunked else 'NULL'} FROM deploy_artifacts "
+        row = conn.execute(text(f"SELECT sha256, {'chunks' if chunked else 'NULL'} FROM deploy_artifacts "
                                 "WHERE name = :n"), {"n": BUNDLE}).first()
         if row is None:
             return False
-        sha = row[0]
+        sha, chunks = row[0], row[1]
         if not force and MARKER.exists() and MARKER.read_text().strip() == sha:
             return False
-        if row[2]:          # chunked upload: join the parts in order
-            parts = conn.execute(text("""SELECT data FROM deploy_artifact_chunks WHERE name = :n AND sha256 = :s
-                ORDER BY seq"""), {"n": BUNDLE, "s": sha}).scalars().all()
-            if len(parts) != row[2]:
-                log.error("artifact bundle has %d of %d chunks; not unpacking", len(parts), row[2])
-                return False
-            data = b"".join(bytes(x) for x in parts)
-        else:
-            data = bytes(row[1])
+    data = None
+    if settings.artifact_bundle_url:
+        data = _download(settings.artifact_bundle_url, settings.artifact_bundle_token)
+        if data is not None and hashlib.sha256(data).hexdigest() != sha:
+            log.warning("downloaded artifact bundle is not the current one (checksum differs); using the database "
+                        "copy. Upload deploy-out/artifacts.tar.gz to the file host again.")
+            data = None
+        elif data is not None:
+            log.info("artifact bundle fetched from ARTIFACT_BUNDLE_URL")
+    if data is None:
+        with engine.connect() as conn:
+            data = _from_database(conn, sha, chunks)
+        if data is None:
+            return False
     if hashlib.sha256(data).hexdigest() != sha:
         log.error("artifact bundle checksum mismatch; not unpacking")
         return False

@@ -22,3 +22,7 @@ services:
         sync: false        # your FlickRaven account email: it may open the private /stats page
       - key: GEMINI_API_KEY
         sync: false        # Google AI Studio key for the Ask FlickRaven assistant; leave empty to switch it off
+      - key: ARTIFACT_BUNDLE_URL
+        sync: false        # private download address of artifacts.tar.gz (docs/deploy.md); empty = from the database
+      - key: ARTIFACT_BUNDLE_TOKEN
+        sync: false        # read-only token for that private repository

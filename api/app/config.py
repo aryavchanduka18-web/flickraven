@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     ai_similar_daily_cap: int = 300      # Gemini calls per day for "More Like This" on series (cached, so one per title per week)
     assistant_daily_cap: int = 30
     assistant_guest_cap: int = 8
+    # Model bundle from a private file host instead of the database (docs/deploy.md, "Model bundle outside the
+    # database"). Each start of the free web service otherwise pulls ~52 MB from Neon, which used up Neon's free
+    # 5 GB monthly transfer in November 2026. The database still says which bundle is current (its checksum);
+    # the bytes come from this URL, and from the database only if the download fails or does not match.
+    artifact_bundle_url: str = ""
+    artifact_bundle_token: str = ""      # read-only token for a private GitHub repo; sent only to that host
 
     @field_validator("database_url")
     @classmethod
