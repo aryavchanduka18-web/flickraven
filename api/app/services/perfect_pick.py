@@ -5,6 +5,8 @@ list and decide how much novelty counts. Nothing here invents a title or a numbe
 """
 from dataclasses import dataclass, field
 
+from app.services import title_class as tc
+
 TIMES = {"short": "Under 90 minutes", "medium": "About 2 hours", "long": "Plenty of time", "series": "A series"}
 ADVENTURES = ("familiar", "balanced", "adventurous")
 SERIES_MAX_HOURS = 25          # "a series I can finish": 25 hours or less in total
@@ -127,6 +129,9 @@ def soft_genres(pf: "Prefs") -> list[str]:
     return [g for g in pf.genres if g != ANIME]
 
 
+# Romance uses the shared rule in title_class.py (same as Home's Romantic rows, 2026-11-12): exact keywords with points,
+# Drama/Comedy/Family support, and Crime or Horror without Comedy need a real romance thread. The Romance word set below
+# is kept for reference only. The other keyword genres are unchanged.
 # TMDB's TV genre list has no Romance, Horror, Thriller, Music or History (pipeline/series.py maps the rest), so no
 # series could ever match those genres or the moods built on them (Romantic, Scary, Intense, Suspenseful). Perfect
 # Pick adds them from TMDB's own keywords, by exact keyword, and says so on the card. ("bromance" and "slight romance"
@@ -166,7 +171,8 @@ def series_genres(genres: list[str], keywords: list[str]) -> tuple[list[str], fr
     kws = {k.lower() for k in keywords}
     have = set(genres)
     added = frozenset(g for g, words in SERIES_KEYWORD_GENRES.items()
-                      if g not in have and kws & words and have & KEYWORD_GENRE_SUPPORT[g])
+                      if g not in have and (tc.is_romantic(genres, keywords) if g == "Romance"
+                                            else kws & words and have & KEYWORD_GENRE_SUPPORT[g]))
     return list(genres) + sorted(added), added
 
 

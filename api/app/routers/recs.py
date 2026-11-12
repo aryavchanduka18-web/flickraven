@@ -17,6 +17,7 @@ from app.services import series_fit as fit
 from app.services import rec_feedback
 from app.services import recent_row
 from app.services import series_rails as series_rails_service
+from app.services import title_class as tc
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
 from cinematch_engine.tonight import Request as TonightRequest
@@ -131,10 +132,11 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     hits = [i for i, r in sorted(anime_list, key=lambda t: -cat.fame_pct[t[1]]) if cat.popularity[anime_ids[i]] >= 7.3][:60]
     anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
     anime_rails.append(("anime_romance", "Romantic anime", "Love stories and romantic comedies in anime form.",
-                        [i for i, r in anime_list if "Romance" in cat.genres[r] or any("romance" in k or "love" in k for k in cat.keywords[r])]))
+                        tc.evidence_first([i for i, r in anime_list if tc.is_romantic(cat.genres[r], cat.keywords[r], anime=True)],
+                                          {i: tc.romance_tier(cat.genres[r], cat.keywords[r], anime=True) for i, r in anime_list})))
     anime_rails.append(("anime_feelgood", "Feel-good anime", "Light, funny and warm anime.",
                         [i for i, r in anime_list if {"Comedy", "Family"} & set(cat.genres[r]) and not {"Horror", "Crime"} & set(cat.genres[r])
-                         and cat.popularity[r] >= 7.0]))
+                         and not tc.dark_in_tone(cat.keywords[r], cat.genres[r]) and cat.popularity[r] >= 7.0]))
     from cinematch_engine.rerank import refresh
     lead = []
     for key, title, sub, ids in anime_rails:
