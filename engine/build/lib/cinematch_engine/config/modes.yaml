@@ -1,0 +1,4 @@
+# Discovery Mode settings (spec section 6.8): lambda (relevance vs diversity) and beta (novelty).
+familiar: {lambda: 0.95, beta: 0.0, explore_boost: 0.0}
+balanced: {lambda: 0.75, beta: 0.05, explore_boost: 0.0}
+discover: {lambda: 0.55, beta: 0.20, explore_boost: 0.05}

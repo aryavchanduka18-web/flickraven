@@ -1,0 +1,13 @@
+# Implicit-feedback weight for each user event type.
+# Positive = interest, negative = disinterest. "rate" is scaled by the rating itself.
+# Weak events (detail_view, quick_view, search_click, hero_view) are listed for reference only: since 2026-11-10 they
+# never enter the taste profile (see cinematch_engine/profile.py tiers). Strong and confirmed events use these weights.
+detail_view: 0.5
+quick_view: 0.25
+search_click: 0.5
+list_add: 3
+list_remove: -2
+watched: 2
+like: 4
+dislike: -5
+rate: 1

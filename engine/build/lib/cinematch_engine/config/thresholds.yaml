@@ -1,0 +1,10 @@
+# The single threshold table (spec section 4.3).
+relevant_min_rating: 7          # "relevant" in every ranking metric
+als_positive_min_rating: 7      # offline ALS positive; confidence rises with the rating
+not_positive_max_rating: 5      # feeds SVD and the dislike logic, never an ALS positive
+match_target_min_rating: 7      # Match % = probability the user rates the film >= 7/10
+onboarding_sim_min_rating: 8    # simulated onboarding picks: earliest films rated >= 8/10
+stage_cold_max_b: 2
+stage_warming_max_b: 10
+explanation_min_share: 0.20
+explanation_max_reasons: 3

@@ -97,3 +97,29 @@ def test_chunked_bundle_is_joined_in_order_and_checked(store, test_engine):
         conn.execute(text("UPDATE deploy_artifacts SET chunks = :c"), {"c": len(parts)})
     assert artifact_store.sync() is True
     assert (store / "models" / "fitted.npz").read_bytes() == bytes(range(256)) * 400
+
+
+def test_bundle_comes_from_the_url_when_set_and_the_database_is_not_read(store, test_engine, monkeypatch):
+    from app.config import get_settings
+    bundle = _bundle({"models/hybrid_weights.json": b'{"from": "url"}'})
+    _put(test_engine, _bundle({"models/hybrid_weights.json": b'{"from": "db"}'}),
+         sha=hashlib.sha256(bundle).hexdigest())           # the row names the current bundle
+    monkeypatch.setattr(get_settings(), "artifact_bundle_url", "https://files.example/bundle")
+    monkeypatch.setattr(get_settings(), "artifact_bundle_token", "t")
+    calls = []
+    monkeypatch.setattr(artifact_store, "_download", lambda url, token: calls.append((url, token)) or bundle)
+    assert artifact_store.sync() is True
+    assert calls == [("https://files.example/bundle", "t")]
+    assert (store / "models" / "hybrid_weights.json").read_bytes() == b'{"from": "url"}'
+    assert artifact_store.sync() is False                  # marker matches: no second download
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("downloaded", [None, b"stale bundle"])
+def test_failed_or_stale_download_falls_back_to_the_database(store, test_engine, monkeypatch, downloaded):
+    from app.config import get_settings
+    _put(test_engine, _bundle({"models/hybrid_weights.json": b'{"from": "db"}'}))
+    monkeypatch.setattr(get_settings(), "artifact_bundle_url", "https://files.example/bundle")
+    monkeypatch.setattr(artifact_store, "_download", lambda url, token: downloaded)
+    assert artifact_store.sync() is True
+    assert (store / "models" / "hybrid_weights.json").read_bytes() == b'{"from": "db"}'
