@@ -2,7 +2,7 @@
 
 One definition used by Home's "Romantic series" and "Feel-good series", Home's "Romantic anime" and "Feel-good anime",
 the Anime page's romance and feel-good rows, and the Feel-good / Romantic mood chip on genre pages and Discover.
-Perfect Pick keeps its own mood rules (perfect_pick.py), which were tuned and checked separately.
+Perfect Pick uses it for the Romance it adds to series from keywords; its other mood rules are its own.
 
 Why (2026-11-12, Aryav): Home's "Romantic series" showed Hannibal and Presumed Innocent. The old rule looked for the
 letters "romance" or "love" anywhere in the joined keyword text, with no genre check, so "female lover", "bromance",
@@ -14,21 +14,26 @@ Romantic, by points over EXACT TMDB keywords (never letters inside other words):
   a weak hint ("love", "dating", "gothic romance", "slight romance", ...) = 1 point;
 - a live-action title also needs Drama, Comedy or Family (a reality show or a documentary is not a romance); anime skips
   this, since TMDB gives almost every anime the coarse Sci-Fi & Fantasy / Action & Adventure genres;
-- needs 2 points, or 4 when the title is Crime, Mystery or Horror: a crime show with a real romance thread (two strong
-  tags) still counts, one with a single stray tag does not.
+- needs 2 points; Crime or Horror without Comedy need 4 (a crime show with a real romance thread, two strong tags,
+  still counts; one with a single stray tag does not); a film without the Romance genre needs 4.
+Tiers (rows show them in this order, each in the person's order): LEAD = Romance/Soap genre or 4+ points; ROMANCE =
+2-3 points and no conflicting genre; SUBPLOT = 2-3 points next to Mystery, Sci-Fi/Fantasy, Action, War, Thriller, or
+Crime/Horror softened by Comedy (Healer, Moonlighting, Veronica Mars).
 Checked on the catalogue (laptop movies_clean.parquet): against MyAnimeList's Romance genre for 648 matched anime,
-precision 0.63 -> 0.74 at recall 0.76 (unchanged); live-action series with 300+ votes 180 -> 144 (Hannibal, Presumed
-Innocent, Lovecraft Country, Better Call Saul, WandaVision out; Bridgerton, Heartstopper, Crash Landing on You,
-Queen Charlotte, Sex and the City in). Known losses: shows with sparse tags and a Mystery genre (e.g. Pushing Daisies).
+precision 0.63 -> 0.72, recall 0.76 -> 0.80; live-action series with 300+ votes 180 -> 158 (Hannibal, Presumed
+Innocent, Lovecraft Country, Better Call Saul, WandaVision out). Perfect Pick's keyword Romance for series uses this too.
 
 Feel-good: on top of each surface's own genre rule, no dark keyword (dark comedy, gore, horror, serial killer, ...),
-unless the title is a clear romance.
+unless the title is a lead romance.
 """
 from __future__ import annotations
 
 ROMANCE_GENRES = {"Romance", "Soap"}
 ROMANCE_SUPPORT = {"Drama", "Comedy", "Family"}           # live action needs one of these
-ROMANCE_CONFLICT = {"Crime", "Mystery", "Horror"}          # these need more evidence
+ROMANCE_HARD_CONFLICT = {"Crime", "Horror"}                  # need 4 points unless there is also Comedy
+ROMANCE_SOFT_CONFLICT = {"Crime", "Horror", "Mystery", "Science Fiction", "Fantasy", "Sci-Fi & Fantasy", "Action",
+                         "Action & Adventure", "War", "War & Politics", "Thriller"}   # romance is then a subplot
+ROMANCE_CONFLICT = ROMANCE_HARD_CONFLICT
 ROMANCE_POINTS = 2
 ROMANCE_POINTS_CONFLICT = 4
 STRONG_POINTS, WEAK_POINTS = 2, 1
@@ -43,7 +48,7 @@ ROMANCE_STRONG = frozenset({
     "fake marriage", "marriage of convenience", "pretend relationship", "love affair", "lovers reunited",
     "friends in love", "searching for love", "enduring love", "tragic love", "gay romance", "lgbt romance",
     "step-sibling romance", "unlikely romance", "adult romance", "healing romance", "horror romance", "period romance",
-    "historical romance", "boys' love (bl)", "girls' love (gl)",
+    "historical romance", "rekindled romance", "boys' love (bl)", "girls' love (gl)",
 })
 ROMANCE_WEAK = frozenset({"love", "dating", "gothic romance", "slight romance", "psychological romance", "lovesickness"})
 
@@ -61,25 +66,47 @@ def romance_points(keywords) -> int:
     return STRONG_POINTS * len(k & ROMANCE_STRONG) + WEAK_POINTS * len(k & ROMANCE_WEAK)
 
 
-def romance_strength(genres, keywords, anime: bool = False) -> int:
-    """0 = not romantic. Otherwise the evidence: 4+ is clear (Romance/Soap genre, or two strong tags), 2-3 is enough."""
+LEAD, ROMANCE, SUBPLOT = 3, 2, 1      # romance_tier values (0 = not romantic)
+
+
+def romance_tier(genres, keywords, anime: bool = False, film: bool = False) -> int:
+    """How romantic a title is, from its genres and exact keywords:
+    LEAD     a Romance/Soap genre or 4+ points (romance is the point of the show);
+    ROMANCE  2-3 points on a title with no conflicting genre;
+    SUBPLOT  2-3 points next to Mystery or Sci-Fi/Fantasy, or Crime/Horror softened by Comedy (Healer, Moonlighting,
+             Pinocchio, Veronica Mars): romance matters, but it shares the show with something else;
+    0        under 2 points; a live-action title without Drama, Comedy or Family; Crime or Horror without Comedy and
+             under 4 points (Better Call Saul's single "romance" tag, Flower of Evil); a film without the Romance
+             genre and under 4 points (films have a real Romance genre, so a stray "love" tag means little)."""
     g = set(genres) if genres is not None else set()
     if g & ROMANCE_GENRES:
-        return ROMANCE_POINTS_CONFLICT + 1
+        return LEAD
     if not anime and not g & ROMANCE_SUPPORT:
         return 0
     pts = romance_points(keywords)
-    need = ROMANCE_POINTS_CONFLICT if g & ROMANCE_CONFLICT else ROMANCE_POINTS
-    return pts if pts >= need else 0
+    if pts >= ROMANCE_POINTS_CONFLICT:
+        return LEAD
+    if film:              # films have a real Romance genre, so keywords alone must be strong (Whiplash, Shrek stay out)
+        return 0
+    if pts < ROMANCE_POINTS:
+        return 0
+    if g & ROMANCE_HARD_CONFLICT and "Comedy" not in g:
+        return 0
+    return SUBPLOT if g & ROMANCE_SOFT_CONFLICT else ROMANCE
 
 
-def is_romantic(genres, keywords, anime: bool = False) -> bool:
-    return romance_strength(genres, keywords, anime) > 0
+def romance_strength(genres, keywords, anime: bool = False) -> int:
+    """Back-compat alias of romance_tier."""
+    return romance_tier(genres, keywords, anime)
+
+
+def is_romantic(genres, keywords, anime: bool = False, film: bool = False) -> bool:
+    return romance_tier(genres, keywords, anime, film) > 0
 
 
 def clear_romance(genres, keywords, anime: bool = False) -> bool:
-    """Strong evidence: rows put these first, so a borderline title never leads a romance row."""
-    return romance_strength(genres, keywords, anime) >= ROMANCE_POINTS_CONFLICT
+    """Romance is the point of the title (LEAD)."""
+    return romance_tier(genres, keywords, anime) == LEAD
 
 
 def dark_in_tone(keywords, genres=None) -> bool:
@@ -89,9 +116,9 @@ def dark_in_tone(keywords, genres=None) -> bool:
     return genres is None or not clear_romance(genres, keywords, anime=True)
 
 
-def evidence_first(ids: list[int], clear: set[int]) -> list[int]:
-    """Clear romances first, each group keeping the given (personal) order."""
-    return [i for i in ids if i in clear] + [i for i in ids if i not in clear]
+def evidence_first(ids: list[int], tier: dict[int, int]) -> list[int]:
+    """Higher romance tier first (lead, then romance, then subplot); inside a tier the given personal order is kept."""
+    return sorted(ids, key=lambda i: -tier.get(i, 0))          # sorted() is stable
 
 
 def romance_sql(alias: str = "m") -> tuple[str, dict]:
@@ -103,10 +130,10 @@ def romance_sql(alias: str = "m") -> tuple[str, dict]:
               f"FROM movie_keywords mk JOIN keywords k ON k.id = mk.keyword_id WHERE mk.movie_id = {alias}.id)")
     sql = (f"(EXISTS ({genres.format(key='rom_genres')}) OR ("
            f"({alias}.title_type = 'anime' OR EXISTS ({genres.format(key='rom_support')})) AND "
-           f"{points} >= CASE WHEN EXISTS ({genres.format(key='rom_conflict')}) THEN {ROMANCE_POINTS_CONFLICT} "
-           f"ELSE {ROMANCE_POINTS} END))")
+           f"{points} >= CASE WHEN {alias}.title_type = 'movie' THEN {ROMANCE_POINTS_CONFLICT} WHEN EXISTS ({genres.format(key='rom_conflict')}) AND NOT EXISTS ({genres.format(key='rom_comedy')}) "
+           f"THEN {ROMANCE_POINTS_CONFLICT} ELSE {ROMANCE_POINTS} END))")
     return sql, {"rom_genres": sorted(ROMANCE_GENRES), "rom_support": sorted(ROMANCE_SUPPORT),
-                 "rom_conflict": sorted(ROMANCE_CONFLICT), "rom_strong": sorted(ROMANCE_STRONG),
+                 "rom_conflict": sorted(ROMANCE_HARD_CONFLICT), "rom_comedy": ["Comedy"], "rom_strong": sorted(ROMANCE_STRONG),
                  "rom_weak": sorted(ROMANCE_WEAK)}
 
 

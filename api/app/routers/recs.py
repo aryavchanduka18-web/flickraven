@@ -131,7 +131,7 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
     anime_rails.append(("anime_romance", "Romantic anime", "Love stories and romantic comedies in anime form.",
                         tc.evidence_first([i for i, r in anime_list if tc.is_romantic(cat.genres[r], cat.keywords[r], anime=True)],
-                                          {i for i, r in anime_list if tc.clear_romance(cat.genres[r], cat.keywords[r], anime=True)})))
+                                          {i: tc.romance_tier(cat.genres[r], cat.keywords[r], anime=True) for i, r in anime_list})))
     anime_rails.append(("anime_feelgood", "Feel-good anime", "Light, funny and warm anime.",
                         [i for i, r in anime_list if {"Comedy", "Family"} & set(cat.genres[r]) and not {"Horror", "Crime"} & set(cat.genres[r])
                          and not tc.dark_in_tone(cat.keywords[r], cat.genres[r]) and cat.popularity[r] >= 7.0]))

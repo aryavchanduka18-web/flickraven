@@ -11,13 +11,29 @@ LOVECRAFT_COUNTRY = (["Drama", "Mystery", "Science Fiction", "Fantasy"], ["lovec
 BETTER_CALL_SAUL = (["Crime", "Drama"], ["lawyer", "romance", "prequel"])
 WEAK_HERO = (["Action", "Adventure", "Drama"], ["bromance", "school bullying"])
 BABY_REINDEER = (["Drama"], ["love", "stalker", "comedian"])
-BRIDGERTON = (["Drama"], ["romance", "period romance", "regency era"])
+BRIDGERTON = (["Drama"], ["courtship", "georgian or regency era", "love", "marriage", "period drama", "romance"])
 HEARTSTOPPER = (["Drama"], ["boys' love (bl)", "first love", "romance", "lgbt"])
 CRASH_LANDING = (["Drama", "Comedy"], ["love triangle", "romance", "star crossed lovers", "north korea"])
 QUEEN_CHARLOTTE = (["Drama"], ["enduring love", "love", "royalty"])
 SEX_AND_THE_CITY = (["Drama", "Comedy"], ["dating", "love", "new york city"])
 ELITE = (["Crime", "Mystery", "Drama"], ["boys' love (bl)", "love triangle", "murder", "school"])
 REALITY_DATING = (["Reality"], ["romance", "dating show"])
+
+
+# Losses Aryav asked to review (2026-11-12): romance-led shows that also carry Mystery or Crime
+MOONLIGHTING = (["Comedy", "Drama", "Mystery", "Crime"], ["detective", "romance", "yuppie"])
+HEALER = (["Comedy", "Action", "Adventure", "Mystery", "Drama"], ["hidden identity", "reporter", "romance"])
+ARE_YOU_HUMAN = (["Science Fiction", "Fantasy", "Drama", "Mystery"], ["humanoid robot", "heir", "romance"])
+PUSHING_DAISIES = (["Drama", "Science Fiction", "Fantasy", "Crime"], ["pie shop", "rekindled romance", "romantic"])
+FLOWER_OF_EVIL = (["Drama", "Crime", "Mystery"], ["psychopath", "romance", "murder"])
+
+
+def test_reviewed_losses_come_back_as_subplot_or_lead():
+    for g, k in (MOONLIGHTING, HEALER, ARE_YOU_HUMAN):
+        assert tc.romance_tier(g, k) == tc.SUBPLOT, k
+    assert tc.romance_tier(*PUSHING_DAISIES) == tc.LEAD
+    assert tc.romance_tier(*FLOWER_OF_EVIL) == 0          # crime thriller, one tag, no comedy
+    assert tc.romance_tier(*BRIDGERTON) == tc.ROMANCE and tc.romance_tier(*SEX_AND_THE_CITY) == tc.ROMANCE
 
 
 def test_crime_and_mystery_shows_with_a_stray_tag_are_not_romantic():
@@ -55,18 +71,18 @@ def test_series_rail_romance_and_evidence_order():
         return dict(id=i, lang="en", countries=["US"], seasons=2, episodes=20, runtime=50, status="Ended", genres=g,
                     keywords=k, popularity=8.0, votes=5000, has_art=True, **kw)
     series = [s(1, HANNIBAL), s(2, PRESUMED_INNOCENT), s(3, QUEEN_CHARLOTTE), s(4, BRIDGERTON), s(5, SEX_AND_THE_CITY),
-              s(6, HEARTSTOPPER), s(7, CRASH_LANDING), s(8, ELITE)]
+              s(6, HEARTSTOPPER), s(7, CRASH_LANDING), s(8, ELITE), s(9, HEALER)]
     assert not sr.in_theme("romance", series[0]) and not sr.in_theme("romance", series[1])
     assert all(sr.in_theme("romance", x) for x in series[2:])
     old, themes = sr.MIN_ROW, sr.THEMES
     sr.MIN_ROW, sr.THEMES = 3, {"romance": sr.THEMES["romance"]}      # only this row, so no other row takes titles first
     try:
-        rows = {r["key"]: r["ids"] for r in sr.build(series, [1, 2, 3, 5, 4, 6, 7, 8])}
+        rows = {r["key"]: r["ids"] for r in sr.build(series, [9, 1, 2, 3, 5, 4, 6, 7, 8])}
     finally:
         sr.MIN_ROW, sr.THEMES = old, themes
     ids = rows["romance"]
     assert 1 not in ids and 2 not in ids
-    assert ids[:4] == [4, 6, 7, 8] and set(ids[4:]) == {3, 5}    # clear romances lead, each group in personal order
+    assert ids == [6, 7, 8, 3, 5, 4, 9]     # lead, then romance, then subplot (Healer), each in personal order
 
 
 def test_feelgood_drops_dark_comedies_and_gore():
@@ -127,3 +143,12 @@ def test_feelgood_keeps_a_romance_tagged_dark_comedy():
     assert not tc.dark_in_tone(queen_of_tears[1], queen_of_tears[0])
     assert tc.dark_in_tone(["dark comedy"], ["Comedy"])
     assert not tc.dark_in_tone(["death", "zombie", "torture"], ["Comedy"])      # too broad to count
+
+
+def test_perfect_pick_romance_uses_the_shared_rule():
+    from app.services import perfect_pick as pp
+    for g, k in (BETTER_CALL_SAUL, BABY_REINDEER, HANNIBAL, FLOWER_OF_EVIL):
+        assert "Romance" not in pp.series_genres(g, k)[1], k
+    for g, k in (BRIDGERTON, HEARTSTOPPER, HEALER, MOONLIGHTING, SEX_AND_THE_CITY):
+        assert "Romance" in pp.series_genres(g, k)[1], k
+    assert pp.series_genres(["Crime"], ["serial killer"])[1] == {"Thriller"}      # other keyword genres unchanged

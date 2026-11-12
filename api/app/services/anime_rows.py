@@ -37,7 +37,7 @@ DARK = {"Mystery", "Thriller", "Crime", "Horror"}
 
 def romantic(t: Title) -> bool:
     # Shared rule (app/services/title_class.py): Romance genre (films), or exact romance keywords (TMDB TV has no Romance).
-    return tc.is_romantic(t.genres, t.keywords, anime=True)
+    return tc.is_romantic(t.genres, t.keywords, anime=True, film=t.kind == "film")
 
 
 def feelgood(t: Title) -> bool:
@@ -97,5 +97,8 @@ def build(series: list[Title], films: list[Title], because: tuple[str, list[int]
     add("film_classics", "Anime films everyone knows", "The best-known anime films, such as the Studio Ghibli classics.",
         [t.id for t in sorted((t for t in films if t.quality >= 7.0), key=lambda t: -t.fame)][:60], keep=6)
     for key, title, subtitle, rule in THEMES:
-        add(key, title, subtitle, mix([t.id for t in series if rule(t)], [t.id for t in films if rule(t)], n=ROW_SIZE * 3))
+        ids = mix([t.id for t in series if rule(t)], [t.id for t in films if rule(t)], n=ROW_SIZE * 3)
+        if key == "romance":            # lead romances first, subplots last; personal order kept inside each tier
+            ids = tc.evidence_first(ids, {t.id: tc.romance_tier(t.genres, t.keywords, anime=True, film=t.kind == "film") for t in series + films})
+        add(key, title, subtitle, ids)
     return rows

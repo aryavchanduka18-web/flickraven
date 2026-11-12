@@ -124,7 +124,7 @@ def build(series: list[dict], ranked_ids: list[int], interest: dict[str, int] | 
     for theme in themes:
         ids = [i for i in ranked_ids if i not in used and i in by_id and by_id[i].get("has_art") and in_theme(theme.key, by_id[i])]
         if theme.key == "romance":           # clear romances lead; a borderline one never heads the row
-            ids = tc.evidence_first(ids, {i for i in ids if tc.clear_romance(by_id[i].get("genres"), by_id[i].get("keywords"))})
+            ids = tc.evidence_first(ids, {i: tc.romance_tier(by_id[i].get("genres"), by_id[i].get("keywords")) for i in ids})
         ids = refresh(ids, ROW_SIZE, rng) if rng is not None else ids[:ROW_SIZE]
         if len(ids) >= MIN_ROW:
             out.append({"key": theme.key, "title": theme.title, "subtitle": theme.subtitle, "ids": ids})
