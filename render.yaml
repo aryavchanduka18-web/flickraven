@@ -8,7 +8,7 @@ services:
     region: singapore
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
-    autoDeploy: true
+    autoDeploy: false      # deploy by hand (Manual Deploy): every build spends free build minutes and every start wakes the app
     envVars:
       - key: DATABASE_URL
         sync: false        # Render asks for it: the Neon connection URL (see docs/deploy.md)
