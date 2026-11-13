@@ -1,3 +1,4 @@
+from cinematch_engine import taxonomy
 """Rows for the Anime page: anime series (TV anime, title_type 'anime') and anime films (Japanese animated films, the
 same rule as the Anime genre page and Perfect Pick).
 
@@ -27,7 +28,7 @@ class Title:
 
 def is_anime_film(genres: list[str], lang: str) -> bool:
     """Japanese animated film: the rule the Anime genre page uses."""
-    return lang == "ja" and "Animation" in genres
+    return taxonomy.style("movie", genres, lang) == "anime"     # one rule for the whole site (cinematch_engine.taxonomy)
 
 
 ACTION = {"Action", "Adventure", "Action & Adventure", "War", "War & Politics"}

@@ -1,3 +1,4 @@
+from cinematch_engine import taxonomy
 """The Perfect Pick: three titles from three answers (mood, time, familiar or adventurous).
 
 The recommender does the ranking (hybrid score for films, series ranking for series); the answers only narrow the
@@ -121,7 +122,7 @@ ANIME = "Anime"     # a Perfect Pick genre choice, not a TMDB genre: picking it 
 
 
 def is_anime_film(genres: list[str], lang: str) -> bool:
-    return lang == "ja" and "Animation" in genres
+    return taxonomy.style("movie", genres, lang) == "anime"     # one rule for the whole site (cinematch_engine.taxonomy)
 
 
 def soft_genres(pf: "Prefs") -> list[str]:
