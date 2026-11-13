@@ -31,7 +31,7 @@ export type SeriesRail = { key: string; title: string; subtitle: string; items: 
 
 /** Themed series rows (Korean, Japanese, Indian, Anglo and international dramas for you, quick comedy, because you liked ..., a films-and-series mix). */
 export const useSeriesRails = () =>
-  useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[]; engaged_series?: number }>("/recs/series-rails"), staleTime: 60_000 });
+  useQuery({ queryKey: ["series-rails"], queryFn: () => api<{ rails: SeriesRail[]; engaged_series?: number; engaged_anime?: number }>("/recs/series-rails"), staleTime: 60_000 });
 
 /** The Anime page: anime series and anime films only (see api/app/services/anime_rows.py). */
 export const useAnimeRails = () =>
