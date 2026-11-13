@@ -33,8 +33,9 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_fallback_models: str = "gemini-2.5-flash,gemini-flash-latest"   # tried in order when a model id returns 404
     assistant_enabled: bool = True
-    # Mixed films, series and anime in the Home hero and first Top Picks (services/mixed_home_plan.py). Off until the offline replay passes.
-    mixed_home: bool = False
+    # Mixed films, series and anime in the Home hero and first Top Picks (services/mixed_home_plan.py). ON for everyone since
+    # 2026-11-14 (Aryav's call, before the offline evaluation); MIXED_HOME=false is an operator kill switch, not a user option.
+    mixed_home: bool = True
     ai_similar_daily_cap: int = 300      # Gemini calls per day for "More Like This" on series (cached, so one per title per week)
     assistant_daily_cap: int = 30
     assistant_guest_cap: int = 8
