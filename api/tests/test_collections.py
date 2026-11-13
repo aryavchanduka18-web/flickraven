@@ -115,3 +115,28 @@ def test_feel_good_and_romance_collections_exist(films):
     assert "feel-good" in got and "romance-films" in got
     titles = {i["movie"]["title"] for i in got["feel-good"]["items"]}
     assert "Big Romcom" in titles
+
+
+def test_collections_hold_films_only_never_series_or_tv_anime(test_engine):
+    """Live bug (2026-11-14): "Anime Films" showed One Piece, Naruto and other TV anime because membership ignored
+    title_type. Same rule protects every collection (a K-drama in Korean Thrillers, a sitcom in Rom-Com)."""
+    rows = [(942001 + i, f"Anime Film {i}", "movie") for i in range(6)] + [(942101, "Tv Anime One", "anime"),
+            (942102, "Tv Anime Two", "anime"), (942103, "Some Series", "series")]
+    with test_engine.begin() as conn:
+        for t, title, kind in rows:
+            mid = conn.execute(text("""INSERT INTO movies (tmdb_id, title, year, tmdb_vote_count, popularity_score, original_language, title_type)
+                VALUES (:t, :ti, 2015, 99999, 99999, 'ja', :k) RETURNING id"""), {"t": t, "ti": title, "k": kind}).scalar()
+            gid = conn.execute(text("""INSERT INTO genres (name, slug) VALUES ('Animation', 'animation')
+                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id""")).scalar()
+            conn.execute(text("INSERT INTO movie_genres (movie_id, genre_id) VALUES (:m, :g)"), {"m": mid, "g": gid})
+    try:
+        c = TestClient(app)
+        got = {x["key"]: x for x in c.get("/api/collections").json()["collections"]}["anime"]
+        titles = {i["movie"]["title"] for i in got["items"]}
+        assert not titles & {"Tv Anime One", "Tv Anime Two", "Some Series"}
+        assert {f"Anime Film {i}" for i in range(6)} <= titles
+        page = c.get("/api/collections/anime").json()
+        assert all(i["movie"]["title_type"] == "movie" for i in page["items"])
+    finally:
+        with test_engine.begin() as conn:
+            conn.execute(text("DELETE FROM movies WHERE tmdb_id BETWEEN 942000 AND 942999"))
