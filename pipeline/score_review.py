@@ -97,12 +97,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sheet", default="review-sheet.csv", help="filled sheet inside work/gemini-tag-pilot/")
     ap.add_argument("--name", default="", help="suffix for the result files, e.g. 'claude'")
+    ap.add_argument("--mapping", default="mapping-HIDDEN-until-review.csv", help="hidden language mapping")
+    ap.add_argument("--evaluation", default="evaluation.json", help="file with the run-to-run repeatability")
     a = ap.parse_args()
     with (DIR / a.sheet).open(encoding="utf-8-sig") as fh:
         sheet = list(csv.DictReader(fh))
-    with (DIR / "mapping-HIDDEN-until-review.csv").open(encoding="utf-8") as fh:
+    with (DIR / a.mapping).open(encoding="utf-8") as fh:
         mapping = {r["blind_id"]: r for r in csv.DictReader(fh)}
-    evaluation = json.loads((DIR / "evaluation.json").read_text(encoding="utf-8"))
+    evaluation = json.loads((DIR / a.evaluation).read_text(encoding="utf-8"))
     res = score(sheet, mapping, evaluation)
     suffix = f"-{a.name}" if a.name else ""
     (DIR / f"review-results{suffix}.json").write_text(json.dumps(res, indent=1), encoding="utf-8")

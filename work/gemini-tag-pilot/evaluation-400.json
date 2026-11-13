@@ -1,0 +1,19 @@
+{
+ "repeatability": {
+  "mood": {
+   "exact_set": 0.565,
+   "jaccard": 0.765
+  },
+  "tone": {
+   "exact": 0.9
+  },
+  "pacing": {
+   "exact": 0.897
+  },
+  "themes": {
+   "exact_set": 0.608,
+   "jaccard": 0.784
+  }
+ },
+ "note": "run 1 vs run 2 on all 400 films; the sheet shows consensus tags"
+}
