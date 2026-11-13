@@ -3,6 +3,8 @@
 The recommender does the ranking (hybrid score for films, series ranking for series); the answers only narrow the
 list and decide how much novelty counts. Nothing here invents a title or a number.
 """
+
+from cinematch_engine import taxonomy
 from dataclasses import dataclass, field
 
 from app.services import title_class as tc
@@ -121,7 +123,7 @@ ANIME = "Anime"     # a Perfect Pick genre choice, not a TMDB genre: picking it 
 
 
 def is_anime_film(genres: list[str], lang: str) -> bool:
-    return lang == "ja" and "Animation" in genres
+    return taxonomy.style("movie", genres, lang) == "anime"     # one rule for the whole site (cinematch_engine.taxonomy)
 
 
 def soft_genres(pf: "Prefs") -> list[str]:

@@ -6,6 +6,8 @@ Nothing here ranks anything. The two orders come in already personal: anime seri
 Both already leave out titles the person rated, watched, liked, picked or disliked, and disliked genres. This module
 only cuts those two lists into rows with plain rules, keeps live-action out, and never repeats a title on the page.
 """
+
+from cinematch_engine import taxonomy
 from dataclasses import dataclass, field
 
 from app.services import title_class as tc
@@ -27,7 +29,7 @@ class Title:
 
 def is_anime_film(genres: list[str], lang: str) -> bool:
     """Japanese animated film: the rule the Anime genre page uses."""
-    return lang == "ja" and "Animation" in genres
+    return taxonomy.style("movie", genres, lang) == "anime"     # one rule for the whole site (cinematch_engine.taxonomy)
 
 
 ACTION = {"Action", "Adventure", "Action & Adventure", "War", "War & Politics"}
