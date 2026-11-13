@@ -1,0 +1,35 @@
+{
+ "image": "flickraven-mem:after",
+ "label": "after",
+ "rated": 0,
+ "stages": {
+  "server_up": {
+   "current_mb": 192.8,
+   "peak_mb": 201.0,
+   "s": 5
+  },
+  "engine_loaded_first_home": {
+   "current_mb": 357.2,
+   "peak_mb": 432.5,
+   "s": 7
+  },
+  "home_with_ratings": {
+   "current_mb": 358.3,
+   "peak_mb": 432.5
+  },
+  "perfect_pick": {
+   "current_mb": 358.9,
+   "peak_mb": 432.5
+  },
+  "series_anime": {
+   "current_mb": 359.8,
+   "peak_mb": 432.5
+  },
+  "after_20_mixed": {
+   "current_mb": 361.9,
+   "peak_mb": 432.5
+  }
+ },
+ "oom_killed": false,
+ "status": "running"
+}

@@ -149,9 +149,10 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     art = set(db.execute(text("SELECT id FROM movies WHERE title_type = 'anime' AND backdrop_path IS NOT NULL")).scalars())
     anime_list = [(i, r) for i, r in anime_ids.items() if i in art]               # already in the user's anime ranking order
     anime_rails = []
-    if engine.anime_interest(st) >= 3:   # an anime fan: their own anime order (kind_rank), not fame
-        hits = [i for i, r in anime_list][:60]
-        anime_rails.append(("anime_hits", "Anime picked for you", "Anime ranked by the anime you rated and liked.", hits))
+    if engine.anime_interest(st) >= 3:
+        # An anime fan already gets Home's personal "Anime for you" row (/kind/anime, their own anime order) right after
+        # Top Picks: no second, fame-ranked anime row here, so Home shows one anime row.
+        pass
     else:
         hits = [i for i, r in sorted(anime_list, key=lambda t: -cat.fame_pct[t[1]]) if cat.popularity[anime_ids[i]] >= 7.3][:60]
         anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
@@ -195,8 +196,8 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
             log_shown(db, uid, request_id, None, f"series_{r['key']}", None, items)   # the report counts series too
     db.commit()
     # How many series the user has shown interest in: Home adds TV-focused rows as this grows (see Home.tsx).
-    # Anime counts too: someone who rated 50 anime should get the full set of TV and anime rows, not just three.
-    return {"rails": out, "engaged_series": sum(1 for r in engaged if cat.kind[r] in ("series", "anime"))}
+    return {"rails": out, "engaged_series": sum(1 for r in engaged if cat.kind[r] == "series"),
+            "engaged_anime": sum(1 for r in engaged if cat.kind[r] == "anime")}
 
 
 @router.get("/anime")
