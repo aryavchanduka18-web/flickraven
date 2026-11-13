@@ -61,6 +61,27 @@ def test_scale_sample_excludes_hindi_and_pilot_films():
     assert set(s[s.group == "world"].original_language) <= {"fr", "de"}
 
 
+def test_review_400_is_stratified_and_blind(tmp_path):
+    import csv
+    rows = []
+    for g, (langs, n) in gs.SCALE_GROUPS.items():
+        for i in range(n):
+            rows.append({"blind_id": f"{g}{i}", "tmdb_id": len(rows), "title": f"t{len(rows)}", "year": 1960 + i % 60,
+                         "genres": ["Comedy", "Crime"] if i % 7 == 0 else ["Drama"], "plot": "p" * 500,
+                         "original_language": (langs or ("fr",))[0], "group": g, "hard": i % 7 == 0,
+                         "tmdb_vote_count": float(i), "decade": 1960, "keywords": []})
+    s = pd.DataFrame(rows)
+    cons = {b: {"mood": ["dark"], "tone": None, "pacing": "fast", "themes": []} for b in s.blind_id}
+    r = gs.build_review_400(s, cons, seed=2)
+    assert len(r) == 60 and r.groupby("group").size().to_dict() == gs.REVIEW_GROUPS
+    path = tmp_path / "sheet.csv"
+    gs.review_sheet_400(r, cons, path)
+    out = list(csv.DictReader(path.open(encoding="utf-8-sig")))
+    assert len(out) == 60 and out[0]["blind_id"] == "R01"
+    assert not set(out[0]) & {"original_language", "group", "tmdb_id", "scale_id"}
+    assert out[0]["tone"] == "(none)" and out[0]["themes"] == "(none)" and len(out[0]["plot"]) == gp.PLOT_CHARS
+
+
 def test_run_supports_extra_run_and_bigger_batches(tmp_path):
     s = pd.DataFrame({"blind_id": [f"S{i:03d}" for i in range(40)], "title": ["x"] * 40, "year": [2000] * 40,
                       "genres": [["Drama"]] * 40, "plot": ["p"] * 40})
