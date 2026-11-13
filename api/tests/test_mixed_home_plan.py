@@ -154,3 +154,25 @@ def test_lane_titles_shown_on_earlier_days_go_behind_fresh_ones():
     first = [x["row"] for x in mh.mix(e, st, lane_plan(105), set())["hero"]]
     later = [x["row"] for x in mh.mix(e, st, lane_plan(105), set(), stale=set(first))["hero"]]
     assert not set(later) & set(first)
+
+
+def test_a_film_is_in_exactly_one_lane_and_is_presented_by_that_lane():
+    e, rows = lane_engine()
+    fan = SimpleNamespace(liked=list(rows["hi_film"])[:8], ratings={}, dislikes=set())
+    plan = lane_plan(105)
+    # Hindi films 40..49 are also in the plan's own Top Picks (with a Match %): put two of them there.
+    plan["rails"][0]["rows"] = [r for r in plan["rails"][0]["rows"]] + [41, 42]
+    plan["rails"][0]["scored"] = plan["rails"][0]["scored"] | {r: {"row": r, "score": 0.99, "match_pct": 91, "shares": {}} for r in (41, 42)}
+    out = mh.mix(e, fan, plan, set())
+    entries = {x["row"]: x for x in out["hero"]} | out["rails"][0]["scored"]
+    shown = [x["row"] for x in out["hero"]] + out["rails"][0]["rows"][:10]
+    hindi = [r for r in shown if r in rows["hi_film"] and r not in fan.liked]
+    assert hindi
+    assert all(entries[r].get("format") == "indian_film" and entries[r]["match_pct"] is None for r in hindi)
+    assert len(shown) == len(set(shown))
+
+
+def test_lane_explanations_name_the_lane():
+    assert mh.reason("hollywood_series")[0]["text"] == "Based on the Hollywood series you have rated highly"
+    assert mh.reason("indian_film")[0]["text"] == "Based on the Indian films you have rated highly"
+    assert mh.reason("anime")[0]["text"] == "Based on the anime you have rated highly"
