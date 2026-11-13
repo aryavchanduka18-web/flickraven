@@ -60,7 +60,11 @@ def mix(engine, st, plan: dict, skip: set[int], stale: set[int] | None = None) -
         cand.sort(key=lambda r: -float(rail[r]))
         return fresh_first([(r, float(rail[r])) for r in cand[:POOL]])
 
-    lanes = {"movie": fresh_first([(row, float(pool[row]["score"])) for row in order if not (anime_on and lane_of[row] == "anime_film")])}
+    # Each film belongs to exactly ONE lane, so how it is presented never depends on which list happened to win it: films of
+    # an active anime / Indian / international lane leave the base film list and are shown by their own lane.
+    film_extras = {n for n in lanes_mod.FILM_EXTRA_LANES if rail is not None and weights[n] >= MIN_WEIGHT}
+    own_lane = ({"anime_film"} if anime_on else set()) | film_extras
+    lanes = {"movie": fresh_first([(row, float(pool[row]["score"])) for row in order if lane_of[row] not in own_lane])}
     w = {"anime_film": weights["anime"]}
     if weights["anime"] >= MIN_WEIGHT:
         rows, scores = engine.kind_rank(st, "anime")
