@@ -1,0 +1,344 @@
+{
+ "budget": 80,
+ "requests_step1": 7,
+ "requests_step2": 50,
+ "step1": {
+  "films_with_3_runs": 60,
+  "consensus": {
+   "films": 60,
+   "with_mood_and_theme": 0.95,
+   "empty_share": {
+    "mood": 0.017,
+    "tone": 0.017,
+    "pacing": 0.0,
+    "themes": 0.033
+   }
+  },
+  "run1_only_empty_share": {
+   "mood": 0.017,
+   "tone": 0.0,
+   "pacing": 0.0,
+   "themes": 0.067
+  },
+  "run3_vs_run1": {
+   "mood": {
+    "exact_set": 0.433,
+    "jaccard": 0.707
+   },
+   "tone": {
+    "exact": 0.917
+   },
+   "pacing": {
+    "exact": 0.867
+   },
+   "themes": {
+    "exact_set": 0.567,
+    "jaccard": 0.73
+   }
+  },
+  "run3_vs_run2": {
+   "mood": {
+    "exact_set": 0.467,
+    "jaccard": 0.735
+   },
+   "tone": {
+    "exact": 0.85
+   },
+   "pacing": {
+    "exact": 0.883
+   },
+   "themes": {
+    "exact_set": 0.567,
+    "jaccard": 0.781
+   }
+  },
+  "vs_claude_review_labels": {
+   "mood": {
+    "judged_right": 56,
+    "consensus_keeps_right": 0.839,
+    "judged_wrong": 1,
+    "consensus_changes_wrong": 0.0
+   },
+   "tone": {
+    "judged_right": 52,
+    "consensus_keeps_right": 0.962,
+    "judged_wrong": 2,
+    "consensus_changes_wrong": 0.0
+   },
+   "pacing": {
+    "judged_right": 48,
+    "consensus_keeps_right": 1.0,
+    "judged_wrong": 0,
+    "consensus_changes_wrong": null
+   },
+   "themes": {
+    "judged_right": 54,
+    "consensus_keeps_right": 0.778,
+    "judged_wrong": 3,
+    "consensus_changes_wrong": 0.667
+   }
+  },
+  "cost": {
+   "input_tokens": 5737,
+   "output_tokens": 4729,
+   "usd_if_paid_list_price": 0.0135,
+   "calls_ok": 6,
+   "calls_failed": 1,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  }
+ },
+ "step2": {
+  "films": 400,
+  "films_with_2_runs": 400,
+  "repeatability": {
+   "mood": {
+    "exact_set": 0.565,
+    "jaccard": 0.765
+   },
+   "tone": {
+    "exact": 0.9
+   },
+   "pacing": {
+    "exact": 0.897
+   },
+   "themes": {
+    "exact_set": 0.608,
+    "jaccard": 0.784
+   }
+  },
+  "abstention_run1": {
+   "mood": 0.015,
+   "tone": 0.003,
+   "pacing": 0.0,
+   "themes": 0.062
+  },
+  "consensus": {
+   "films": 400,
+   "with_mood_and_theme": 0.887,
+   "empty_share": {
+    "mood": 0.035,
+    "tone": 0.102,
+    "pacing": 0.102,
+    "themes": 0.092
+   }
+  },
+  "gap_rate_run1": 0.438,
+  "gap_examples": [
+   "societal oppression of women",
+   "generational curses",
+   "surrogacy ethics",
+   "imperial court intrigue",
+   "end of life decisions",
+   "timing and missed connections",
+   "tragedy of stardom",
+   "voyeurism and alienation",
+   "transformation into a fish",
+   "temptation and moral decay",
+   "stray dog survival",
+   "mental illness and obsession",
+   "marital strife and economic ruin",
+   "samurai honor and sacrifice",
+   "alien friendship",
+   "redemption and marital fidelity",
+   "zombie apocalypse survival",
+   "devastating famine",
+   "paranoia among strangers",
+   "youth alienation",
+   "obsession with the deep sea",
+   "time loop personal growth",
+   "demonic possession",
+   "immigrant journey",
+   "surreal haunted house",
+   "Decadence in the face of rising fascism",
+   "the rise and fall of a sports icon",
+   "rural harassment and marital survival",
+   "domestic destruction by an intruder",
+   "surviving a deadly geometric labyrinth"
+  ],
+  "taste_dna_consistency_consensus": {
+   "dark": {
+    "taste_dna_says_yes": 17,
+    "pilot_agrees": 0.706,
+    "taste_dna_silent": 383,
+    "pilot_claims_anyway": 0.305
+   },
+   "slow_burn": {
+    "taste_dna_says_yes": 1,
+    "pilot_agrees": 1.0,
+    "taste_dna_silent": 399,
+    "pilot_claims_anyway": 0.16
+   },
+   "fast": {
+    "taste_dna_says_yes": 12,
+    "pilot_agrees": 0.583,
+    "taste_dna_silent": 388,
+    "pilot_claims_anyway": 0.175
+   },
+   "humour": {
+    "taste_dna_says_yes": 112,
+    "pilot_agrees": 0.759,
+    "taste_dna_silent": 288,
+    "pilot_claims_anyway": 0.101
+   }
+  },
+  "by_group": {
+   "english": {
+    "films": 100,
+    "repeatability": {
+     "mood": {
+      "exact_set": 0.6,
+      "jaccard": 0.784
+     },
+     "tone": {
+      "exact": 0.9
+     },
+     "pacing": {
+      "exact": 0.89
+     },
+     "themes": {
+      "exact_set": 0.62,
+      "jaccard": 0.778
+     }
+    },
+    "consensus": {
+     "films": 100,
+     "with_mood_and_theme": 0.87,
+     "empty_share": {
+      "mood": 0.04,
+      "tone": 0.11,
+      "pacing": 0.11,
+      "themes": 0.11
+     }
+    }
+   },
+   "japanese": {
+    "films": 60,
+    "repeatability": {
+     "mood": {
+      "exact_set": 0.6,
+      "jaccard": 0.789
+     },
+     "tone": {
+      "exact": 0.817
+     },
+     "pacing": {
+      "exact": 0.9
+     },
+     "themes": {
+      "exact_set": 0.55,
+      "jaccard": 0.753
+     }
+    },
+    "consensus": {
+     "films": 60,
+     "with_mood_and_theme": 0.883,
+     "empty_share": {
+      "mood": 0.033,
+      "tone": 0.183,
+      "pacing": 0.1,
+      "themes": 0.1
+     }
+    }
+   },
+   "korean": {
+    "films": 60,
+    "repeatability": {
+     "mood": {
+      "exact_set": 0.45,
+      "jaccard": 0.705
+     },
+     "tone": {
+      "exact": 0.933
+     },
+     "pacing": {
+      "exact": 0.833
+     },
+     "themes": {
+      "exact_set": 0.717,
+      "jaccard": 0.856
+     }
+    },
+    "consensus": {
+     "films": 60,
+     "with_mood_and_theme": 0.933,
+     "empty_share": {
+      "mood": 0.017,
+      "tone": 0.067,
+      "pacing": 0.167,
+      "themes": 0.067
+     }
+    }
+   },
+   "other_indian": {
+    "films": 100,
+    "repeatability": {
+     "mood": {
+      "exact_set": 0.52,
+      "jaccard": 0.758
+     },
+     "tone": {
+      "exact": 0.95
+     },
+     "pacing": {
+      "exact": 0.93
+     },
+     "themes": {
+      "exact_set": 0.59,
+      "jaccard": 0.8
+     }
+    },
+    "consensus": {
+     "films": 100,
+     "with_mood_and_theme": 0.94,
+     "empty_share": {
+      "mood": 0.03,
+      "tone": 0.05,
+      "pacing": 0.07,
+      "themes": 0.03
+     }
+    }
+   },
+   "world": {
+    "films": 80,
+    "repeatability": {
+     "mood": {
+      "exact_set": 0.637,
+      "jaccard": 0.78
+     },
+     "tone": {
+      "exact": 0.875
+     },
+     "pacing": {
+      "exact": 0.912
+     },
+     "themes": {
+      "exact_set": 0.575,
+      "jaccard": 0.74
+     }
+    },
+    "consensus": {
+     "films": 80,
+     "with_mood_and_theme": 0.812,
+     "empty_share": {
+      "mood": 0.05,
+      "tone": 0.125,
+      "pacing": 0.087,
+      "themes": 0.163
+     }
+    }
+   }
+  },
+  "cost": {
+   "input_tokens": 65852,
+   "output_tokens": 60689,
+   "usd_if_paid_list_price": 0.1715,
+   "calls_ok": 40,
+   "calls_failed": 10,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  }
+ }
+}
