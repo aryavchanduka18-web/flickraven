@@ -1,4 +1,6 @@
 """The "New Releases For You" row: films only, last three years, one title per page, never Top Picks."""
+from types import SimpleNamespace
+
 import numpy as np
 
 from app.services import recent_row as rr
@@ -125,6 +127,7 @@ def home_client(test_engine, monkeypatch):
     cat = HomeCat(ids)
     monkeypatch.setattr(recs_router, "engine_or_503", lambda db: HomeEngine(cat))
     monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: HomeState())
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=False, imdb_ratings=True))   # these tests are about the plain Home
     monkeypatch.setattr(recs_router.rec, "user_tuning", lambda db, u: None)
     monkeypatch.setattr(recs_router.rec, "recent_positive_rows", lambda db, u, e: [])
     monkeypatch.setattr(recs_router, "agreement_all", lambda e, s, sc: np.full(N, np.nan))
@@ -163,7 +166,7 @@ def test_the_new_row_can_be_hidden_and_its_titles_can_be_turned_down(home_client
     assert "recent_for_you" not in [r["key"] for r in home_client.get("/api/recs/home").json()["rails"]]
 
 
-def test_mixed_home_puts_anime_in_the_hero_and_top_picks_only_when_switched_on(home_client, monkeypatch):
+def test_mixed_home_is_on_by_default_and_the_kill_switch_turns_it_off(home_client, monkeypatch):
     from types import SimpleNamespace
     cat = recs_router.engine_or_503(None).cat
     cat.kind = np.array(["movie"] * 30 + ["anime"] * 10, dtype=object)
@@ -186,11 +189,29 @@ def test_mixed_home_puts_anime_in_the_hero_and_top_picks_only_when_switched_on(h
 
     monkeypatch.setattr(recs_router, "engine_or_503", lambda db: MixEngine(cat))
     monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: FanState())
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=False, imdb_ratings=True))
     off = home_client.get("/api/recs/home").json()
-    assert all(i["movie"]["id"] not in home_client.ids[30:] for i in off["hero"])      # off by default: films only
+    assert all(i["movie"]["id"] not in home_client.ids[30:] for i in off["hero"])      # MIXED_HOME=false: films only
     monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=True, imdb_ratings=True))
     on = home_client.get("/api/recs/home").json()
     mixed = [i for i in on["hero"] + on["rails"][0]["items"][:10] if i["movie"]["id"] in home_client.ids[30:]]
     assert mixed and all(i["match_pct"] is None and "rated highly" in i["reasons"][0]["text"] for i in mixed)
     ids = [i["movie"]["id"] for i in on["hero"]] + [i["movie"]["id"] for r in on["rails"] for i in r["items"]]
     assert len(ids) == len(set(ids))
+
+
+def test_mixed_home_default_is_on_and_env_can_turn_it_off(monkeypatch):
+    from app.config import Settings
+    monkeypatch.delenv("MIXED_HOME", raising=False)
+    assert Settings().mixed_home is True
+    monkeypatch.setenv("MIXED_HOME", "false")
+    assert Settings().mixed_home is False
+
+
+def test_a_failure_in_the_mix_never_breaks_home(home_client, monkeypatch):
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=True, imdb_ratings=True))
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(recs_router.mixed_home_plan, "mix", boom)
+    r = home_client.get("/api/recs/home")
+    assert r.status_code == 200 and r.json()["hero"]
