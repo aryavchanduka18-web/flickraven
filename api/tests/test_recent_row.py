@@ -161,3 +161,33 @@ def test_the_new_row_can_be_hidden_and_its_titles_can_be_turned_down(home_client
     assert first not in [i["movie"]["id"] for r in rails for i in r["items"]]
     assert home_client.put("/api/feedback/rows", json={"source": "rail:recent_for_you"}).status_code == 200
     assert "recent_for_you" not in [r["key"] for r in home_client.get("/api/recs/home").json()["rails"]]
+
+
+def test_mixed_home_puts_anime_in_the_hero_and_top_picks_only_when_switched_on(home_client, monkeypatch):
+    from types import SimpleNamespace
+    cat = recs_router.engine_or_503(None).cat
+    cat.kind = np.array(["movie"] * 30 + ["anime"] * 10, dtype=object)
+    cat.language = ["en"] * 30 + ["ja"] * 10
+    cat.genres = [["Drama"]] * N
+
+    class MixEngine(HomeEngine):
+        def engaged_rows(self, st):
+            return set(st.liked)
+
+        def kind_rank(self, st, fmt):
+            return (np.arange(30, 40), np.linspace(0.95, 0.2, 10)) if fmt == "anime" else (np.array([], dtype=int), np.array([]))
+
+    class FanState(HomeState):
+        liked = list(range(30, 38))
+        dislikes = set()
+
+    monkeypatch.setattr(recs_router, "engine_or_503", lambda db: MixEngine(cat))
+    monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: FanState())
+    off = home_client.get("/api/recs/home").json()
+    assert all(i["movie"]["id"] not in home_client.ids[30:] for i in off["hero"])      # off by default: films only
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=True, imdb_ratings=True))
+    on = home_client.get("/api/recs/home").json()
+    mixed = [i for i in on["hero"] + on["rails"][0]["items"][:10] if i["movie"]["id"] in home_client.ids[30:]]
+    assert mixed and all(i["match_pct"] is None and "rated highly" in i["reasons"][0]["text"] for i in mixed)
+    ids = [i["movie"]["id"] for i in on["hero"]] + [i["movie"]["id"] for r in on["rails"] for i in r["items"]]
+    assert len(ids) == len(set(ids))

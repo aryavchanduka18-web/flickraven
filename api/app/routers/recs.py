@@ -10,9 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.auth import current_user
 from app.db import get_db
+from app.config import get_settings
 from app.services import recommender as rec
 from app.services import daily
 from app.services import freshness
+from app.services import mixed_home_plan
 from app.services import match_display
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
@@ -308,6 +310,8 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     seen = {cat.row_of[m] for m in freshness.recently_shown_ids(db, uid) if m in cat.row_of}   # shown on earlier days: move back
     plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
                        scores=scores, seed=daily.seed(uid, f"home:{mode}"), stale=seen)
+    if get_settings().mixed_home:           # films, series and anime together in the hero and first Top Picks (off by default)
+        plan = mixed_home_plan.mix(engine, st, plan, {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of})
     agree = agreement_all(engine, st, scores)
     request_id, page_id = str(uuid.uuid4()), str(uuid.uuid4())
 
@@ -318,6 +322,9 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
         extra = {}
         for e in entries:
             mid = int(cat.movie_ids[e["row"]])
+            if e.get("format"):             # a series or anime in the mix: no Match %, an honest reason
+                extra[mid] = {"score": e["score"], "match_pct": None, "reasons": mixed_home_plan.reason(e["format"]), "agreement": None}
+                continue
             extra[mid] = {"score": e["score"], "match_pct": e["match_pct"], "components": e["shares"],
                           "reasons": engine.reasons(st, e["row"], e["shares"], e.get("reranked", False)),
                           "agreement": agreement(e["row"])}
