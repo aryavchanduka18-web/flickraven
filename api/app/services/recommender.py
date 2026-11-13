@@ -5,8 +5,11 @@ stage weights, Match % calibrator) and the catalog from Postgres, and builds one
 Per request, it reads the user's current state from Postgres (ratings, reactions, list, watched,
 onboarding, events) and asks the engine. Nothing personal is cached (spec 6.12 freshness).
 """
+import ctypes
+import gc
 import json
 import logging
+import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -97,12 +100,13 @@ def _similar_table(tmdb_ids: list[int]) -> dict | None:
     f = np.load(path)
     row_of = {int(t): i for i, t in enumerate(tmdb_ids)}
     src = np.array([row_of.get(int(t), -1) for t in f["tmdb_ids"]], dtype=np.int64)    # file row -> catalog row
-    n, k = len(tmdb_ids), f["rows"].shape[1]
+    f_rows, f_comps = f["rows"], f["comps"]             # read once: each npz access decompresses a new full copy
+    n, k = len(tmdb_ids), f_rows.shape[1]
     rows = np.full((n, k), -1, dtype=np.int32)
     scores = np.zeros((n, k), dtype=np.float16)
-    comps = np.zeros((f["comps"].shape[0], n, k), dtype=np.uint8)
+    comps = np.zeros((f_comps.shape[0], n, k), dtype=np.uint8)
     have = src >= 0
-    nb = f["rows"][have]
+    nb = f_rows[have]
     mapped = np.where(nb >= 0, src[np.maximum(nb, 0)], -1)
     # a neighbour that left the catalog is dropped and the rest move up, keeping their order
     order = np.argsort(mapped < 0, axis=1, kind="stable")
@@ -110,7 +114,7 @@ def _similar_table(tmdb_ids: list[int]) -> dict | None:
     rows[src[have]] = take(mapped)
     scores[src[have]] = take(f["scores"][have])
     for i in range(comps.shape[0]):
-        comps[i, src[have]] = take(f["comps"][i][have])
+        comps[i, src[have]] = take(f_comps[i][have])
     return {"rows": rows, "scores": scores, "comps": comps, "stored": [str(s) for s in f["stored"]]}
 
 
@@ -185,10 +189,13 @@ def load_engine(db: Session) -> OnlineEngine:
         universe_rows = np.array([tmdb_to_row[t] for t in f["item_tmdb"]])
         series_sim = _series_similarities(movies["tmdb_id"].tolist())
         gemini_sim = _gemini_similarities(movies)
+        # Genres, keywords and languages repeat across titles: interning keeps one string object per distinct value
+        # instead of one per occurrence (same values, less memory).
         catalog = Catalog(
             movie_ids=movies["id"].to_numpy(), titles=movies["title"].tolist(),
-            genres=[list(g) for g in movies["genres"]], keywords=[list(k) for k in movies["keywords"]],
-            language=movies["original_language"].fillna("").tolist(),
+            genres=[[sys.intern(str(x)) for x in g] for g in movies["genres"]],
+            keywords=[[sys.intern(str(x)) for x in k] for k in movies["keywords"]],
+            language=[sys.intern(x) for x in movies["original_language"].fillna("").tolist()],
             runtime=movies["runtime_min"].astype(float).to_numpy(), year=movies["year"].astype(float).to_numpy(),
             part=movies["catalog_part"].to_numpy(), popularity=movies["popularity"].astype(float).to_numpy(),
             votes=movies["votes"].astype(float).to_numpy(), has_award=movies["has_award"].fillna(False).to_numpy(),
@@ -196,19 +203,32 @@ def load_engine(db: Session) -> OnlineEngine:
             kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim, gemini_sim=gemini_sim)
         train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
         uc, ic, sv, al = _settings("user_cf"), _settings("item_cf"), _settings("svd"), _settings("als")
+        nb = (f["item_nb_idx"], f["item_nb_vals"])     # read once: every npz access decompresses a new copy
         sources = SourceModels(
             train=train, popularity=f["popularity"], content_sim=np.zeros((1, 1), dtype=np.float32),
-            item_neighbors=(f["item_nb_idx"], f["item_nb_vals"]), item_k=ic["neighbors"], item_beta=ic["beta"],
+            item_neighbors=nb, item_k=ic["neighbors"], item_beta=ic["beta"],
             user_cf={"k": uc["k"], "min_overlap": uc["min_overlap"], "beta": uc["beta"]},
             svd={"mu": float(f["svd_mu"]), "bi": f["svd_bi"], "Q": f["svd_Q"], "reg": sv["reg_all"]},
             als={"Y": f["als_Y"], "alpha": al["alpha"], "reg": al["regularization"]})
         weights = json.loads((MODELS / "hybrid_weights.json").read_text(encoding="utf-8"))
         calibrator = joblib.load(MODELS / "calibration.joblib")
-        engine = OnlineEngine(catalog, sources, weights, calibrator, (f["item_nb_idx"], f["item_nb_vals"]), train)
+        engine = OnlineEngine(catalog, sources, weights, calibrator, nb, train)
         engine.similar_table = _similar_table(movies["tmdb_id"].tolist())
         engine.availability = AvailabilityMap.load(MODELS / "availability_calibration.json")   # None = old zero rule
         _engine = engine
+        del movies, rows, content, f, train
+        _release_memory()
         return _engine
+
+
+def _release_memory() -> None:
+    """After the one-off load: collect the temporaries and hand freed heap pages back to the OS (glibc only), so the
+    resident size the host counts drops to what the engine really keeps."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass                                        # not glibc (Windows, macOS): nothing to trim
 
 
 def user_state(db: Session, user_id: int, engine: OnlineEngine) -> UserState:

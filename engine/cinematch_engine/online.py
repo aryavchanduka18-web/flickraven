@@ -122,12 +122,42 @@ class UserState:
         return sorted(self.likes | self.picks | {r for r, v in self.ratings.items() if v >= 8})
 
 
+def item_raters(train: sp.csr_matrix, shared_t: sp.csr_matrix | None = None, user_means: np.ndarray | None = None):
+    """Item -> (user indices, ratings) as CSR arrays (indptr, indices, data), for neighbor_votes.
+
+    Replaces a full float32 CSC copy of the training matrix (about 23 MB): the index arrays are taken from the CF
+    sources' item x user matrix when it has the same structure, and whole-number ratings are kept as uint8 (exact).
+
+    Fast path (no transposed copy, which would add about 23 MB at start-up): when `shared_t` is the CF sources' centred
+    item x user matrix and every rating is a whole number, rating = round(centred value + that user's mean) exactly.
+    The result is checked against the per-user rating counts and sums and the slow path is used if anything differs."""
+    means = user_means
+    if (means is not None and shared_t is not None and shared_t.shape == (train.shape[1], train.shape[0]) and shared_t.nnz == train.nnz
+            and train.nnz and train.data.min() >= 0 and train.data.max() <= 255
+            and np.array_equal(train.data, np.round(train.data))):
+        raw = np.rint(shared_t.data.astype(np.float64) + means[shared_t.indices]).astype(np.int64)
+        per_user = np.bincount(shared_t.indices, weights=raw, minlength=train.shape[0])
+        if (raw.min() >= 0 and raw.max() <= 255
+                and np.allclose(per_user, np.asarray(train.sum(axis=1)).ravel(), rtol=0, atol=1e-3)
+                and np.array_equal(np.bincount(shared_t.indices, minlength=train.shape[0]), np.diff(train.indptr))):
+            return shared_t.indptr, shared_t.indices, raw.astype(np.uint8)
+    t = train.T.tocsr()
+    t.sort_indices()
+    data = t.data
+    if data.size and data.min() >= 0 and data.max() <= 255 and np.array_equal(data, np.round(data)):
+        data = data.astype(np.uint8)
+    if (shared_t is not None and shared_t.shape == t.shape and np.array_equal(shared_t.indptr, t.indptr)
+            and np.array_equal(shared_t.indices, t.indices)):
+        return shared_t.indptr, shared_t.indices, data
+    return t.indptr, t.indices, data
+
+
 class OnlineEngine:
     def __init__(self, catalog: Catalog, sources: SourceModels, weights: dict, calibrator,
                  item_neighbors: tuple[np.ndarray, np.ndarray], train: sp.csr_matrix):
         self.cat, self.src, self.weights, self.cal = catalog, sources, weights, calibrator
         self.nb_idx, self.nb_vals = item_neighbors
-        self.train_csc = train.tocsc()
+        self._raters = item_raters(train, getattr(sources, "cf_rc_t", None), getattr(sources, "cf_means", None))
         self.event_weights = event_weights()
         self.availability: AvailabilityMap | None = None   # set by the API when availability_calibration.json exists
 
@@ -665,8 +695,8 @@ class OnlineEngine:
             return None
         idx, vals = nb
         neigh = idx[0][vals[0] > 0]
-        col = self.train_csc[:, u]
-        raters = dict(zip(col.indices, col.data))
+        indptr, indices, data = self._raters
+        raters = dict(zip(indices[indptr[u]:indptr[u + 1]], data[indptr[u]:indptr[u + 1]]))
         return sum(1 for v in neigh if raters.get(int(v), 0) >= 8) or None
 
     def top_genre(self, st: UserState) -> str | None:
