@@ -13,7 +13,7 @@ from cinematch_engine import taxonomy
 SERIES_LANES = ("indian_series", "hollywood_series", "korean_series", "international_series")
 FILM_EXTRA_LANES = ("indian_film", "international_film")       # hollywood_film is the existing film list itself
 LABEL = {"indian_film": "Indian films", "international_film": "international films", "hollywood_film": "films",
-         "indian_series": "Indian series", "hollywood_series": "series", "korean_series": "Korean series",
+         "indian_series": "Indian series", "hollywood_series": "Hollywood series", "korean_series": "Korean series",
          "international_series": "international series", "anime_series": "anime", "anime_film": "anime", "anime": "anime"}
 
 
