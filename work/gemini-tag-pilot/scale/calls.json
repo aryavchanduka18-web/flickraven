@@ -1,0 +1,1032 @@
+[
+ {
+  "run": 1,
+  "batch": 1,
+  "attempt": 1,
+  "at": "2026-11-12T22:28:41+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1579,
+   "candidatesTokenCount": 1594,
+   "totalTokenCount": 3173,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1579
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 2,
+  "attempt": 1,
+  "at": "2026-11-12T22:28:51+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1639,
+   "candidatesTokenCount": 1501,
+   "totalTokenCount": 3140,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1639
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 3,
+  "attempt": 1,
+  "at": "2026-11-12T22:29:01+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1581,
+   "candidatesTokenCount": 1480,
+   "totalTokenCount": 3061,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1581
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 4,
+  "attempt": 1,
+  "at": "2026-11-12T22:29:11+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1598,
+   "candidatesTokenCount": 1715,
+   "totalTokenCount": 3313,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1598
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 5,
+  "attempt": 1,
+  "at": "2026-11-12T22:29:22+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1502,
+   "candidatesTokenCount": 1190,
+   "totalTokenCount": 2692,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1502
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 6,
+  "attempt": 1,
+  "at": "2026-11-12T22:29:32+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1670,
+   "candidatesTokenCount": 1592,
+   "totalTokenCount": 3262,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1670
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 7,
+  "attempt": 1,
+  "at": "2026-11-12T22:29:42+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1498,
+   "candidatesTokenCount": 1610,
+   "totalTokenCount": 3108,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1498
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 8,
+  "attempt": 1,
+  "at": "2026-11-12T22:29:52+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1620,
+   "candidatesTokenCount": 1540,
+   "totalTokenCount": 3160,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1620
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 9,
+  "attempt": 1,
+  "at": "2026-11-12T22:30:03+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1709,
+   "candidatesTokenCount": 1509,
+   "totalTokenCount": 3218,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1709
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 10,
+  "attempt": 1,
+  "at": "2026-11-12T22:30:13+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1723,
+   "candidatesTokenCount": 1556,
+   "totalTokenCount": 3279,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1723
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 11,
+  "attempt": 1,
+  "at": "2026-11-12T22:30:24+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1794,
+   "candidatesTokenCount": 1501,
+   "totalTokenCount": 3295,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1794
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 12,
+  "attempt": 1,
+  "at": "2026-11-12T22:30:34+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 1,
+  "batch": 12,
+  "attempt": 2,
+  "at": "2026-11-12T22:32:36+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1643,
+   "candidatesTokenCount": 1495,
+   "totalTokenCount": 3138,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1643
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 13,
+  "attempt": 1,
+  "at": "2026-11-12T22:32:46+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 1,
+  "batch": 13,
+  "attempt": 2,
+  "at": "2026-11-12T22:34:48+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1580,
+   "candidatesTokenCount": 1562,
+   "totalTokenCount": 3142,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1580
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 14,
+  "attempt": 1,
+  "at": "2026-11-12T22:34:58+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1752,
+   "candidatesTokenCount": 1497,
+   "totalTokenCount": 3249,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1752
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 15,
+  "attempt": 1,
+  "at": "2026-11-12T22:35:08+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1601,
+   "candidatesTokenCount": 1522,
+   "totalTokenCount": 3123,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1601
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 16,
+  "attempt": 1,
+  "at": "2026-11-12T22:35:18+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1766,
+   "candidatesTokenCount": 1535,
+   "totalTokenCount": 3301,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1766
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 17,
+  "attempt": 1,
+  "at": "2026-11-12T22:35:29+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1720,
+   "candidatesTokenCount": 1597,
+   "totalTokenCount": 3317,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1720
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 18,
+  "attempt": 1,
+  "at": "2026-11-12T22:35:39+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 1,
+  "batch": 18,
+  "attempt": 2,
+  "at": "2026-11-12T22:37:42+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1637,
+   "candidatesTokenCount": 1563,
+   "totalTokenCount": 3200,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1637
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 19,
+  "attempt": 1,
+  "at": "2026-11-12T22:37:53+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1751,
+   "candidatesTokenCount": 1465,
+   "totalTokenCount": 3216,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1751
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 1,
+  "batch": 20,
+  "attempt": 1,
+  "at": "2026-11-12T22:38:03+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1563,
+   "candidatesTokenCount": 1545,
+   "totalTokenCount": 3108,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1563
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 1,
+  "attempt": 1,
+  "at": "2026-11-12T22:38:14+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1579,
+   "candidatesTokenCount": 1551,
+   "totalTokenCount": 3130,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1579
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 2,
+  "attempt": 1,
+  "at": "2026-11-12T22:38:23+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1639,
+   "candidatesTokenCount": 1511,
+   "totalTokenCount": 3150,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1639
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 3,
+  "attempt": 1,
+  "at": "2026-11-12T22:42:19+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 3,
+  "attempt": 2,
+  "at": "2026-11-12T22:44:23+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1581,
+   "candidatesTokenCount": 1452,
+   "totalTokenCount": 3033,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1581
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 4,
+  "attempt": 1,
+  "at": "2026-11-12T22:44:33+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1598,
+   "candidatesTokenCount": 1694,
+   "totalTokenCount": 3292,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1598
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 5,
+  "attempt": 1,
+  "at": "2026-11-12T22:44:43+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1502,
+   "candidatesTokenCount": 1487,
+   "totalTokenCount": 2989,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1502
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 6,
+  "attempt": 1,
+  "at": "2026-11-12T22:44:53+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1670,
+   "candidatesTokenCount": 1148,
+   "totalTokenCount": 2818,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1670
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 7,
+  "attempt": 1,
+  "at": "2026-11-12T22:45:02+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1498,
+   "candidatesTokenCount": 1608,
+   "totalTokenCount": 3106,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1498
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 8,
+  "attempt": 1,
+  "at": "2026-11-12T22:45:11+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1620,
+   "candidatesTokenCount": 1593,
+   "totalTokenCount": 3213,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1620
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 9,
+  "attempt": 1,
+  "at": "2026-11-12T22:45:21+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 9,
+  "attempt": 2,
+  "at": "2026-11-12T22:47:23+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1709,
+   "candidatesTokenCount": 1490,
+   "totalTokenCount": 3199,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1709
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 10,
+  "attempt": 1,
+  "at": "2026-11-12T22:47:33+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1723,
+   "candidatesTokenCount": 1461,
+   "totalTokenCount": 3184,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1723
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 11,
+  "attempt": 1,
+  "at": "2026-11-12T22:47:43+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 11,
+  "attempt": 2,
+  "at": "2026-11-12T22:49:46+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 12,
+  "attempt": 1,
+  "at": "2026-11-12T22:49:54+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 11,
+  "attempt": 1,
+  "at": "2026-11-12T23:00:30+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 11,
+  "attempt": 2,
+  "at": "2026-11-12T23:02:31+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1794,
+   "candidatesTokenCount": 1510,
+   "totalTokenCount": 3304,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1794
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 12,
+  "attempt": 1,
+  "at": "2026-11-12T23:02:41+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "ok": false,
+  "error": "HTTP 503"
+ },
+ {
+  "run": 2,
+  "batch": 12,
+  "attempt": 2,
+  "at": "2026-11-12T23:04:42+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1643,
+   "candidatesTokenCount": 1594,
+   "totalTokenCount": 3237,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1643
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 13,
+  "attempt": 1,
+  "at": "2026-11-12T23:04:52+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1580,
+   "candidatesTokenCount": 1525,
+   "totalTokenCount": 3105,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1580
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 14,
+  "attempt": 1,
+  "at": "2026-11-12T23:05:03+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1752,
+   "candidatesTokenCount": 1517,
+   "totalTokenCount": 3269,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1752
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 15,
+  "attempt": 1,
+  "at": "2026-11-12T23:05:13+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1601,
+   "candidatesTokenCount": 1512,
+   "totalTokenCount": 3113,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1601
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 16,
+  "attempt": 1,
+  "at": "2026-11-12T23:05:23+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1766,
+   "candidatesTokenCount": 1149,
+   "totalTokenCount": 2915,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1766
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 17,
+  "attempt": 1,
+  "at": "2026-11-12T23:05:33+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1720,
+   "candidatesTokenCount": 1517,
+   "totalTokenCount": 3237,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1720
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 18,
+  "attempt": 1,
+  "at": "2026-11-12T23:05:43+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1637,
+   "candidatesTokenCount": 1601,
+   "totalTokenCount": 3238,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1637
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 19,
+  "attempt": 1,
+  "at": "2026-11-12T23:05:53+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1751,
+   "candidatesTokenCount": 1506,
+   "totalTokenCount": 3257,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1751
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ },
+ {
+  "run": 2,
+  "batch": 20,
+  "attempt": 1,
+  "at": "2026-11-12T23:06:03+00:00",
+  "prompt_version": "tags-only-v1",
+  "vocab_version": "ai_similar_films:fb082399be",
+  "tier": "assumed free (same key as the Hindi run); not changed by the pilot",
+  "model": "gemini-3.5-flash-lite",
+  "usage": {
+   "promptTokenCount": 1563,
+   "candidatesTokenCount": 1694,
+   "totalTokenCount": 3257,
+   "promptTokensDetails": [
+    {
+     "modality": "TEXT",
+     "tokenCount": 1563
+    }
+   ],
+   "serviceTier": "standard"
+  },
+  "ok": true
+ }
+]

@@ -1707,5 +1707,857 @@
    "gap": null,
    "dropped": 0
   }
+ },
+ "run3": {
+  "P01": {
+   "mood": [
+    "gritty",
+    "thrilling",
+    "epic"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "revenge",
+    "crime and the underworld",
+    "friendship"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P02": {
+   "mood": [
+    "emotional",
+    "inspiring"
+   ],
+   "tone": "realistic",
+   "pacing": "steady",
+   "themes": [
+    "class and caste",
+    "ambition",
+    "music and performance"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P03": {
+   "mood": [
+    "emotional",
+    "funny",
+    "quirky"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "journey"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P04": {
+   "mood": [
+    "dark",
+    "melancholic",
+    "emotional"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "family",
+    "grief and loss",
+    "social issues"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P05": {
+   "mood": [
+    "gritty",
+    "tense",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "war and patriotism"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P06": {
+   "mood": [
+    "gritty",
+    "tense",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "politics"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P07": {
+   "mood": [
+    "dark",
+    "suspenseful",
+    "gritty"
+   ],
+   "tone": "serious",
+   "pacing": "fast",
+   "themes": [
+    "revenge",
+    "grief and loss"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P08": {
+   "mood": [
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "journey"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P09": {
+   "mood": [
+    "romantic",
+    "thrilling"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "politics"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P10": {
+   "mood": [
+    "emotional",
+    "epic",
+    "inspiring"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "revenge",
+    "war and patriotism",
+    "love"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P11": {
+   "mood": [
+    "heartwarming",
+    "funny",
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "identity"
+   ],
+   "gap": "inner beauty versus societal standards of appearance",
+   "dropped": 0
+  },
+  "P12": {
+   "mood": [
+    "heartwarming",
+    "inspiring"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "coming of age",
+    "journey"
+   ],
+   "gap": "human and pokemon companionship",
+   "dropped": 0
+  },
+  "P13": {
+   "mood": [
+    "melancholic",
+    "emotional"
+   ],
+   "tone": "realistic",
+   "pacing": "slow-burn",
+   "themes": [
+    "love",
+    "identity"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P14": {
+   "mood": [
+    "suspenseful",
+    "tense",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "betrayal",
+    "mystery and investigation"
+   ],
+   "gap": "deception in marriage",
+   "dropped": 0
+  },
+  "P15": {
+   "mood": [
+    "emotional",
+    "epic"
+   ],
+   "tone": "melodramatic",
+   "pacing": "steady",
+   "themes": [
+    "revenge",
+    "love",
+    "crime and the underworld"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P16": {
+   "mood": [
+    "dark",
+    "suspenseful",
+    "eerie"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "supernatural"
+   ],
+   "gap": "childhood innocence corrupted by malicious imagination",
+   "dropped": 0
+  },
+  "P17": {
+   "mood": [
+    "dark",
+    "suspenseful",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "mystery and investigation",
+    "ambition"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P18": {
+   "mood": [
+    "gritty",
+    "thrilling"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "identity"
+   ],
+   "gap": "redemption through unexpected human connection",
+   "dropped": 0
+  },
+  "P19": {
+   "mood": [
+    "quirky",
+    "eerie"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "family"
+   ],
+   "gap": "childhood mischief and folklore",
+   "dropped": 0
+  },
+  "P20": {
+   "mood": [
+    "quirky",
+    "nostalgic"
+   ],
+   "tone": "mixed",
+   "pacing": "slow-burn",
+   "themes": [
+    "music and performance"
+   ],
+   "gap": "celebration and history of circus arts",
+   "dropped": 0
+  },
+  "P21": {
+   "mood": [
+    "emotional",
+    "epic"
+   ],
+   "tone": "melodramatic",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "family",
+    "war and patriotism"
+   ],
+   "gap": "Forbidden historical romance and court intrigue",
+   "dropped": 0
+  },
+  "P22": {
+   "mood": [
+    "funny",
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "fast",
+   "themes": [
+    "crime and the underworld"
+   ],
+   "gap": "Afterlife battle against the god of death",
+   "dropped": 0
+  },
+  "P23": {
+   "mood": [
+    "nostalgic",
+    "inspiring"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "ambition",
+    "identity"
+   ],
+   "gap": "Animal rights and anti-corporate defiance",
+   "dropped": 0
+  },
+  "P24": {
+   "mood": [
+    "heartwarming",
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "family",
+    "grief and loss"
+   ],
+   "gap": "Rediscovering community and belonging through online fame",
+   "dropped": 0
+  },
+  "P25": {
+   "mood": [
+    "suspenseful",
+    "tense"
+   ],
+   "tone": "serious",
+   "pacing": "fast",
+   "themes": [
+    "politics",
+    "corruption",
+    "social issues"
+   ],
+   "gap": "One-day chief minister political reform",
+   "dropped": 0
+  },
+  "P26": {
+   "mood": [
+    "gritty",
+    "melancholic"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "family",
+    "grief and loss"
+   ],
+   "gap": "Chaos surrounding a coastal funeral",
+   "dropped": 0
+  },
+  "P27": {
+   "mood": [
+    "suspenseful",
+    "tense",
+    "gritty"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "crime and the underworld",
+    "mystery and investigation",
+    "family"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P28": {
+   "mood": [
+    "emotional",
+    "epic"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "war and patriotism",
+    "history"
+   ],
+   "gap": "Wartime romance behind enemy lines",
+   "dropped": 0
+  },
+  "P29": {
+   "mood": [
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "ambition"
+   ],
+   "gap": "Culinary success upended by sudden life changes",
+   "dropped": 0
+  },
+  "P30": {
+   "mood": [
+    "dark",
+    "tense",
+    "gritty"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "crime and the underworld",
+    "mystery and investigation"
+   ],
+   "gap": "Moral dilemmas in child abduction cases",
+   "dropped": 0
+  },
+  "P31": {
+   "mood": [
+    "emotional",
+    "tense"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "family"
+   ],
+   "gap": "religious conflict",
+   "dropped": 0
+  },
+  "P32": {
+   "mood": [
+    "dark",
+    "suspenseful"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [],
+   "gap": "mad science",
+   "dropped": 0
+  },
+  "P33": {
+   "mood": [
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": null,
+   "themes": [
+    "class and caste",
+    "family"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P34": {
+   "mood": [
+    "heartwarming"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "sports",
+    "coming of age"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P35": {
+   "mood": [
+    "thrilling",
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": "fast",
+   "themes": [
+    "crime and the underworld"
+   ],
+   "gap": "time loop",
+   "dropped": 0
+  },
+  "P36": {
+   "mood": [
+    "romantic",
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "family"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P37": {
+   "mood": [
+    "inspiring",
+    "nostalgic"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "music and performance",
+    "history"
+   ],
+   "gap": "film scoring",
+   "dropped": 0
+  },
+  "P38": {
+   "mood": [
+    "dark",
+    "eerie",
+    "suspenseful"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "social issues"
+   ],
+   "gap": "nuclear anxiety",
+   "dropped": 0
+  },
+  "P39": {
+   "mood": [
+    "funny",
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [],
+   "gap": "apocalyptic survival",
+   "dropped": 0
+  },
+  "P40": {
+   "mood": [
+    "funny",
+    "quirky"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "family"
+   ],
+   "gap": "ghost hunting",
+   "dropped": 0
+  },
+  "P41": {
+   "mood": [
+    "melancholic",
+    "emotional",
+    "epic"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "war and patriotism",
+    "love"
+   ],
+   "gap": "survival of humanity",
+   "dropped": 0
+  },
+  "P42": {
+   "mood": [
+    "heartwarming",
+    "feel-good",
+    "nostalgic"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "love"
+   ],
+   "gap": "overcoming adversity through hope",
+   "dropped": 0
+  },
+  "P43": {
+   "mood": [
+    "suspenseful",
+    "tense",
+    "thrilling"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "love"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P44": {
+   "mood": [
+    "dark",
+    "tense",
+    "eerie"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "identity"
+   ],
+   "gap": "obsession and distorted perception",
+   "dropped": 0
+  },
+  "P45": {
+   "mood": [
+    "gritty",
+    "tense"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "ambition",
+    "revenge"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P46": {
+   "mood": [
+    "heartwarming",
+    "feel-good",
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "family"
+   ],
+   "gap": "generational technology gap",
+   "dropped": 0
+  },
+  "P47": {
+   "mood": [
+    "tense",
+    "gritty",
+    "funny"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "ambition",
+    "social issues"
+   ],
+   "gap": "desperation from economic ruin",
+   "dropped": 0
+  },
+  "P48": {
+   "mood": [
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "crime and the underworld",
+    "mystery and investigation"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P49": {
+   "mood": [
+    "funny",
+    "quirky",
+    "emotional"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "family"
+   ],
+   "gap": "short term memory loss",
+   "dropped": 0
+  },
+  "P50": {
+   "mood": [
+    "quirky",
+    "feel-good",
+    "nostalgic"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "music and performance"
+   ],
+   "gap": "psychedelic surrealism",
+   "dropped": 0
+  },
+  "P51": {
+   "mood": [
+    "funny",
+    "heartwarming"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "family"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P52": {
+   "mood": [
+    "funny",
+    "romantic"
+   ],
+   "tone": "light",
+   "pacing": "steady",
+   "themes": [
+    "love",
+    "friendship"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P53": {
+   "mood": [
+    "dark",
+    "suspenseful",
+    "tense"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "revenge",
+    "crime and the underworld",
+    "grief and loss"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P54": {
+   "mood": [
+    "emotional"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "ambition",
+    "grief and loss"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P55": {
+   "mood": [
+    "dark",
+    "suspenseful",
+    "tense"
+   ],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "corruption",
+    "mystery and investigation",
+    "grief and loss"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P56": {
+   "mood": [
+    "eerie",
+    "suspenseful"
+   ],
+   "tone": "serious",
+   "pacing": "slow-burn",
+   "themes": [
+    "mystery and investigation",
+    "identity"
+   ],
+   "gap": "indigenous mythology and apocalyptic premonitions",
+   "dropped": 0
+  },
+  "P57": {
+   "mood": [
+    "funny"
+   ],
+   "tone": "light",
+   "pacing": "fast",
+   "themes": [
+    "family",
+    "war and patriotism"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P58": {
+   "mood": [
+    "funny"
+   ],
+   "tone": "mixed",
+   "pacing": "steady",
+   "themes": [
+    "family",
+    "supernatural"
+   ],
+   "gap": null,
+   "dropped": 0
+  },
+  "P59": {
+   "mood": [
+    "emotional",
+    "nostalgic"
+   ],
+   "tone": "realistic",
+   "pacing": "steady",
+   "themes": [
+    "friendship",
+    "ambition",
+    "social issues"
+   ],
+   "gap": "social media addiction and modern loneliness",
+   "dropped": 0
+  },
+  "P60": {
+   "mood": [],
+   "tone": "serious",
+   "pacing": "steady",
+   "themes": [
+    "family",
+    "journey",
+    "supernatural"
+   ],
+   "gap": "transmutation and the cost of playing God",
+   "dropped": 0
+  }
  }
 }

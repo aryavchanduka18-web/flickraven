@@ -196,31 +196,34 @@ def ask_once(body: dict, key: str, opener=urllib.request.urlopen) -> tuple:
     raise RuntimeError("no model answered")
 
 
-def missing_batches(tags: dict, rows: list) -> set:
+def missing_batches(tags: dict, rows: list, runs=None, per_call: int = PER_CALL) -> set:
     """(run, batch start) pairs whose films have no answer yet (clean(None) marks an unanswered film with dropped -1)."""
     todo = set()
-    for r in range(1, RUNS + 1):
+    for r in (runs or range(1, RUNS + 1)):
         got = tags.get(f"run{r}", {})
-        for b in range(0, len(rows), PER_CALL):
-            if any(got.get(x["blind_id"], {"dropped": -1})["dropped"] == -1 for x in rows[b:b + PER_CALL]):
+        for b in range(0, len(rows), per_call):
+            if any(got.get(x["blind_id"], {"dropped": -1})["dropped"] == -1 for x in rows[b:b + per_call]):
                 todo.add((r, b))
     return todo
 
 
 def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: float = 6.0, resume: bool = False,
         retry_pause: float | None = None, stop_after_failures: int | None = None,
-        max_requests: int | None = None) -> dict:
+        max_requests: int | None = None, runs=None, per_call: int = PER_CALL) -> dict:
     """RUNS x ceil(n / PER_CALL) calls; a failed batch is retried once, never more. resume=True keeps earlier answers
     and calls, and asks only for the batches that have no answer yet (same budget: one call + one retry each)."""
     raw_dir = out / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    tags = {f"run{r}": {} for r in range(1, RUNS + 1)}
+    runs = tuple(runs or range(1, RUNS + 1))
+    tags = {f"run{r}": {} for r in runs}
     calls = []
     rows = sample.to_dict("records")
     if resume:
         tags = json.loads((out / "tags.json").read_text(encoding="utf-8"))
         calls = json.loads((out / "calls.json").read_text(encoding="utf-8"))
-    todo = missing_batches(tags, rows)
+    for r in runs:
+        tags.setdefault(f"run{r}", {})
+    todo = missing_batches(tags, rows, runs, per_call)
     streak = 0                                     # consecutive failed requests (e.g. HTTP 503 overload)
     stopped = False
     sent = 0
@@ -228,11 +231,11 @@ def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: fl
     def save():                                    # after every batch, so a crash cannot lose the call log
         (out / "tags.json").write_text(json.dumps(tags, ensure_ascii=False, indent=1), encoding="utf-8")
         (out / "calls.json").write_text(json.dumps(calls, indent=1), encoding="utf-8")
-    for r in range(1, RUNS + 1):
-        for b in range(0, len(rows), PER_CALL):
+    for r in runs:
+        for b in range(0, len(rows), per_call):
             if (r, b) not in todo or stopped:
                 continue
-            batch = rows[b:b + PER_CALL]
+            batch = rows[b:b + per_call]
             body = {"contents": [{"role": "user", "parts": [{"text": prompt(batch)}]}],
                     "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4000,
                                          "responseMimeType": "application/json"}}
@@ -241,7 +244,7 @@ def run(sample: pd.DataFrame, key: str, ask=ask_once, out: Path = OUT, pause: fl
                     stopped = True
                     break
                 sent += 1
-                rec = {"run": r, "batch": b // PER_CALL + 1, "attempt": attempt,
+                rec = {"run": r, "batch": b // per_call + 1, "attempt": attempt,
                        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                        "prompt_version": PROMPT_VERSION, "vocab_version": vocab_version(),
                        "tier": "assumed free (same key as the Hindi run); not changed by the pilot"}
