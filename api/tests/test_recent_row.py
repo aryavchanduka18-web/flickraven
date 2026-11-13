@@ -166,7 +166,7 @@ def test_the_new_row_can_be_hidden_and_its_titles_can_be_turned_down(home_client
     assert "recent_for_you" not in [r["key"] for r in home_client.get("/api/recs/home").json()["rails"]]
 
 
-def test_mixed_home_is_on_by_default_and_the_kill_switch_turns_it_off(home_client, monkeypatch):
+def test_mixed_home_can_be_switched_on_and_off_per_request_setting(home_client, monkeypatch):
     from types import SimpleNamespace
     cat = recs_router.engine_or_503(None).cat
     cat.kind = np.array(["movie"] * 30 + ["anime"] * 10, dtype=object)
@@ -200,12 +200,12 @@ def test_mixed_home_is_on_by_default_and_the_kill_switch_turns_it_off(home_clien
     assert len(ids) == len(set(ids))
 
 
-def test_mixed_home_default_is_on_and_env_can_turn_it_off(monkeypatch):
+def test_mixed_home_default_is_off_until_the_film_guard_passes(monkeypatch):
     from app.config import Settings
     monkeypatch.delenv("MIXED_HOME", raising=False)
-    assert Settings().mixed_home is True
-    monkeypatch.setenv("MIXED_HOME", "false")
     assert Settings().mixed_home is False
+    monkeypatch.setenv("MIXED_HOME", "true")
+    assert Settings().mixed_home is True
 
 
 def test_a_failure_in_the_mix_never_breaks_home(home_client, monkeypatch):

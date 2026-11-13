@@ -311,7 +311,7 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     seen = {cat.row_of[m] for m in freshness.recently_shown_ids(db, uid) if m in cat.row_of}   # shown on earlier days: move back
     plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
                        scores=scores, seed=daily.seed(uid, f"home:{mode}"), stale=seen)
-    if get_settings().mixed_home:           # films, series and anime together in the hero and first Top Picks (on by default; MIXED_HOME=false turns it off)
+    if get_settings().mixed_home:           # films, series and anime together in the hero and first Top Picks (off by default; MIXED_HOME=true turns it on)
         try:                                # the mix is an add-on: if it ever fails, Home is still the plain film Home
             plan = mixed_home_plan.mix(engine, st, plan, {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of}, seen)
         except Exception:
