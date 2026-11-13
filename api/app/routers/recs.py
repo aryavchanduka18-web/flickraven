@@ -128,14 +128,15 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     # "Because you liked X": the series most like the one the user liked or rated highest.
     liked = {r: 1.0 for r in st.likes | st.picks}
     liked.update({r: (v - 6) / 4 for r, v in st.ratings.items() if v >= 7})
-    liked = {r: w for r, w in liked.items() if cat.kind[r] == "series"}
+    liked = {r: w for r, w in liked.items() if cat.kind[r] in ("series", "anime")}      # anime fans get one too
     if liked:
         base = min(liked, key=lambda r: (-liked[r], r))
+        same_kind = set(engine.kind_rank(st, "anime")[0].tolist()) if cat.kind[base] == "anime" else ranked_series_rows
         similar = [int(cat.movie_ids[r]) for r in engine.similar(base, k=120)
-                   if cat.kind[r] == "series" and r in ranked_series_rows and int(cat.movie_ids[r]) not in shown_series][:20]
+                   if cat.kind[r] == cat.kind[base] and r in same_kind and int(cat.movie_ids[r]) not in shown_series][:20]
         if len(similar) >= series_rails_service.MIN_ROW:
             rails.append({"key": "because", "title": f"Because you liked {cat.titles[base]}",
-                          "subtitle": "Series with a similar feel.", "ids": similar})
+                          "subtitle": ("Anime" if cat.kind[base] == "anime" else "Series") + " with a similar feel.", "ids": similar})
             shown_series.update(similar)
 
     day_rng = daily.rng(uid, "series-rails")
@@ -149,8 +150,13 @@ def series_rails(user=Depends(current_user), db: Session = Depends(get_db)) -> d
     art = set(db.execute(text("SELECT id FROM movies WHERE title_type = 'anime' AND backdrop_path IS NOT NULL")).scalars())
     anime_list = [(i, r) for i, r in anime_ids.items() if i in art]               # already in the user's anime ranking order
     anime_rails = []
-    hits = [i for i, r in sorted(anime_list, key=lambda t: -cat.fame_pct[t[1]]) if cat.popularity[anime_ids[i]] >= 7.3][:60]
-    anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
+    if engine.anime_interest(st) >= 3:
+        # An anime fan already gets Home's personal "Anime for you" row (/kind/anime, their own anime order) right after
+        # Top Picks: no second, fame-ranked anime row here, so Home shows one anime row.
+        pass
+    else:
+        hits = [i for i, r in sorted(anime_list, key=lambda t: -cat.fame_pct[t[1]]) if cat.popularity[anime_ids[i]] >= 7.3][:60]
+        anime_rails.append(("anime_hits", "Anime everyone is talking about", "The most-watched anime series, from Attack on Titan to Demon Slayer and Solo Leveling.", hits))
     anime_rails.append(("anime_romance", "Romantic anime", "Love stories and romantic comedies in anime form.",
                         tc.evidence_first([i for i, r in anime_list if tc.is_romantic(cat.genres[r], cat.keywords[r], anime=True)],
                                           {i: tc.romance_tier(cat.genres[r], cat.keywords[r], anime=True) for i, r in anime_list})))
