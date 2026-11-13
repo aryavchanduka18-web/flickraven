@@ -113,9 +113,9 @@ def similar(movie_id: int, request: Request, offset: int = 0, limit: int = 20, d
         order = ai_ids[:30] + stored
         total = len(order)
         ids = order[offset:offset + limit]
-        extra = {i: extra_all.get(i, {"score": 0.0}) | ({"reasons": [{"code": "ai_similar", "text": "Similar film, picked with Google Gemini" if kind == "movie" else "Similar series, picked with Google Gemini",
-                                                                       "source": "more_like_this", "share": 0.0, "anchor_movie_id": None}]} if i in ai_ids else {})
-                 for i in ids}
+        # No "picked with Google Gemini" caption on the cards (Aryav, 2026-11-13). A Gemini pick that is also on the
+        # stored list keeps that list's own reason (shared cast, themes); any other Gemini pick shows no caption.
+        extra = {i: extra_all.get(i, {"score": 0.0}) for i in ids}
     else:
         page, extra, total = similar_svc.similar_page(db, engine, movie_id, offset, limit)
         ids = list(extra)

@@ -9,4 +9,12 @@ describe("Radar", () => {
     expect(screen.getByRole("img").getAttribute("aria-label")).toContain("Plot complexity 80 out of 100");
     expect(screen.getAllByText("Humour").length).toBe(1);
   });
+
+  it("splits long side labels onto two lines so they are not cut off", () => {
+    const pts = ["Plot complexity", "Psychological tension", "Dark atmosphere", "Character focus"].map((l, i) => ({ key: String(i), label: l, you: 50, catalog: 50 }));
+    const { container } = render(<Radar points={pts} />);
+    const texts = Array.from(container.querySelectorAll("text"));
+    expect(texts[0].querySelectorAll("tspan").length).toBe(0);            // top label stays on one line
+    expect(Array.from(texts[1].querySelectorAll("tspan")).map((t) => t.textContent)).toEqual(["Psychological", "tension"]);
+  });
 });
