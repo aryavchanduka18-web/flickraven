@@ -1,0 +1,218 @@
+{
+  "anime": {
+    "users": 300,
+    "eligible_pool": 46847,
+    "pages_changed": 0.7767,
+    "avg_non_film_slots_current": 6.53,
+    "avg_non_film_slots_mixed": 6.12,
+    "mixed_lanes_seen": {
+      "anime_film": 298,
+      "hollywood_film": 239,
+      "anime_series": 233,
+      "international_film": 217,
+      "indian_film": 4
+    },
+    "hit15": {
+      "current": 0.0,
+      "mixed": 0.26,
+      "diff": 0.26,
+      "ci95": [
+        0.2103,
+        0.3097
+      ]
+    },
+    "recall15": {
+      "current": 0.0,
+      "mixed": 0.0496,
+      "diff": 0.0496,
+      "ci95": [
+        0.0364,
+        0.0628
+      ]
+    },
+    "ndcg10": {
+      "current": 0.0,
+      "mixed": 0.0339,
+      "diff": 0.0339,
+      "ci95": [
+        0.0247,
+        0.043
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.0,
+      "mixed": 0.0436,
+      "diff": 0.0436,
+      "ci95": [
+        0.0321,
+        0.0551
+      ]
+    }
+  },
+  "kdrama": {
+    "users": 300,
+    "eligible_pool": 55419,
+    "pages_changed": 0.6367,
+    "avg_non_film_slots_current": 0.54,
+    "avg_non_film_slots_mixed": 2.96,
+    "mixed_lanes_seen": {
+      "international_film": 299,
+      "hollywood_film": 222,
+      "korean_series": 189,
+      "anime_film": 144,
+      "international_series": 36,
+      "indian_film": 13
+    },
+    "hit15": {
+      "current": 0.0,
+      "mixed": 0.1767,
+      "diff": 0.1767,
+      "ci95": [
+        0.1334,
+        0.2199
+      ]
+    },
+    "recall15": {
+      "current": 0.0,
+      "mixed": 0.0251,
+      "diff": 0.0251,
+      "ci95": [
+        0.0173,
+        0.0329
+      ]
+    },
+    "ndcg10": {
+      "current": 0.0,
+      "mixed": 0.0179,
+      "diff": 0.0179,
+      "ci95": [
+        0.0125,
+        0.0233
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.0,
+      "mixed": 0.0281,
+      "diff": 0.0281,
+      "ci95": [
+        0.02,
+        0.0362
+      ]
+    }
+  },
+  "indian": {
+    "users": 102,
+    "eligible_pool": 102,
+    "pages_changed": 0.902,
+    "avg_non_film_slots_current": 0.18,
+    "avg_non_film_slots_mixed": 0.81,
+    "mixed_lanes_seen": {
+      "hollywood_film": 101,
+      "international_film": 92,
+      "indian_film": 60,
+      "anime_film": 29,
+      "anime_series": 18
+    },
+    "hit15": {
+      "current": 0.0196,
+      "mixed": 0.0784,
+      "diff": 0.0588,
+      "ci95": [
+        0.0129,
+        0.1047
+      ]
+    },
+    "recall15": {
+      "current": 0.0112,
+      "mixed": 0.0345,
+      "diff": 0.0233,
+      "ci95": [
+        0.0004,
+        0.0462
+      ]
+    },
+    "ndcg10": {
+      "current": 0.0045,
+      "mixed": 0.0146,
+      "diff": 0.0101,
+      "ci95": [
+        0.0015,
+        0.0186
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.0031,
+      "mixed": 0.0143,
+      "diff": 0.0111,
+      "ci95": [
+        0.0016,
+        0.0206
+      ]
+    }
+  },
+  "film": {
+    "users": 1000,
+    "eligible_pool": null,
+    "pages_changed": 0.403,
+    "avg_non_film_slots_current": 0.26,
+    "avg_non_film_slots_mixed": 0.39,
+    "mixed_lanes_seen": {
+      "hollywood_film": 1000,
+      "international_film": 816,
+      "indian_film": 195,
+      "anime_film": 178,
+      "anime_series": 50
+    },
+    "hit15": {
+      "current": 0.607,
+      "mixed": 0.6,
+      "diff": -0.007,
+      "ci95": [
+        -0.0186,
+        0.0046
+      ]
+    },
+    "recall15": {
+      "current": 0.1041,
+      "mixed": 0.0958,
+      "diff": -0.0083,
+      "ci95": [
+        -0.0106,
+        -0.006
+      ]
+    },
+    "ndcg10": {
+      "current": 0.1092,
+      "mixed": 0.1008,
+      "diff": -0.0085,
+      "ci95": [
+        -0.011,
+        -0.0059
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.148,
+      "mixed": 0.1269,
+      "diff": -0.021,
+      "ci95": [
+        -0.0272,
+        -0.0148
+      ]
+    }
+  },
+  "reference_lane_rows_hit20": {
+    "anime": 0.7933,
+    "kdrama": 0.75
+  },
+  "film_guard": {
+    "rule": "mixed NDCG@10 minus current >= -0.003",
+    "diff": -0.0085,
+    "ci95": [
+      -0.011,
+      -0.0059
+    ],
+    "pass": false,
+    "pass_strict_ci": false
+  },
+  "seconds": 974
+}
