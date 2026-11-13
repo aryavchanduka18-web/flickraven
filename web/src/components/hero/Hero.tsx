@@ -102,6 +102,8 @@ export default function Hero({ items }: { items: RecItem[] }) {
               <h1 className="mb-3 font-display text-5xl font-extrabold leading-[1.02] tracking-tight drop-shadow-lg md:text-7xl">{m.title}</h1>
             )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/85">
+              {m.title_type === "anime" && <span className="rounded-full border border-white/30 px-2.5 py-0.5 text-xs font-semibold">Anime series</span>}
+              {m.title_type === "series" && <span className="rounded-full border border-white/30 px-2.5 py-0.5 text-xs font-semibold">Series</span>}
               {m.year && <span>{m.year}</span>}
               {m.runtime && <span>{runtime(m.runtime)}</span>}
               <span>{m.genres.slice(0, 3).join(" · ")}</span>
