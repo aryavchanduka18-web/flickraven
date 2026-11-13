@@ -87,7 +87,7 @@ def test_series_page_puts_gemini_picks_first_then_the_stored_list(test_engine, t
         items = c.get(f"/api/movies/{a}/similar").json()["items"]
     got = [i["movie"]["id"] for i in items]
     assert got == [f, o]
-    assert items[0]["reasons"][0]["code"] == "ai_similar" and not items[1]["reasons"]
+    assert not items[0]["reasons"] and not items[1]["reasons"]   # Gemini picks carry no "picked with Google Gemini" caption
 
 
 def test_shipped_file_answers_without_any_gemini_call(test_engine, titles, monkeypatch):
@@ -259,7 +259,7 @@ def test_film_page_drops_disliked_and_watched_gemini_picks(test_engine, titles, 
         items = c.get(f"/api/movies/{a}/similar").json()["items"]
     got = [i["movie"]["id"] for i in items]
     assert got == [fi]                        # disliked f and watched o are gone; Gemini naming them changes nothing
-    assert items[0]["reasons"][0]["text"] == "Similar film, picked with Google Gemini"
+    assert not any("Gemini" in r["text"] for it in items for r in it.get("reasons", []))   # no Gemini caption on cards
 
 
 def test_film_page_disliked_genre_is_a_hard_rule_except_the_pages_own_genre(test_engine, titles, monkeypatch):
