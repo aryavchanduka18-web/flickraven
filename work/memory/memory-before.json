@@ -1,0 +1,201 @@
+{
+ "label": "before",
+ "seconds": 12.7,
+ "stages": {
+  "start": {
+   "rss_mb": 19.4,
+   "peak_mb": 19.4
+  },
+  "after_imports": {
+   "rss_mb": 203.0,
+   "peak_mb": 203.0
+  },
+  "after_load_engine": {
+   "rss_mb": 413.7,
+   "peak_mb": 470.8
+  },
+  "after_load_engine_gc": {
+   "rss_mb": 413.7,
+   "peak_mb": 470.8
+  },
+  "after_30_ratings": {
+   "rss_mb": 415.9,
+   "peak_mb": 470.8
+  },
+  "after_home": {
+   "rss_mb": 420.6,
+   "peak_mb": 470.8
+  },
+  "after_perfect_pick": {
+   "rss_mb": 424.0,
+   "peak_mb": 470.8
+  },
+  "after_tonight": {
+   "rss_mb": 423.8,
+   "peak_mb": 470.8
+  },
+  "after_series_anime": {
+   "rss_mb": 426.5,
+   "peak_mb": 470.8
+  },
+  "after_more_like_this": {
+   "rss_mb": 431.6,
+   "peak_mb": 470.8
+  },
+  "after_20_mixed": {
+   "rss_mb": 436.1,
+   "peak_mb": 470.8
+  },
+  "after_final_gc": {
+   "rss_mb": 436.0,
+   "peak_mb": 470.8
+  }
+ },
+ "components": [
+  {
+   "object": "sources.cf_rc",
+   "mb": 23.2,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "sources.cf_ind",
+   "mb": 23.2,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "engine.train_csc",
+   "mb": 23.1,
+   "type": "csc_matrix"
+  },
+  {
+   "object": "sources.cf_rc_t",
+   "mb": 23.1,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "sources.cf_ind_t",
+   "mb": 23.1,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "sources.cf_sq_t",
+   "mb": 23.1,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "catalog.keywords",
+   "mb": 17.3,
+   "type": "list"
+  },
+  {
+   "object": "catalog.content",
+   "mb": 14.6,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "engine.similar_table",
+   "mb": 13.8,
+   "type": "dict"
+  },
+  {
+   "object": "catalog.genres",
+   "mb": 6.7,
+   "type": "list"
+  },
+  {
+   "object": "sources.item_sim_t",
+   "mb": 3.7,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "sources.svd",
+   "mb": 3.7,
+   "type": "dict"
+  },
+  {
+   "object": "catalog.row_of",
+   "mb": 3.0,
+   "type": "dict"
+  },
+  {
+   "object": "sources.als",
+   "mb": 2.3,
+   "type": "dict"
+  },
+  {
+   "object": "catalog.titles",
+   "mb": 2.0,
+   "type": "list"
+  },
+  {
+   "object": "engine.nb_idx",
+   "mb": 1.8,
+   "type": "ndarray"
+  },
+  {
+   "object": "engine.nb_vals",
+   "mb": 1.8,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.kind",
+   "mb": 1.7,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.language",
+   "mb": 1.6,
+   "type": "list"
+  },
+  {
+   "object": "catalog.gemini_sim",
+   "mb": 1.5,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "catalog.series_sim",
+   "mb": 0.5,
+   "type": "csr_matrix"
+  },
+  {
+   "object": "catalog.movie_ids",
+   "mb": 0.3,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.runtime",
+   "mb": 0.3,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.year",
+   "mb": 0.3,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.part",
+   "mb": 0.3,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.popularity",
+   "mb": 0.3,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.votes",
+   "mb": 0.3,
+   "type": "ndarray"
+  },
+  {
+   "object": "catalog.universe_of_row",
+   "mb": 0.3,
+   "type": "ndarray"
+  }
+ ],
+ "threads": {
+  "OMP_NUM_THREADS": "1",
+  "OPENBLAS_NUM_THREADS": "1",
+  "MKL_NUM_THREADS": "1"
+ }
+}
