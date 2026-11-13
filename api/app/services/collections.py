@@ -50,7 +50,9 @@ BY_KEY = {c["key"]: c for c in COLLECTIONS}
 
 def member_ids(db: Session, c: dict) -> list[int]:
     """Films in the collection, most popular first (the order used when nothing personal is known)."""
-    where, p = ["true"], {}
+    # Collections are film shelves ("Anime Films", "Korean Thrillers", ...): series and TV anime share genres and
+    # languages with films, so they are left out unless a collection names other kinds.
+    where, p = ["m.title_type = ANY(:kinds)"], {"kinds": list(c.get("kinds", ["movie"]))}
     for i, g in enumerate(c.get("all_genres", [])):
         where.append(f"EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id "
                      f"WHERE mg.movie_id = m.id AND g.name = :g{i})")

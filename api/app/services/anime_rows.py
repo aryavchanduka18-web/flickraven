@@ -1,4 +1,3 @@
-from cinematch_engine import taxonomy
 """Rows for the Anime page: anime series (TV anime, title_type 'anime') and anime films (Japanese animated films, the
 same rule as the Anime genre page and Perfect Pick).
 
@@ -7,6 +6,8 @@ Nothing here ranks anything. The two orders come in already personal: anime seri
 Both already leave out titles the person rated, watched, liked, picked or disliked, and disliked genres. This module
 only cuts those two lists into rows with plain rules, keeps live-action out, and never repeats a title on the page.
 """
+
+from cinematch_engine import taxonomy
 from dataclasses import dataclass, field
 
 from app.services import title_class as tc

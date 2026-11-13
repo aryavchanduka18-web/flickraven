@@ -1,9 +1,10 @@
-from cinematch_engine import taxonomy
 """The Perfect Pick: three titles from three answers (mood, time, familiar or adventurous).
 
 The recommender does the ranking (hybrid score for films, series ranking for series); the answers only narrow the
 list and decide how much novelty counts. Nothing here invents a title or a number.
 """
+
+from cinematch_engine import taxonomy
 from dataclasses import dataclass, field
 
 from app.services import title_class as tc
