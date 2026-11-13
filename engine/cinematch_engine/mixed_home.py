@@ -61,7 +61,8 @@ def compose(lanes: dict[str, list[tuple[int, float]]], weights: dict[str, float]
     count_lang: dict[str, int] = {}
     count_genre: dict[str, int] = {}
     taken: set[int] = set()
-    family = lambda fmt: fmt.split("_")[0]            # anime and anime_film (Japanese animated films) count as one format
+    def family(fmt):                                  # anime and anime_film count as one format, all series lanes as one
+        return "anime" if fmt.startswith("anime") else "series" if fmt.endswith("_series") else fmt
     while pool and len(picked) < k:
         def value(c):
             v, row, fmt = c
