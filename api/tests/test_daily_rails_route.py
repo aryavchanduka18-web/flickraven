@@ -118,3 +118,12 @@ def test_kind_rail_keeps_a_core_and_changes_with_the_day(client, monkeypatch):
         changed = changed or other != first
         assert len(set(other) & set(first)) >= 3                         # a strong core stays
     assert changed
+
+
+def test_series_rails_count_anime_the_person_liked(client, monkeypatch):
+    class AnimeFan(State):
+        ratings = {100: 9, 101: 8, 102: 10}                              # rows 100 and up are the anime
+        likes = {103}
+    monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: AnimeFan())
+    body = client.get("/api/recs/series-rails").json()
+    assert body["engaged_anime"] == 4 and body["engaged_series"] == 0

@@ -11,7 +11,7 @@ import TunePanel from "../components/discovery/TunePanel";
 import Hero from "../components/hero/Hero";
 import { PageMessage, RailSkeleton } from "../components/Loading";
 import Rail from "../components/rail/Rail";
-import { themedRowLimit } from "../lib/seriesRows";
+import { animeRowSlot, themedRowLimit } from "../lib/seriesRows";
 
 const PERSONAL = new Set(["top_picks", "based_on_ratings", "people_like_you", "different"]);
 
@@ -36,6 +36,7 @@ export default function Home() {
   const anime = useKindRail("anime");
   const showAnimeRow = !!anime.data && anime.data.items.length > 0;
   const themed = useSeriesRails();
+  const animeSlot = animeRowSlot(themed.data?.engaged_anime ?? 0);
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
@@ -107,13 +108,13 @@ export default function Home() {
               {i === 1 && themed.data?.rails.filter((x) => x.key === "because").map((x) => (
                 <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source="rail:series_because" personal={false} />
               ))}
-              {i === 1 && themed.data?.rails.filter((x) => x.key !== "mix" && x.key !== "because").slice(0, themedRowLimit(themed.data.engaged_series ?? 0)).map((x) => (
+              {i === 1 && themed.data?.rails.filter((x) => x.key !== "mix" && x.key !== "because").slice(0, themedRowLimit((themed.data.engaged_series ?? 0) + (themed.data.engaged_anime ?? 0))).map((x) => (
                 <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source={`rail:series_${x.key}`} personal={false} />
               ))}
               {i === 3 && themed.data?.rails.filter((x) => x.key === "mix").map((x) => (
                 <Rail key={x.key} title={x.title} subtitle={x.subtitle} items={x.items} source="rail:series_mix" personal={false} />
               ))}
-              {i === 1 && showAnimeRow && (
+              {i === animeSlot && showAnimeRow && (
                 <Rail title="Anime for you" subtitle="From what you like and what is popular."
                   items={anime.data!.items} source="rail:anime" personal={false} />
               )}
