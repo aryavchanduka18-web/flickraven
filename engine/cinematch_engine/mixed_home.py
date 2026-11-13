@@ -40,15 +40,19 @@ def percentile(scores: list[float]) -> list[float]:
 
 def compose(lanes: dict[str, list[tuple[int, float]]], weights: dict[str, float], k: int, language: dict[int, str],
             genres: dict[int, list[str]], floor: float = FLOOR) -> list[tuple[int, str]]:
-    """lanes: format -> [(row, score)] best first, e.g. {"movie": [...], "anime": [...], "series": [...]}.
-    weights: format -> evidence weight (movie is always 1.0). Returns up to k (row, format), best first."""
+    """lanes: format -> [(row, score)] best first, e.g. {"movie": [...], "anime": [...], "series": [...]}. Only the ORDER
+    of a lane counts (its rank share), never the score. weights: format -> evidence weight (movie is always 1.0).
+    Returns up to k (row, format), best first."""
     pool: list[tuple[float, int, str]] = []
     for fmt, items in lanes.items():
         w = 1.0 if fmt == "movie" else weights.get(fmt, 0.0)
         if fmt != "movie" and w < MIN_WEIGHT:
             continue
-        pct = percentile([s for _, s in items])
-        for (row, _), p in zip(items, pct):
+        n = len(items)
+        # Rank share from the lane's own order (best first), NOT recomputed from raw scores, so a lane that was already
+        # put in fresh-first order for Home keeps that order here.
+        for i, (row, _) in enumerate(items):
+            p = 1.0 - i / n
             if fmt != "movie" and p < floor:
                 continue
             pool.append((p * (1.0 if fmt == "movie" else 0.5 + 0.5 * w), row, fmt))
@@ -57,10 +61,11 @@ def compose(lanes: dict[str, list[tuple[int, float]]], weights: dict[str, float]
     count_lang: dict[str, int] = {}
     count_genre: dict[str, int] = {}
     taken: set[int] = set()
+    family = lambda fmt: fmt.split("_")[0]            # anime and anime_film (Japanese animated films) count as one format
     while pool and len(picked) < k:
         def value(c):
             v, row, fmt = c
-            v *= FORMAT_DECAY ** count_fmt.get(fmt, 0) if fmt != "movie" else 1.0
+            v *= FORMAT_DECAY ** count_fmt.get(family(fmt), 0) if fmt != "movie" else 1.0
             v *= LANG_DECAY ** count_lang.get(language.get(row, ""), 0)
             for g in genres.get(row, [])[:2]:
                 v *= GENRE_DECAY ** count_genre.get(g, 0)
@@ -71,7 +76,7 @@ def compose(lanes: dict[str, list[tuple[int, float]]], weights: dict[str, float]
         _, row, fmt = best
         picked.append((row, fmt))
         taken.add(row)
-        count_fmt[fmt] = count_fmt.get(fmt, 0) + 1
+        count_fmt[family(fmt)] = count_fmt.get(family(fmt), 0) + 1
         count_lang[language.get(row, "")] = count_lang.get(language.get(row, ""), 0) + 1
         for g in genres.get(row, [])[:2]:
             count_genre[g] = count_genre.get(g, 0) + 1

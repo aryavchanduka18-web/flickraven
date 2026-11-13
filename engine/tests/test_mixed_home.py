@@ -55,3 +55,20 @@ def test_an_empty_or_short_lane_never_breaks_it():
     assert compose({"movie": [], "anime": []}, {"anime": 1.0}, 5, LANG, GEN) == []
     got = compose({"movie": [(1, 0.5)], "anime": [(100, 0.4)]}, {"anime": 1.0}, 5, LANG, GEN)
     assert len(got) <= 2
+
+
+def test_lane_order_is_kept_even_when_scores_disagree():
+    # A lane put in fresh-first order for Home: the first title has a LOWER score than the next ones. Its place must win.
+    anime = [(129, 0.2)] + [(100 + i, 0.9 - i / 100) for i in range(29)]
+    got = compose({"movie": lanes()["movie"], "anime": anime}, {"anime": 1.0}, 10, LANG, GEN)
+    first_anime = next(r for r, f in got if f == "anime")
+    assert first_anime == 129
+
+
+def test_anime_films_and_anime_series_share_one_format_limit():
+    split = {"movie": lanes()["movie"], "anime": lanes()["anime"][:15], "anime_film": [(300 + i, 0.9) for i in range(15)]}
+    lang = LANG | {300 + i: "ja" for i in range(15)}
+    gen = GEN | {300 + i: ["Animation"] for i in range(15)}
+    both = [f for _, f in compose(split, {"anime": 1.0, "anime_film": 1.0}, 10, lang, gen)]
+    one = [f for _, f in compose(lanes(), {"anime": 1.0}, 10, LANG, GEN)]
+    assert both.count("anime") + both.count("anime_film") <= one.count("anime") + 1

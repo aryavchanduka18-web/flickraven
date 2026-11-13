@@ -174,6 +174,9 @@ def test_mixed_home_puts_anime_in_the_hero_and_top_picks_only_when_switched_on(h
         def engaged_rows(self, st):
             return set(st.liked)
 
+        def excluded(self, st):
+            return np.array(sorted(st.liked), dtype=np.int64)
+
         def kind_rank(self, st, fmt):
             return (np.arange(30, 40), np.linspace(0.95, 0.2, 10)) if fmt == "anime" else (np.array([], dtype=int), np.array([]))
 
