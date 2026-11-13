@@ -68,3 +68,21 @@ def test_no_title_twice_on_one_page_and_new_rows_exist():
         light = {r for r in rows_of(p)["feel_good"]}
         assert all(not {"Horror", "Thriller"} & set(make().cat.genres[r]) for r in light)
         assert all("Romance" in make().cat.genres[r] for r in rows_of(p)["romance"])
+
+
+def test_stale_titles_move_behind_fresh_ones_but_are_never_removed():
+    base = plan(7)
+    seen = {h["row"] for h in base["hero"]} | {r for rail in base["rails"] for r in rail["rows"][:8]}
+    fresh = OnlineEngine.home(make(), UserState(), "balanced", seed=7, stale=seen)
+    hero_after = {h["row"] for h in fresh["hero"]}
+    assert not hero_after & {h["row"] for h in base["hero"]}                 # a new hero
+    for rail in fresh["rails"]:
+        assert len(rail["rows"]) >= 8                                         # pools still fill
+    heads = lambda p: sum(r in seen for rail in p["rails"] for r in rail["rows"][:3])
+    assert heads(fresh) < heads(base)                                         # the fixed head of rows is fresher
+    every = [h["row"] for h in fresh["hero"]] + [r for rail in fresh["rails"] for r in rail["rows"]]
+    assert len(every) == len(set(every))
+
+
+def test_no_stale_set_changes_nothing():
+    assert rows_of(OnlineEngine.home(make(), UserState(), "balanced", seed=3, stale=set())) == rows_of(plan(3))

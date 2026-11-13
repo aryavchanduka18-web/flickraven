@@ -12,6 +12,7 @@ from app.auth import current_user
 from app.db import get_db
 from app.services import recommender as rec
 from app.services import daily
+from app.services import freshness
 from app.services import match_display
 from app.services import perfect_pick as pp
 from app.services import series_fit as fit
@@ -297,9 +298,10 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     mode = mode_of(db, uid, mode)
     st = rec.user_state(db, uid, engine)
     scores = engine.scores(st)            # scored once: Home and the agreement numbers share it
-    plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
-                       scores=scores, seed=daily.seed(uid, f"home:{mode}"))
     cat = engine.cat
+    seen = {cat.row_of[m] for m in freshness.recently_shown_ids(db, uid) if m in cat.row_of}   # shown on earlier days: move back
+    plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
+                       scores=scores, seed=daily.seed(uid, f"home:{mode}"), stale=seen)
     agree = agreement_all(engine, st, scores)
     request_id, page_id = str(uuid.uuid4()), str(uuid.uuid4())
 

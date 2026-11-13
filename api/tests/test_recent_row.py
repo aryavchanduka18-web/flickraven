@@ -91,7 +91,7 @@ class HomeEngine:
     def scores(self, st):
         return {}
 
-    def home(self, st, mode, tuning=None, recent_rows=None, scores=None, seed=None):
+    def home(self, st, mode, tuning=None, recent_rows=None, scores=None, seed=None, stale=None):
         rail = np.linspace(1.0, 0.0, N)
         entry = lambda r: {"row": r, "score": float(rail[r]), "match_pct": None, "shares": {}}
         top = [r for r in range(2, 14)]

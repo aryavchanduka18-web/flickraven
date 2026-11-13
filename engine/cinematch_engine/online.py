@@ -710,16 +710,21 @@ class OnlineEngine:
     # ------------------------------------------------------------------ home page plan (spec 7)
     def home(self, st: UserState, mode: str = "balanced", rail_size: int = 20, min_rail: int = 8,
              tuning: Tuning | None = None, recent_rows: list[int] | None = None, scores: dict | None = None,
-             seed: int | None = None) -> dict:
+             seed: int | None = None, stale: set[int] | None = None) -> dict:
         """The Home plan. With a `seed` (the API passes one that changes every day per person) the page is refreshed:
         hero and rows are drawn from a wider top of the same ranking, and the order of the themed rows is shuffled.
-        Without a seed the plan is fully deterministic (tests, evaluation)."""
+        `stale` are catalogue rows this person was shown in the last few days and did not act on: they go behind
+        the fresh ones in the hero and in every row (never removed, so a small pool still fills up), which keeps the
+        page from showing the same top titles for days. Without a seed the plan is fully deterministic (tests, evaluation)."""
         cat = self.cat
         scores = scores or self.scores(st)           # callers that already scored this user pass them in
         rail = self.rail_scores(st, scores)
         rng = np.random.default_rng(seed) if seed is not None else None
         used: set[int] = set()
+        stale = stale or set()
         picks = self.top_picks(st, mode, k=5 + rail_size * (3 if rng is not None else 1), scores=scores, tuning=tuning)
+        if stale:                           # fresh titles first, same order inside each group
+            picks = [p for p in picks if p["row"] not in stale] + [p for p in picks if p["row"] in stale]
         hero = refresh(picks[:12], 5, rng, pool_mult=2, keep=2) if rng is not None else picks[:5]
         picks = [p for p in picks if p not in hero]
         picks = hero + picks
@@ -728,6 +733,8 @@ class OnlineEngine:
 
         def take(key, title, rows, source, reason=None, scored=None):
             rows = [int(r) for r in rows if int(r) not in used and np.isfinite(rail[int(r)])]
+            if stale:
+                rows = [r for r in rows if r not in stale] + [r for r in rows if r in stale]
             rows = refresh(rows, rail_size, rng) if rng is not None else rows[:rail_size]
             if len(rows) < min_rail:
                 return
