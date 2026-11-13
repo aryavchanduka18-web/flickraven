@@ -92,3 +92,65 @@ def test_anime_films_join_the_anime_lane_for_an_anime_fan():
 def out_first(out):
     top = next(r for r in out["rails"] if r["key"] == "top_picks")
     return [e["row"] for e in out["hero"]] + top["rows"][:10]
+
+
+# ---- Phase 2: one personal list per taxonomy lane -------------------------------------------------------------------
+
+def lane_engine():
+    """40 English films, 10 Hindi films, 10 French films, 15 Korean series, 15 English series, 15 Hindi series."""
+    kinds, langs, genres = [], [], []
+    for n, k, l in ((40, "movie", "en"), (10, "movie", "hi"), (10, "movie", "fr"), (15, "series", "ko"), (15, "series", "en"), (15, "series", "hi")):
+        kinds += [k] * n
+        langs += [l] * n
+        genres += [["Drama"]] * n
+    cat = SimpleNamespace(kind=np.array(kinds, dtype=object), language=langs, genres=genres)
+    e = SimpleNamespace(cat=cat)
+    e.engaged_rows = lambda st: set(st.liked)
+    e.excluded = lambda st: np.array(sorted(set(st.liked) | set(st.ratings)), dtype=np.int64)
+    ks = [r for r in range(len(kinds)) if kinds[r] == "series"]
+    e.kind_rank = lambda st, fmt: (np.array(ks), np.linspace(0.95, 0.2, len(ks))) if fmt == "series" else (np.array([], dtype=int), np.array([]))
+    return e, {"ko": range(60, 75), "en_series": range(75, 90), "hi_series": range(90, 105), "hi_film": range(40, 50), "fr_film": range(50, 60)}
+
+
+def lane_plan(n_rows):
+    entries = {r: {"row": r, "score": 1.0 - r / 100, "match_pct": 80, "shares": {}} for r in range(30)}
+    rail = np.full(n_rows, -np.inf)
+    rail[:60] = np.linspace(0.9, 0.1, 60)
+    return {"rail_scores": rail, "hero": [entries[r] for r in range(5)],
+            "rails": [{"key": "top_picks", "rows": list(range(5, 30)), "scored": {r: entries[r] for r in range(5, 30)}}]}
+
+
+def test_each_series_lane_counts_only_with_its_own_evidence():
+    e, rows = lane_engine()
+    st = SimpleNamespace(liked=list(rows["ko"])[:8], ratings={}, dislikes=set())            # eight Korean series, nothing else
+    out = mh.mix(e, st, lane_plan(105), set())
+    shown = [x["row"] for x in out["hero"]] + out["rails"][0]["rows"][:10]
+    assert any(r in rows["ko"] for r in shown)
+    assert not any(r in rows["hi_series"] or r in rows["en_series"] for r in shown)      # no evidence: no Hindi or English series
+    assert all(x["format"] == "korean_series" and x["match_pct"] is None for x in out["hero"] if x["row"] in rows["ko"])
+    assert mh.reason("korean_series")[0]["text"] == "Based on the Korean series you have rated highly"
+
+
+def test_a_hindi_film_fan_gets_a_hindi_lane_but_an_english_only_viewer_does_not():
+    e, rows = lane_engine()
+    fan = SimpleNamespace(liked=list(rows["hi_film"])[:8], ratings={}, dislikes=set())
+    out = mh.mix(e, fan, lane_plan(105), set())
+    shown = [x["row"] for x in out["hero"]] + out["rails"][0]["rows"][:10]
+    assert any(r in rows["hi_film"] for r in shown if r not in fan.liked)
+    plan = lane_plan(105)
+    assert mh.mix(e, SimpleNamespace(liked=[0, 1, 2], ratings={}, dislikes=set()), plan, set()) is plan      # English films only: unchanged
+
+
+def test_disliking_a_lane_removes_it():
+    e, rows = lane_engine()
+    st = SimpleNamespace(liked=list(rows["fr_film"])[:5], ratings={r: 2 for r in list(rows["fr_film"])[5:10]}, dislikes=set())
+    plan = lane_plan(105)
+    assert mh.mix(e, st, plan, set()) is plan                  # 5 liked, 5 disliked: weight below the floor
+
+
+def test_lane_titles_shown_on_earlier_days_go_behind_fresh_ones():
+    e, rows = lane_engine()
+    st = SimpleNamespace(liked=list(rows["ko"])[:8], ratings={}, dislikes=set())
+    first = [x["row"] for x in mh.mix(e, st, lane_plan(105), set())["hero"]]
+    later = [x["row"] for x in mh.mix(e, st, lane_plan(105), set(), stale=set(first))["hero"]]
+    assert not set(later) & set(first)
