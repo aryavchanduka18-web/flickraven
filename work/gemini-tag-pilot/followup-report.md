@@ -1,5 +1,19 @@
 # Gemini tags follow-up: consensus and 400 non-Hindi films (2026-11-12/13)
 
+> **Blind review of 60 of these 400 films:** open `work/gemini-tag-pilot/review-sheet-400.csv`. For each film, fill
+> `mood_ok`, `tone_ok`, `pacing_ok` and `themes_ok` with **r** = right, **w** = wrong or **u** = unsure. "(none)" marked
+> right means the tag was rightly left empty.
+>
+> Then run:
+>
+>     .\.venv\Scripts\python.exe -m pipeline.score_review --sheet review-sheet-400.csv --mapping mapping-400-HIDDEN-until-review.csv --evaluation evaluation-400.json --name 400
+>
+> About the sheet:
+> - It shows the consensus tags: words kept only when both runs agree, and tone or pacing only when both runs agree.
+> - Films: 15 Tamil/Telugu/Malayalam, 9 Korean, 9 Japanese, 15 English and 12 world, seed 31. 16 of them are flagged
+>   hard (mixed tone).
+> - The language mapping stays on the laptop and is not committed.
+
 This is an offline follow-up to the 60-film pilot (#137, #139, #140). Script: `pipeline/gemini_tag_scale.py`.
 
 It reuses the pilot's tags-only prompt (`tags-only-v1`), the existing vocabulary (not expanded), the model and the call

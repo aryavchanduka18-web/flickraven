@@ -191,9 +191,42 @@ def evaluate() -> dict:
     return rep
 
 
+REVIEW_GROUPS = {"other_indian": 15, "korean": 9, "japanese": 9, "english": 15, "world": 12}
+REVIEW_HARD = 10
+REVIEW_SEED = 31
+
+
+def build_review_400(sample: pd.DataFrame, cons: dict, seed: int = REVIEW_SEED) -> pd.DataFrame:
+    """60 of the 400 tagged films for a blind human review: stratified by language group (REVIEW_GROUPS), fame band and
+    decade (gp.stratified_pick), about REVIEW_HARD hard mixed-tone films, only films with a consensus entry."""
+    rng = np.random.default_rng(seed)
+    s = sample[sample.blind_id.isin(cons)].copy()
+    total = sum(REVIEW_GROUPS.values())
+    parts = [gp.stratified_pick(s[s.group == g], n, max(1, round(n * REVIEW_HARD / total)), rng)
+             for g, n in REVIEW_GROUPS.items()]
+    r = pd.concat(parts)
+    r = r.iloc[rng.permutation(len(r))].reset_index(drop=True)
+    r["review_id"] = [f"R{i + 1:02d}" for i in range(len(r))]
+    return r
+
+
+def review_sheet_400(review: pd.DataFrame, cons: dict, path) -> None:
+    """Blind sheet with the CONSENSUS tags; no language, group or ids that reveal them."""
+    cols = ["blind_id", "title", "year", "genres", "plot", "mood", "tone", "pacing", "themes",
+            "mood_ok", "tone_ok", "pacing_ok", "themes_ok", "comment"]
+    with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+        w = csv.writer(fh)
+        w.writerow(cols)
+        for x in review.sort_values("review_id").itertuples():
+            c = cons[x.blind_id]
+            w.writerow([x.review_id, x.title, int(x.year), ", ".join(list(x.genres)[:4]), str(x.plot)[:gp.PLOT_CHARS],
+                        ", ".join(c["mood"]) or "(none)", c["tone"] or "(none)", c["pacing"] or "(none)",
+                        ", ".join(c["themes"]) or "(none)", "", "", "", "", ""])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["step1", "sample2", "step2", "evaluate"])
+    ap.add_argument("step", choices=["step1", "sample2", "step2", "evaluate", "review400"])
     a = ap.parse_args()
     if a.step == "step1":
         print(json.dumps(step1(), indent=1))
@@ -206,6 +239,19 @@ def main() -> None:
         print(s.groupby("group").agg(n=("blind_id", "size"), hard=("hard", "sum")).to_string())
     elif a.step == "step2":
         print(json.dumps(step2(), indent=1))
+    elif a.step == "review400":                 # no API call
+        sample = pd.read_json(SCALE / "sample.json")
+        cons = _read(SCALE / "consensus-2runs.json", {})
+        rev = build_review_400(sample, cons)
+        review_sheet_400(rev, cons, gp.OUT / "review-sheet-400.csv")
+        rev.rename(columns={"blind_id": "scale_id"}).assign(blind_id=rev.review_id)[
+            ["blind_id", "scale_id", "tmdb_id", "original_language", "group", "hard", "tmdb_vote_count", "decade"]
+        ].to_csv(gp.OUT / "mapping-400-HIDDEN-until-review.csv", index=False)
+        ev = _read(gp.OUT / "followup-evaluation.json", {})
+        (gp.OUT / "evaluation-400.json").write_text(json.dumps(
+            {"repeatability": ev.get("step2", {}).get("repeatability", {}),
+             "note": "run 1 vs run 2 on all 400 films; the sheet shows consensus tags"}, indent=1), encoding="utf-8")
+        print(rev.groupby("group").agg(n=("review_id", "size"), hard=("hard", "sum")).to_string())
     else:
         print(json.dumps(evaluate(), indent=1, ensure_ascii=False)[:6000])
 
