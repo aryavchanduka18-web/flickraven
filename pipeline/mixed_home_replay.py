@@ -94,7 +94,7 @@ def leak_free_series_sim(engine, row_of_tmdb, lists: dict, test_uids: dict) -> s
 
 
 # ---------------------------------------------------------------------------------------------------------- users
-def list_users(pairs, mapping, row_of_tmdb, lane_of, lane_ok, n, seed, min_liked=10):
+def list_users(pairs, mapping, row_of_tmdb, lane_of, lane_ok, n, seed, min_liked=10, max_liked=None):
     """Users of a list dataset with at least `min_liked` liked titles in the wanted lane(s) and at least 60% of their
     matched list in it. Returns ([(uid, ratings {row: score}, hidden rows)], eligible count); 20% of the liked titles
     of that lane are hidden (at least 1)."""
@@ -104,7 +104,8 @@ def list_users(pairs, mapping, row_of_tmdb, lane_of, lane_ok, n, seed, min_liked
     p["ok"] = p["row"].map(lambda r: lane_ok(lane_of[r]))
     liked = p[(p["score"] >= 7) & p["ok"]].groupby("uid").size()
     share = p.groupby("uid")["ok"].mean()
-    cand = sorted(set(liked[liked >= min_liked].index) & set(share[share >= 0.6].index))
+    ok_n = liked[(liked >= min_liked) & (liked <= (max_liked or 10**9))]
+    cand = sorted(set(ok_n.index) & set(share[share >= 0.6].index))
     rng = np.random.default_rng(seed)
     chosen = rng.choice(cand, size=min(n, len(cand)), replace=False)
     by = p[p["uid"].isin(chosen)].groupby("uid")
@@ -149,7 +150,20 @@ def movielens(row_of_tmdb, lane_of, n_film, n_indian, seed):
         good = g[g["ind"] & (g["rating"] >= 7)]["row"].to_numpy()
         hide = set(int(x) for x in rng.choice(good, size=max(1, len(good) // 3), replace=False))
         indian.append((int(u), {int(r): float(v) for r, v in zip(g["row"], g["rating"]) if int(r) not in hide}, hide))
-    return film, indian, len(cand)
+    # international-film fans who pass the strict gate: 10+ liked international films and over half of their liked films
+    liked = tr[tr["rating"] >= 7]
+    tot = liked.groupby("user_id").size()
+    intl_n = liked[liked["row"].map(lambda r: lane_of[r] == "international_film")].groupby("user_id").size()
+    cand2 = sorted(u for u in intl_n.index if intl_n[u] >= 10 and intl_n[u] > 0.5 * tot[u])
+    pick2 = rng.choice(cand2, size=min(n_indian, len(cand2)), replace=False) if cand2 else []
+    g3 = tr[tr["user_id"].isin(pick2)].groupby("user_id")
+    intl_film = []
+    for u in pick2:
+        g = g3.get_group(u)
+        good = g[(g["rating"] >= 7) & g["row"].map(lambda r: lane_of[r] == "international_film")]["row"].to_numpy()
+        hide = set(int(x) for x in rng.choice(good, size=max(1, len(good) // 3), replace=False))
+        intl_film.append((int(u), {int(r): float(v) for r, v in zip(g["row"], g["rating"]) if int(r) not in hide}, hide))
+    return film, indian, intl_film, len(cand), len(cand2)
 
 
 # ---------------------------------------------------------------------------------------------------------- replay
@@ -166,7 +180,7 @@ def screen_metrics(lst: list[int], targets: set[int]) -> dict:
             "ndcg10": float((hit[:K] * DISC[:len(hit[:K])]).sum() / ideal) if ideal else 0.0}
 
 
-def run_user(engine, mix, ratings, targets, lane_of):
+def run_user(engine, mix, ratings, targets, lane_of, lanes=frozenset()):
     st = UserState(ratings=dict(ratings), behavioral_count=len(ratings))
     scores = engine.scores(st)
     plan = engine.home(st, "balanced", scores=scores)
@@ -178,6 +192,11 @@ def run_user(engine, mix, ratings, targets, lane_of):
             "non_film": sum(1 for r in lst if str(engine.cat.kind[r]) != "movie" or lane_of[r] == "anime_film"),
             "lanes": sorted({lane_of[r] for r in lst})}
     out["changed"] = cur != new
+    # does this person qualify for any switched-on lane (enough liked titles of it)? Only those can see a different page.
+    from app.services import mixed_home_plan as mh
+    from cinematch_engine.mixed_home import MIN_WEIGHT, lane_weight
+    ev = mh.evidence(engine, st)
+    out["qualifies"] = any(lane_weight(*ev[g]) >= MIN_WEIGHT for g in mh.GROUPS if g in lanes)
     return out
 
 
@@ -207,13 +226,11 @@ def main() -> None:
     ap.add_argument("--users", type=int, default=300)
     ap.add_argument("--film-users", type=int, default=800)
     ap.add_argument("--seed", type=int, default=5)
-    ap.add_argument("--variant", choices=["served", "no_film_lanes"], default="served",
-                    help="no_film_lanes: Indian and international films stay in the one film list (they share its "
-                         "scale, rail_scores); only anime, anime films and series lanes are mixed in")
-    ap.add_argument("--groups", default="anime,kdrama,indian,film")
+    ap.add_argument("--lanes", default="anime", help="lanes switched on (HOME_LANES): anime, korean_series, indian_series, "
+                    "hollywood_series, international_series, indian_film, international_film")
+    ap.add_argument("--out", default=None, help="results file name in work/mixed-home-replay/")
+    ap.add_argument("--groups", default="anime,anime_light,kdrama,kdrama_light,intl_drama,indian,intl_film,film")
     a = ap.parse_args()
-    if a.variant == "no_film_lanes":
-        lanes_mod.FILM_EXTRA_LANES = ()
     t0 = time.time()
     engine, row_of_tmdb = load()
     from app.services import mixed_home_plan
@@ -224,26 +241,37 @@ def main() -> None:
     anime_pairs = as_pairs(pd.read_csv(RAW / "anime" / "rating.csv"))
     drama_pairs = pd.read_parquet(RAW / "mydramalist" / "df_pairs.parquet", columns=["uid", "sid", "score", "completed"])
     amap, dmap = (pd.read_csv(PROCESSED / f) for f in ("anime_mal_map.csv", "drama_mdl_map.csv"))
-    anime, n_anime = list_users(anime_pairs, amap, row_of_tmdb, lane_of, lambda l: l.startswith("anime"), a.users, a.seed)
-    kdrama, n_kd = list_users(drama_pairs, dmap, row_of_tmdb, lane_of, lambda l: l == "korean_series", a.users, a.seed)
+    is_anime, is_ko, is_intl = (lambda l: l.startswith("anime")), (lambda l: l == "korean_series"), (lambda l: l == "international_series")
+    anime, n_anime = list_users(anime_pairs, amap, row_of_tmdb, lane_of, is_anime, a.users, a.seed)
+    kdrama, n_kd = list_users(drama_pairs, dmap, row_of_tmdb, lane_of, is_ko, a.users, a.seed)
+    # light fans: 3 to 9 liked titles of the lane (partial lane weight), and non-Korean Asian drama fans
+    anime_l, n_al = list_users(anime_pairs, amap, row_of_tmdb, lane_of, is_anime, a.users, a.seed + 1, 3, 9)
+    kdrama_l, n_kl = list_users(drama_pairs, dmap, row_of_tmdb, lane_of, is_ko, a.users, a.seed + 1, 3, 9)
+    intl, n_int = list_users(drama_pairs, dmap, row_of_tmdb, lane_of, is_intl, a.users, a.seed + 2, 5)
+    excluded_anime = {u for u, _, _ in anime + anime_l}
+    excluded_drama = {u for u, _, _ in kdrama + kdrama_l + intl}
     engine.cat.series_sim = leak_free_series_sim(engine, row_of_tmdb, {"anime": (anime_pairs, amap), "drama": (drama_pairs, dmap)},
-                                                 {"anime": {u for u, _, _ in anime}, "drama": {u for u, _, _ in kdrama}})
-    film, indian, n_ind = movielens(row_of_tmdb, lane_of, a.film_users, a.users, a.seed)
-    log.info("users: anime %d (of %d eligible), kdrama %d (of %d), indian %d (of %d), film %d",
-             len(anime), n_anime, len(kdrama), n_kd, len(indian), n_ind, len(film))
+                                                 {"anime": excluded_anime, "drama": excluded_drama})
+    film, indian, intl_film, n_ind, n_if = movielens(row_of_tmdb, lane_of, a.film_users, a.users, a.seed)
+    pools = {"anime": n_anime, "anime_light": n_al, "kdrama": n_kd, "kdrama_light": n_kl, "intl_drama": n_int, "indian": n_ind, "intl_film": n_if}
+    log.info("eligible pools %s, film %d", pools, len(film))
+    import functools
+    lanes = mixed_home_plan.enabled_lanes(a.lanes)
+    mix = functools.partial(mixed_home_plan.mix, lanes=lanes)
 
     results = {}
-    for name, users in (("anime", anime), ("kdrama", kdrama), ("indian", indian), ("film", film)):
+    for name, users in (("anime", anime), ("anime_light", anime_l), ("kdrama", kdrama), ("kdrama_light", kdrama_l),
+                        ("intl_drama", intl), ("indian", indian), ("intl_film", intl_film), ("film", film)):
         if name not in a.groups.split(","):
             continue
         rows = []
         t1 = time.time()
         for i, (_, ratings, targets) in enumerate(users):
             if targets:
-                rows.append(run_user(engine, mixed_home_plan.mix, ratings, targets, lane_of))
+                rows.append(run_user(engine, mix, ratings, targets, lane_of, lanes))
             if i % 50 == 49:
                 log.info("%s %d/%d (%.0fs)", name, i + 1, len(users), time.time() - t1)
-        res = {"users": len(rows), "eligible_pool": {"anime": n_anime, "kdrama": n_kd, "indian": n_ind}.get(name)}
+        res = {"users": len(rows), "eligible_pool": pools.get(name)}
         if rows:
             res |= {"pages_changed": round(float(np.mean([r["changed"] for r in rows])), 4),
                     "avg_non_film_slots_current": round(float(np.mean([r["current"]["non_film"] for r in rows])), 2),
@@ -251,22 +279,28 @@ def main() -> None:
                     "mixed_lanes_seen": pd.Series([l for r in rows for l in r["mixed"]["lanes"]]).value_counts().to_dict()}
             for key in ("hit15", "recall15", "ndcg10"):
                 res[key] = paired(rows, key)
+            q, nq = [r for r in rows if r["qualifies"]], [r for r in rows if not r["qualifies"]]
+            res["share_qualifying_for_a_switched_on_lane"] = round(len(q) / len(rows), 4)
+            res["non_qualifiers"] = {"users": len(nq), "pages_changed": round(float(np.mean([r["changed"] for r in nq])), 4) if nq else None}
+            if len(q) > 1:
+                res["ndcg10_qualifiers_only"] = paired(q, "ndcg10")
+                res["hit15_qualifiers_only"] = paired(q, "hit15")
             changed = [r for r in rows if r["changed"]]
             if len(changed) > 1:
                 res["ndcg10_changed_pages_only"] = paired(changed, "ndcg10")
         results[name] = res
         log.info("%s: %s", name, json.dumps(res))
-    if a.variant == "served":
+    if True:
         results["reference_lane_rows_hit20"] = {"anime": lane_hit_reference(engine, anime, "anime", None, lane_of),
                                                 "kdrama": lane_hit_reference(engine, kdrama, "series", "korean_series", lane_of)}
     if "film" in results:
         d = results["film"]["ndcg10"]
         results["film_guard"] = {"rule": f"mixed NDCG@10 minus current >= -{GUARD}", "diff": d["diff"], "ci95": d["ci95"],
                                  "pass": d["diff"] >= -GUARD, "pass_strict_ci": d["ci95"][0] >= -GUARD}
-    results["variant"] = a.variant
+    results["lanes"] = sorted(lanes)
     results["seconds"] = round(time.time() - t0)
     OUT.mkdir(parents=True, exist_ok=True)
-    out = OUT / ("results.json" if a.variant == "served" else f"results-{a.variant}.json")
+    out = OUT / (a.out or "results-lanes.json")
     write_json(out, results)
     log.info("wrote %s", out)
 

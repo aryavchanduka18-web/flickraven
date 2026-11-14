@@ -1,0 +1,238 @@
+{
+  "anime": {
+    "users": 300,
+    "eligible_pool": 46847,
+    "pages_changed": 0.7767,
+    "avg_non_film_slots_current": 6.53,
+    "avg_non_film_slots_mixed": 6.12,
+    "mixed_lanes_seen": {
+      "anime_film": 298,
+      "hollywood_film": 239,
+      "anime_series": 233,
+      "international_film": 217,
+      "indian_film": 4
+    },
+    "hit15": {
+      "current": 0.0,
+      "mixed": 0.26,
+      "diff": 0.26,
+      "ci95": [
+        0.2103,
+        0.3097
+      ]
+    },
+    "recall15": {
+      "current": 0.0,
+      "mixed": 0.0496,
+      "diff": 0.0496,
+      "ci95": [
+        0.0364,
+        0.0628
+      ]
+    },
+    "ndcg10": {
+      "current": 0.0,
+      "mixed": 0.0341,
+      "diff": 0.0341,
+      "ci95": [
+        0.0249,
+        0.0433
+      ]
+    },
+    "share_qualifying_for_a_switched_on_lane": 1.0,
+    "non_qualifiers": {
+      "users": 0,
+      "pages_changed": null
+    },
+    "ndcg10_qualifiers_only": {
+      "current": 0.0,
+      "mixed": 0.0341,
+      "diff": 0.0341,
+      "ci95": [
+        0.0249,
+        0.0433
+      ]
+    },
+    "hit15_qualifiers_only": {
+      "current": 0.0,
+      "mixed": 0.26,
+      "diff": 0.26,
+      "ci95": [
+        0.2103,
+        0.3097
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.0,
+      "mixed": 0.0439,
+      "diff": 0.0439,
+      "ci95": [
+        0.0324,
+        0.0554
+      ]
+    }
+  },
+  "anime_light": {
+    "users": 300,
+    "eligible_pool": 13811,
+    "pages_changed": 0.7633,
+    "avg_non_film_slots_current": 8.44,
+    "avg_non_film_slots_mixed": 7.64,
+    "mixed_lanes_seen": {
+      "anime_film": 299,
+      "hollywood_film": 242,
+      "international_film": 233,
+      "anime_series": 228
+    },
+    "hit15": {
+      "current": 0.0,
+      "mixed": 0.13,
+      "diff": 0.13,
+      "ci95": [
+        0.0919,
+        0.1681
+      ]
+    },
+    "recall15": {
+      "current": 0.0,
+      "mixed": 0.1117,
+      "diff": 0.1117,
+      "ci95": [
+        0.0777,
+        0.1457
+      ]
+    },
+    "ndcg10": {
+      "current": 0.0,
+      "mixed": 0.03,
+      "diff": 0.03,
+      "ci95": [
+        0.0168,
+        0.0432
+      ]
+    },
+    "share_qualifying_for_a_switched_on_lane": 0.8033,
+    "non_qualifiers": {
+      "users": 59,
+      "pages_changed": 0.0
+    },
+    "ndcg10_qualifiers_only": {
+      "current": 0.0,
+      "mixed": 0.0374,
+      "diff": 0.0374,
+      "ci95": [
+        0.021,
+        0.0537
+      ]
+    },
+    "hit15_qualifiers_only": {
+      "current": 0.0,
+      "mixed": 0.1618,
+      "diff": 0.1618,
+      "ci95": [
+        0.1152,
+        0.2084
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.0,
+      "mixed": 0.0393,
+      "diff": 0.0393,
+      "ci95": [
+        0.0222,
+        0.0565
+      ]
+    }
+  },
+  "film": {
+    "users": 1000,
+    "eligible_pool": null,
+    "pages_changed": 0.083,
+    "avg_non_film_slots_current": 0.26,
+    "avg_non_film_slots_mixed": 0.44,
+    "mixed_lanes_seen": {
+      "hollywood_film": 1000,
+      "international_film": 788,
+      "indian_film": 195,
+      "anime_film": 170,
+      "anime_series": 56
+    },
+    "hit15": {
+      "current": 0.607,
+      "mixed": 0.605,
+      "diff": -0.002,
+      "ci95": [
+        -0.0068,
+        0.0028
+      ]
+    },
+    "recall15": {
+      "current": 0.1041,
+      "mixed": 0.1019,
+      "diff": -0.0022,
+      "ci95": [
+        -0.0032,
+        -0.0012
+      ]
+    },
+    "ndcg10": {
+      "current": 0.1092,
+      "mixed": 0.1077,
+      "diff": -0.0015,
+      "ci95": [
+        -0.0026,
+        -0.0004
+      ]
+    },
+    "share_qualifying_for_a_switched_on_lane": 0.083,
+    "non_qualifiers": {
+      "users": 917,
+      "pages_changed": 0.0
+    },
+    "ndcg10_qualifiers_only": {
+      "current": 0.192,
+      "mixed": 0.1739,
+      "diff": -0.018,
+      "ci95": [
+        -0.0312,
+        -0.0048
+      ]
+    },
+    "hit15_qualifiers_only": {
+      "current": 0.8313,
+      "mixed": 0.8072,
+      "diff": -0.0241,
+      "ci95": [
+        -0.0821,
+        0.0339
+      ]
+    },
+    "ndcg10_changed_pages_only": {
+      "current": 0.192,
+      "mixed": 0.1739,
+      "diff": -0.018,
+      "ci95": [
+        -0.0312,
+        -0.0048
+      ]
+    }
+  },
+  "reference_lane_rows_hit20": {
+    "anime": 0.7933,
+    "kdrama": 0.75
+  },
+  "film_guard": {
+    "rule": "mixed NDCG@10 minus current >= -0.003",
+    "diff": -0.0015,
+    "ci95": [
+      -0.0026,
+      -0.0004
+    ],
+    "pass": true,
+    "pass_strict_ci": true
+  },
+  "lanes": [
+    "anime"
+  ],
+  "seconds": 2527
+}

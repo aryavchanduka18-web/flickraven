@@ -96,6 +96,9 @@ def out_first(out):
 
 # ---- Phase 2: one personal list per taxonomy lane -------------------------------------------------------------------
 
+ALL = set(mh.ALL_LANES)      # every lane switched on, to test the lanes themselves; defaults are tested separately
+
+
 def lane_engine():
     """40 English films, 10 Hindi films, 10 French films, 15 Korean series, 15 English series, 15 Hindi series."""
     kinds, langs, genres = [], [], []
@@ -123,7 +126,7 @@ def lane_plan(n_rows):
 def test_each_series_lane_counts_only_with_its_own_evidence():
     e, rows = lane_engine()
     st = SimpleNamespace(liked=list(rows["ko"])[:8], ratings={}, dislikes=set())            # eight Korean series, nothing else
-    out = mh.mix(e, st, lane_plan(105), set())
+    out = mh.mix(e, st, lane_plan(105), set(), lanes=ALL)
     shown = [x["row"] for x in out["hero"]] + out["rails"][0]["rows"][:10]
     assert any(r in rows["ko"] for r in shown)
     assert not any(r in rows["hi_series"] or r in rows["en_series"] for r in shown)      # no evidence: no Hindi or English series
@@ -131,12 +134,11 @@ def test_each_series_lane_counts_only_with_its_own_evidence():
     assert mh.reason("korean_series")[0]["text"] == "Based on the Korean series you have rated highly"
 
 
-def test_a_hindi_film_fan_gets_a_hindi_lane_but_an_english_only_viewer_does_not():
+def test_a_hindi_film_fan_keeps_the_film_list_no_separate_film_lane():
+    # Phase 5: Indian and international films compete inside the film list (same scale); no lane of their own.
     e, rows = lane_engine()
-    fan = SimpleNamespace(liked=list(rows["hi_film"])[:8], ratings={}, dislikes=set())
-    out = mh.mix(e, fan, lane_plan(105), set())
-    shown = [x["row"] for x in out["hero"]] + out["rails"][0]["rows"][:10]
-    assert any(r in rows["hi_film"] for r in shown if r not in fan.liked)
+    plan = lane_plan(105)
+    assert mh.mix(e, SimpleNamespace(liked=list(rows["hi_film"])[:8], ratings={}, dislikes=set()), plan, set()) is plan
     plan = lane_plan(105)
     assert mh.mix(e, SimpleNamespace(liked=[0, 1, 2], ratings={}, dislikes=set()), plan, set()) is plan      # English films only: unchanged
 
@@ -151,24 +153,23 @@ def test_disliking_a_lane_removes_it():
 def test_lane_titles_shown_on_earlier_days_go_behind_fresh_ones():
     e, rows = lane_engine()
     st = SimpleNamespace(liked=list(rows["ko"])[:8], ratings={}, dislikes=set())
-    first = [x["row"] for x in mh.mix(e, st, lane_plan(105), set())["hero"]]
-    later = [x["row"] for x in mh.mix(e, st, lane_plan(105), set(), stale=set(first))["hero"]]
+    first = [x["row"] for x in mh.mix(e, st, lane_plan(105), set(), lanes=ALL)["hero"]]
+    later = [x["row"] for x in mh.mix(e, st, lane_plan(105), set(), stale=set(first), lanes=ALL)["hero"]]
     assert not set(later) & set(first)
 
 
 def test_a_film_is_in_exactly_one_lane_and_is_presented_by_that_lane():
     e, rows = lane_engine()
-    fan = SimpleNamespace(liked=list(rows["hi_film"])[:8], ratings={}, dislikes=set())
+    fan = SimpleNamespace(liked=list(rows["hi_film"])[:8] + list(rows["ko"])[:8], ratings={}, dislikes=set())
     plan = lane_plan(105)
-    # Hindi films 40..49 are also in the plan's own Top Picks (with a Match %): put two of them there.
+    # Hindi films 41, 42 are in the plan's own Top Picks with a Match %: they stay films, never relabelled as a lane.
     plan["rails"][0]["rows"] = [r for r in plan["rails"][0]["rows"]] + [41, 42]
     plan["rails"][0]["scored"] = plan["rails"][0]["scored"] | {r: {"row": r, "score": 0.99, "match_pct": 91, "shares": {}} for r in (41, 42)}
-    out = mh.mix(e, fan, plan, set())
+    out = mh.mix(e, fan, plan, set(), lanes=ALL)
     entries = {x["row"]: x for x in out["hero"]} | out["rails"][0]["scored"]
     shown = [x["row"] for x in out["hero"]] + out["rails"][0]["rows"][:10]
-    hindi = [r for r in shown if r in rows["hi_film"] and r not in fan.liked]
-    assert hindi
-    assert all(entries[r].get("format") == "indian_film" and entries[r]["match_pct"] is None for r in hindi)
+    assert any(r in rows["ko"] for r in shown)
+    assert all(entries[r].get("format") is None for r in shown if r in rows["hi_film"])
     assert len(shown) == len(set(shown))
 
 
@@ -176,3 +177,40 @@ def test_lane_explanations_name_the_lane():
     assert mh.reason("hollywood_series")[0]["text"] == "Based on the Hollywood series you have rated highly"
     assert mh.reason("indian_film")[0]["text"] == "Based on the Indian films you have rated highly"
     assert mh.reason("anime")[0]["text"] == "Based on the anime you have rated highly"
+
+
+def test_a_lane_that_is_not_switched_on_never_enters_the_page():
+    e, rows = lane_engine()
+    st = SimpleNamespace(liked=list(rows["ko"])[:8], ratings={}, dislikes=set())
+    plan = lane_plan(105)
+    assert mh.mix(e, st, plan, set(), lanes={"anime"}) is plan                       # K-drama fan, Korean lane off: today's Home
+    on = mh.mix(e, st, lane_plan(105), set(), lanes={"korean_series"})
+    assert any(x.get("format") == "korean_series" for x in on["hero"])
+
+
+def test_hollywood_and_indian_series_enter_only_when_switched_on_and_never_without_evidence():
+    e, rows = lane_engine()
+    for key, lane in (("hi_series", "indian_series"), ("en_series", "hollywood_series")):
+        fan = SimpleNamespace(liked=list(rows[key])[:10], ratings={}, dislikes=set())
+        plan = lane_plan(105)
+        assert mh.mix(e, fan, plan, set(), lanes={"anime"}) is plan                    # lane off: today's Home
+        assert any(x.get("format") == lane for x in mh.mix(e, fan, lane_plan(105), set(), lanes={lane})["hero"])
+        other = SimpleNamespace(liked=list(rows["ko"])[:10], ratings={}, dislikes=set())
+        assert not any(x.get("format") == lane for x in mh.mix(e, other, lane_plan(105), set(), lanes=ALL)["hero"])    # no evidence: no lane
+
+
+def test_film_lanes_need_the_strict_gate_even_when_switched_on():
+    e, rows = lane_engine()
+    plan = lane_plan(105)
+    few = SimpleNamespace(liked=list(rows["hi_film"])[:8], ratings={}, dislikes=set())       # 8 liked: below the 10 needed
+    assert mh.mix(e, few, plan, set(), lanes={"indian_film"}) is plan
+    diluted = SimpleNamespace(liked=list(rows["hi_film"])[:10] + list(range(0, 12)), ratings={}, dislikes=set())   # not over half of their films
+    assert mh.mix(e, diluted, plan, set(), lanes={"indian_film"}) is plan
+
+
+def test_film_lane_gate_boundaries():
+    assert not mh.film_lane_gate(9, 9)           # a pure fan, but under 10 titles
+    assert mh.film_lane_gate(10, 10)
+    assert not mh.film_lane_gate(10, 20)         # exactly half of their films is not over half
+    assert mh.film_lane_gate(11, 20)
+    assert not mh.film_lane_gate(0, 0)

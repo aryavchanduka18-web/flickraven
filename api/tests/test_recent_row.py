@@ -127,7 +127,7 @@ def home_client(test_engine, monkeypatch):
     cat = HomeCat(ids)
     monkeypatch.setattr(recs_router, "engine_or_503", lambda db: HomeEngine(cat))
     monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: HomeState())
-    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=False, imdb_ratings=True))   # these tests are about the plain Home
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(home_mix_disabled=True, anime_home_mix=True, mixed_home=True, home_lanes="korean_series", imdb_ratings=True))   # these tests are about the plain Home
     monkeypatch.setattr(recs_router.rec, "user_tuning", lambda db, u: None)
     monkeypatch.setattr(recs_router.rec, "recent_positive_rows", lambda db, u, e: [])
     monkeypatch.setattr(recs_router, "agreement_all", lambda e, s, sc: np.full(N, np.nan))
@@ -189,10 +189,13 @@ def test_mixed_home_can_be_switched_on_and_off_per_request_setting(home_client, 
 
     monkeypatch.setattr(recs_router, "engine_or_503", lambda db: MixEngine(cat))
     monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: FanState())
-    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=False, imdb_ratings=True))
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(home_mix_disabled=True, anime_home_mix=True, mixed_home=True, home_lanes="korean_series", imdb_ratings=True))
     off = home_client.get("/api/recs/home").json()
-    assert all(i["movie"]["id"] not in home_client.ids[30:] for i in off["hero"])      # MIXED_HOME=false: films only
-    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=True, imdb_ratings=True))
+    assert all(i["movie"]["id"] not in home_client.ids[30:] for i in off["hero"])      # emergency switch: films only
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(home_mix_disabled=False, anime_home_mix=True, mixed_home=False, home_lanes="korean_series", imdb_ratings=True))
+    anime_only = home_client.get("/api/recs/home").json()
+    assert any(i["movie"]["id"] in home_client.ids[30:] for i in anime_only["hero"] + anime_only["rails"][0]["items"][:10])   # anime switch alone
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(home_mix_disabled=False, anime_home_mix=True, mixed_home=True, home_lanes="korean_series", imdb_ratings=True))
     on = home_client.get("/api/recs/home").json()
     mixed = [i for i in on["hero"] + on["rails"][0]["items"][:10] if i["movie"]["id"] in home_client.ids[30:]]
     assert mixed and all(i["match_pct"] is None and "rated highly" in i["reasons"][0]["text"] for i in mixed)
@@ -200,16 +203,27 @@ def test_mixed_home_can_be_switched_on_and_off_per_request_setting(home_client, 
     assert len(ids) == len(set(ids))
 
 
-def test_mixed_home_default_is_off_until_the_film_guard_passes(monkeypatch):
+def test_lane_switches_are_independent_and_the_emergency_switch_beats_them_all(monkeypatch):
     from app.config import Settings
-    monkeypatch.delenv("MIXED_HOME", raising=False)
-    assert Settings().mixed_home is False
+    from app.services.mixed_home_plan import active_lanes
+    for var in ("MIXED_HOME", "ANIME_HOME_MIX", "HOME_LANES", "HOME_MIX_DISABLED"):
+        monkeypatch.delenv(var, raising=False)
+    assert active_lanes(Settings()) == {"anime", "korean_series", "hollywood_series", "indian_series"}     # defaults: passing lanes only
+    monkeypatch.setenv("MIXED_HOME", "false")                                    # series off, anime stays
+    assert active_lanes(Settings()) == {"anime"}
     monkeypatch.setenv("MIXED_HOME", "true")
-    assert Settings().mixed_home is True
+    monkeypatch.setenv("ANIME_HOME_MIX", "false")                                # anime off, series stay
+    assert active_lanes(Settings()) == {"korean_series", "hollywood_series", "indian_series"}
+    monkeypatch.setenv("ANIME_HOME_MIX", "true")
+    monkeypatch.setenv("HOME_MIX_DISABLED", "true")                              # emergency switch: everything off
+    assert active_lanes(Settings()) == set()
+    monkeypatch.setenv("HOME_MIX_DISABLED", "false")
+    monkeypatch.setenv("HOME_LANES", "korean_series, typo ,international_film")   # unknown names ignored
+    assert active_lanes(Settings()) == {"anime", "korean_series", "international_film"}
 
 
 def test_a_failure_in_the_mix_never_breaks_home(home_client, monkeypatch):
-    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(mixed_home=True, imdb_ratings=True))
+    monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(home_mix_disabled=False, anime_home_mix=True, mixed_home=True, home_lanes="korean_series", imdb_ratings=True))
     def boom(*a, **k):
         raise RuntimeError("boom")
     monkeypatch.setattr(recs_router.mixed_home_plan, "mix", boom)
