@@ -73,3 +73,35 @@ Only 8% of film-only pages change (the anime lane, for users with 3+ liked anime
 
 Hindi or other Indian **series** (no lists), Hollywood and international series fans, people who mix formats in one
 history (list users rate only anime or only dramas), daily freshness (`stale`) and the daily seed, real FlickRaven users.
+
+## Update: per-lane Home, shipped (2026-11-14)
+
+The failing part was the separate Indian and international film lanes. The shipped Home drops them and gives every
+remaining lane its own switch. Each lane was replayed on its own (`results-A-anime.json`, `results-B-korean.json`,
+`results-C-shipped-default.json`, `results-E-intl-film-strict.json`, `results-F-intl-series.json`). "Qualifies" means
+3+ liked titles of the lane (lane weight at least 0.25); everyone else gets the film Home unchanged (0.0% of non-qualifiers'
+pages changed in every run).
+
+| Lane | Cohort | Qualify | First-screen hit, today → mixed | NDCG@10 diff (95% CI) | Default |
+|---|---|---|---|---|---|
+| Anime | established (10+ liked), 300 | 100% | 0% → 26% | +0.034 (+0.025..+0.043) | **On** |
+| Anime | light (3-9 liked), 300 | 80% | 0% → 13% | +0.030 (+0.017..+0.043); qualifiers +0.037 | **On** |
+| Korean series | established, 300 | 100% | 0% → 19% | +0.019 (+0.014..+0.025) | **On** |
+| Korean series | light, 300 | 79% | 0% → 5% | +0.004 (+0.0004..+0.007) | **On** (small gain) |
+| International series | 207 fans (37 matched titles) | 99% | 0% → 11% | +0.024 (+0.012..+0.036) | Off (thin coverage) |
+| Hollywood series | none: no list data | - | not measurable | - | **On at Aryav's request**; benefit unmeasured |
+| Indian series | none: no list data | - | not measurable | - | **On at Aryav's request**; benefit unmeasured |
+| International films (strict gate: 10+ liked and over half of liked films) | 33 users | 100% | 79% → 73% | −0.030 (−0.073..+0.013) | **Off**: no benefit shown |
+| Indian films | - | - | - | - | **Off**: needs a better ranking strategy |
+
+Film guard (1,000 film-only users, NDCG@10 vs today, limit −0.003): anime only **−0.0015** (−0.0026..−0.0004) pass; Korean only
+**0.0000** pass; shipped default lanes **−0.0015** pass (same as anime only: Korean, Hollywood and Indian series do not
+change a film-only user's page); strict international-film gate +0.0001 pass (opens for 0.1% of film users). 917 of 1,000
+film users get exactly today's page; the 8% who like 3+ anime lose 0.018 within their own group, which the guard counts.
+
+Hollywood and Indian series pass the film guard trivially (film-only users have no liked series, so those lanes never
+open for them), but their benefit cannot be replayed: there are no held-out Hollywood or Indian series ratings. They use
+the same method as Korean series, which is measured.
+
+Controls: `ANIME_HOME_MIX` (anime lane), `MIXED_HOME` + `HOME_LANES` (series and other lanes), `HOME_MIX_DISABLED=true`
+(emergency switch for all of them). A crash in the mix falls back to the film Home.

@@ -11,7 +11,7 @@ import TunePanel from "../components/discovery/TunePanel";
 import Hero from "../components/hero/Hero";
 import { PageMessage, RailSkeleton } from "../components/Loading";
 import Rail from "../components/rail/Rail";
-import { animeRowSlot, themedRowLimit } from "../lib/seriesRows";
+import { animeFilmsUnderAnimeRow, animeRowSlot, seriesRowSlot, themedRowLimit } from "../lib/seriesRows";
 
 const PERSONAL = new Set(["top_picks", "based_on_ratings", "people_like_you", "different"]);
 
@@ -40,6 +40,9 @@ export default function Home() {
   const taken = new Set([...(home.data?.hero ?? []), ...(home.data?.rails.flatMap((r) => r.items) ?? [])].map((x) => x.movie.id));
   const fresh = <T extends { movie: { id: number } }>(items: T[]) => (taken.size ? items.filter((x) => !taken.has(x.movie.id)) : items);
   const animeSlot = animeRowSlot(themed.data?.engaged_anime ?? 0);
+  const seriesSlot = seriesRowSlot(themed.data?.engaged_series ?? 0);
+  // For an anime fan the Anime Films shelf sits right under the Anime row instead of at the bottom with the other collections.
+  const animeFilms = animeFilmsUnderAnimeRow(themed.data?.engaged_anime ?? 0) ? collections.data?.collections.find((c) => c.key === "anime") : undefined;
 
   if (me.data && !me.data.onboarded) return <Navigate to="/onboarding" replace />;
   if (home.isError) return <PageMessage title="Recommendations are not ready">{(home.error as Error).message}</PageMessage>;
@@ -104,7 +107,7 @@ export default function Home() {
                 personal={PERSONAL.has(r.key) || r.items.some((x) => x.match_pct != null)} learned={r.learned} slot={i}
                 onHide={r.key === "top_picks" ? undefined : () => hideRow.mutate(`rail:${r.key.split(":")[0]}`)} />
               {/* Series and anime come right after the first two film rails, so they are seen without long scrolling. */}
-              {i === 1 && series.data && series.data.items.length > 0 && (
+              {i === seriesSlot && series.data && series.data.items.length > 0 && (
                 <Rail title="Series for you" subtitle="From what you like and what is popular. Series have no ratings here, so there is no match score."
                   items={fresh(series.data.items)} source="rail:series" personal={false} />
               )}
@@ -121,9 +124,13 @@ export default function Home() {
                 <Rail title="Anime for you" subtitle="From what you like and what is popular."
                   items={fresh(anime.data!.items)} source="rail:anime" personal={false} />
               )}
+              {i === animeSlot && animeFilms && animeFilms.items.length > 0 && (
+                <Rail title={animeFilms.title} subtitle={`${animeFilms.count.toLocaleString()} films`} items={fresh(animeFilms.items)}
+                  source={`collection:${animeFilms.key}`} personal={animeFilms.items.some((x) => x.match_pct != null)} />
+              )}
             </Fragment>
           ))}
-          {home.data && collections.data?.collections.map((c) => (
+          {home.data && collections.data?.collections.filter((c) => c !== animeFilms).map((c) => (
             <Rail key={c.key} title={c.title} subtitle={`${c.count.toLocaleString()} films`} items={c.items}
               source={`collection:${c.key}`} personal={c.items.some((i) => i.match_pct != null)} />
           ))}

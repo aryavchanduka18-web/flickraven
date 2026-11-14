@@ -311,9 +311,11 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     seen = {cat.row_of[m] for m in freshness.recently_shown_ids(db, uid) if m in cat.row_of}   # shown on earlier days: move back
     plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
                        scores=scores, seed=daily.seed(uid, f"home:{mode}"), stale=seen)
-    if get_settings().mixed_home:           # films, series and anime together in the hero and first Top Picks (off by default; MIXED_HOME=true turns it on)
+    lanes = mixed_home_plan.active_lanes(get_settings())
+    if lanes:                               # anime / series lanes on the first screen for their fans (HOME_MIX_DISABLED=true: plain film Home)
         try:                                # the mix is an add-on: if it ever fails, Home is still the plain film Home
-            plan = mixed_home_plan.mix(engine, st, plan, {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of}, seen)
+            plan = mixed_home_plan.mix(engine, st, plan, {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of}, seen,
+                                       lanes=lanes)
         except Exception:
             logging.getLogger(__name__).exception("mixed home failed; serving the plain Home")
     agree = agreement_all(engine, st, scores)

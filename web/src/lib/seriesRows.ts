@@ -9,3 +9,15 @@ export function themedRowLimit(engagedSeries: number): number {
 export function animeRowSlot(engagedAnime: number): 0 | 1 {
   return engagedAnime >= 3 ? 0 : 1;
 }
+
+/** Where Home puts the "Series for you" row: right after Top Picks (slot 0) for someone who has shown interest in 3 or
+ *  more series, after the second film row (slot 1) for everyone else. */
+export function seriesRowSlot(engagedSeries: number): 0 | 1 {
+  return engagedSeries >= 3 ? 0 : 1;
+}
+
+/** The "Anime Films" shelf sits right under the "Anime for you" row for an anime fan (3 or more anime liked), and stays
+ *  with the other film collections at the bottom for everyone else. */
+export function animeFilmsUnderAnimeRow(engagedAnime: number): boolean {
+  return engagedAnime >= 3;
+}

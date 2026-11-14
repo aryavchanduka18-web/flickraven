@@ -11,6 +11,35 @@ HERO, FIRST_PICKS, POOL = 5, 10, 150
 SERIES_FEEDS = lanes_mod.SERIES_LANES
 LABEL = lanes_mod.LABEL
 GROUPS = ("anime",) + lanes_mod.SERIES_LANES + lanes_mod.FILM_EXTRA_LANES
+# Every lane has its own switch (setting HOME_LANES, a comma list of these names). A lane earns default-on status through
+# its own evaluation (docs/unified-home-phase5-replay.md), not because another lane performed well.
+ALL_LANES = ("anime",) + lanes_mod.SERIES_LANES + lanes_mod.FILM_EXTRA_LANES
+DEFAULT_LANES = frozenset({"anime", "korean_series", "hollywood_series", "indian_series"})
+STRICT_FILM_MIN_LIKED, STRICT_FILM_MIN_SHARE = 10, 0.5     # film lanes: 10+ liked in the lane AND over half of the person's liked films
+
+
+def film_lane_gate(liked_in_lane: int, liked_films: int) -> bool:
+    """Film lanes (Indian, international) open only for a real fan: 10+ liked titles in the lane AND over half of all the
+    films the person likes. A few liked foreign films do not make a lane (they rank in the film list as before)."""
+    return liked_in_lane >= STRICT_FILM_MIN_LIKED and liked_in_lane > STRICT_FILM_MIN_SHARE * max(liked_films, 1)
+
+
+def enabled_lanes(spec: str) -> frozenset[str]:
+    """HOME_LANES -> lane names; unknown names are ignored (a typo cannot switch on something else)."""
+    return frozenset(n.strip() for n in spec.split(",") if n.strip() in ALL_LANES)
+
+
+def active_lanes(settings) -> frozenset[str]:
+    """The lanes switched on: HOME_MIX_DISABLED turns off everything; ANIME_HOME_MIX controls the anime lane on its own;
+    MIXED_HOME controls the other lanes listed in HOME_LANES (series, films)."""
+    if getattr(settings, "home_mix_disabled", False):
+        return frozenset()
+    lanes: set[str] = set()
+    if getattr(settings, "anime_home_mix", False):
+        lanes.add("anime")
+    if getattr(settings, "mixed_home", False):
+        lanes |= enabled_lanes(getattr(settings, "home_lanes", "")) - {"anime"}
+    return frozenset(lanes)
 
 
 def anime_film_rows(cat) -> set[int]:
@@ -34,14 +63,21 @@ def evidence(engine, st, films: set[int] | None = None) -> dict[str, tuple[int, 
     return {g: (v[0], v[1]) for g, v in out.items()}
 
 
-def mix(engine, st, plan: dict, skip: set[int], stale: set[int] | None = None) -> dict:
+def mix(engine, st, plan: dict, skip: set[int], stale: set[int] | None = None, lanes: frozenset[str] | set[str] = DEFAULT_LANES) -> dict:
     """`stale` are rows shown on earlier days: they go behind fresh ones in EVERY lane (films, series, anime), so the
-    mix changes day to day like the rest of Home. Each lane counts as much as this person's evidence for it."""
+    mix changes day to day like the rest of Home. Each lane counts as much as this person's evidence for it.
+    `lanes` are the lanes switched on (HOME_LANES); a lane that is not in it never enters the page."""
     stale = stale or set()
     cat = engine.cat
     lane_of = lanes_mod.lane_of_rows(cat)
     ev = evidence(engine, st)
     weights = {g: lane_weight(*ev[g]) for g in GROUPS}
+    liked_films = [r for r in engine.engaged_rows(st) if lane_of[r].endswith("_film")]
+    for g in GROUPS:
+        if g not in lanes:
+            weights[g] = 0.0
+        elif g in lanes_mod.FILM_EXTRA_LANES and not film_lane_gate(ev[g][0], len(liked_films)):
+            weights[g] = 0.0                      # strict gate for film lanes: a real fan of that lane, not a person who liked a few
     if max(weights.values()) < MIN_WEIGHT:
         return plan
     top = next((r for r in plan["rails"] if r["key"] == "top_picks"), None)
@@ -61,7 +97,7 @@ def mix(engine, st, plan: dict, skip: set[int], stale: set[int] | None = None) -
         return fresh_first([(r, float(rail[r])) for r in cand[:POOL]])
 
     # Each film belongs to exactly ONE lane, so how it is presented never depends on which list happened to win it: films of
-    # an active anime / Indian / international lane leave the base film list and are shown by their own lane.
+    # an active anime or film lane leave the base film list and are shown by their own lane.
     film_extras = {n for n in lanes_mod.FILM_EXTRA_LANES if rail is not None and weights[n] >= MIN_WEIGHT}
     own_lane = ({"anime_film"} if anime_on else set()) | film_extras
     lanes = {"movie": fresh_first([(row, float(pool[row]["score"])) for row in order if lane_of[row] not in own_lane])}
