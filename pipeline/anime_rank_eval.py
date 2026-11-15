@@ -108,7 +108,7 @@ def main() -> None:
     ap.add_argument("--val", type=int, default=500)
     ap.add_argument("--test", type=int, default=1200)
     ap.add_argument("--seed", type=int, default=11)
-    ap.add_argument("--lams", default="100,300,1000,3000")
+    ap.add_argument("--lams", default="300,3000,10000,30000")
     ap.add_argument("--fetch", action="store_true", help="fetch missing TMDB alternative titles of anime films")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -160,14 +160,9 @@ def main() -> None:
     for lam in [float(v) for v in a.lams.split(",")]:
         b = am.ease(xt, lam)
         models[f"ease{int(lam)}"] = b
-        models[f"ease{int(lam)}_top{am.TOP}"] = am.sparsify(b).toarray()
+        for top in (60, 200):
+            models[f"ease{int(lam)}_top{top}"] = am.sparsify(b, top).toarray()
     is_series = np.array([int(r) in series_rows for r in rows_of_col])
-    idx = np.nonzero(is_series)[0]
-    sub = {int(c): i for i, c in enumerate(idx)}
-    xs = am.matrix(pairs, {sid: sub[c] for sid, c in col_of_sid.items() if c in sub}, len(idx), drop_uids=held)
-    bs = np.zeros((n_items, n_items))
-    bs[np.ix_(idx, idx)] = am.ease(xs, am.LAM)
-    models["ease_series_only"] = bs
     # cosine item CF on the new mapping (series + films), for a like-for-like comparison with EASE
     present = (xt > 0).astype(np.float64)
     xn = xt @ sp.diags(1 / np.sqrt(np.maximum(np.asarray(xt.multiply(xt).sum(axis=0)).ravel(), 1e-9)))
@@ -200,13 +195,16 @@ def main() -> None:
                 g = np.asarray((vec @ gem[:, kr]).todense()).ravel()
         out = {"popularity_lists": dict(zip(kr, pop_col[cols])), "content": dict(zip(kr, content))}
         pc, pf, pg = pct(content), pct(fame), pct(g)
+        raw = {}
         for name in which:
             sc = u @ models[name][:, cols] if u.any() else np.zeros(len(kr))
+            raw[name] = pct(sc + 1e-9 * fame)
             out[name] = dict(zip(kr, sc + 1e-9 * fame))
-            p = pct(sc + 1e-9 * fame)
-            for wm, wc, wf, wg in ((0.85, 0.0, 0.15, 0.0), (0.7, 0.0, 0.3, 0.0), (0.7, 0.15, 0.15, 0.0),
-                                   (0.7, 0.0, 0.15, 0.15), (0.55, 0.15, 0.3, 0.0), (0.6, 0.1, 0.15, 0.15)):
-                out[f"{name}|m{wm}c{wc}f{wf}g{wg}"] = dict(zip(kr, wm * p + wc * pc + wf * pf + wg * pg))
+        for name in which:                      # the two model families together, and one fame blend for the record
+            if name.startswith("ease"):
+                for we in (0.5, 0.7):
+                    out[f"{name}+cosine|e{we}"] = dict(zip(kr, we * raw[name] + (1 - we) * raw["cosine"]))
+        out["ease3000|m0.85f0.15"] = dict(zip(kr, 0.85 * raw["ease3000"] + 0.15 * pf)) if "ease3000" in raw else out["cosine"]
         return out
 
     names_full = list(models)
