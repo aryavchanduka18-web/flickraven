@@ -118,9 +118,10 @@ matter most for anime films with short profiles (7.2 of today's top 10 films are
 
 ## Real FlickRaven users per tier (live database, read-only count, 2026-11-15)
 
-42 users: 37 have no liked anime the model knows (no change), 4 have 1 to 7 ("short"), 0 have 8 to 24, 1 has 25+. So
-today the model reaches 5 people. Small risk, small benefit until more anime fans join; the "short" tier is where new
-anime fans start.
+First count (superseded): 42 users; 37 none, 4 short, 0 mid, 1 long. That count treated a title as known when it had
+any rating in the 2023 lists, which is not exactly the engine's rule (a vote in the trained "mid" model, inside the
+catalog). `pipeline/anime_tier_counts.py` now uses the engine's own reader, input and rule against the built model
+file. Recount: PENDING.
 
 ## Speed and memory (laptop, 75 list users per size, 2023 models)
 
@@ -142,8 +143,31 @@ Engine 128 passed, pipeline 120 passed, API 363 passed and 1 skipped on the lapt
 run because their stand-in engines had no `anime_order`; fixed in the tests (the real engine always has it). In one of
 them the mixed Home caught the error and served the plain Home, which is the intended safety fallback.
 
+## Building the model file (provenance)
+
+The served file is built from the 2023 lists only:
+
+    python -m pipeline.anime_model --ratings data/raw/anime2023/rating.csv --out artifacts/models/anime_model.json
+
+- `--ratings` now defaults to the 2023 file, so a plain run cannot build a 2017 model by accident (it used to default
+  to `data/raw/anime/rating.csv`, the 2017 lists).
+- The file records `settings.ratings`, `settings.ratings_sha256`, `settings.id_map` and `settings.id_map_sha256`; the
+  build log prints the model file's own SHA-256.
+- Review build (laptop, written to `work/anime-rank-eval-2023/anime_model.json`, not to `artifacts/` and not uploaded):
+  PENDING checksums.
+
+## Loading safety
+
+`engine/cinematch_engine/anime_model_file.parse` checks the whole file before any matrix is built: a `models` object,
+the three tiers as objects, numeric title ids, every vote a `[integer tmdb id, finite number]` pair. Anything else
+(for example `{"models": null}`, a NaN or infinite weight, a string id) rejects the whole file and the site serves
+today's order; a last catch-all guard in the loader means the anime model can never stop the site from starting.
+The same module holds the one "known liked anime" rule used by the engine and by the real-user count.
+
 ## Limits
 
+- "Today" is today's ranking method rebuilt leak-free on the same lists (cosine neighbours fitted without the held-out
+  users), not a replay of the 2017 cosine file deployed on the site. Claims should say "against today's method".
 - MyAnimeList users are not FlickRaven users. Offline NDCG must not be read as expected clicks or engagement.
 - Titles the lists do not know keep today's places, untested.
 - Licence: the lists come from MyAnimeList via Kaggle uploads; Aryav accepted that risk, credited on the Terms page.

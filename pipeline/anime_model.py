@@ -2,7 +2,7 @@
 Database", data/raw/anime; CC0 tag by the uploader, lists from MyAnimeList, a licence risk the site owner accepted,
 credited on the Terms page).
 
-    python -m pipeline.anime_model            # fit on all list users, write artifacts/models/anime_model.json
+    python -m pipeline.anime_model --ratings data/raw/anime2023/rating.csv --out artifacts/models/anime_model.json
 
 Method: EASE (Steck 2019), a linear item-to-item model with a closed-form fit: B = I - P / diag(P), P = (X'X + lam I)^-1,
 over the anime that can be matched to the catalog (TV/ONA entries to anime series, Movie entries to anime films). A
@@ -205,14 +205,35 @@ def fit(x: sp.csr_matrix) -> dict[str, sp.csr_matrix]:
     return {"long": sparsify(ease(x, LAM)), "mid": sparsify(ease(x, LAM_MID)), "short": sparsify(cosine(x))}
 
 
+RATINGS_2023 = RAW / "anime2023" / "rating.csv"      # the served model's lists (2023 MyAnimeList dump, no usernames)
+
+
+def sha256(path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 def main() -> None:
+    """Build the served model (documented in docs/anime-model-eval.md, "Building the model file"):
+
+        python -m pipeline.anime_model --ratings data/raw/anime2023/rating.csv --out artifacts/models/anime_model.json
+
+    --ratings defaults to the 2023 lists, so a plain run never builds a 2017 model by accident. The file records the
+    ratings file, the id map and their SHA-256, and the log prints the model file's SHA-256."""
     import argparse
     import sys
     from pathlib import Path
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ratings", help="ratings file (user_id, anime_id, rating); default data/raw/anime/rating.csv")
+    ap.add_argument("--ratings", default=str(RATINGS_2023),
+                    help="ratings file (user_id, anime_id, rating); default the 2023 lists, data/raw/anime2023/rating.csv")
     ap.add_argument("--out", help="where to write the model (default artifacts/models/anime_model.json, which the site loads)")
     a = ap.parse_args()
+    ratings = Path(a.ratings)
+    legacy = ratings.resolve() == (SRC / "rating.csv").resolve()        # the 2017 lists: also allows title matching
     out = Path(a.out) if a.out else OUT
     out.parent.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
@@ -220,8 +241,8 @@ def main() -> None:
     movies = pd.read_parquet(PROCESSED / "movies_clean.parquet")
     films = {int(r.tmdb_id) for r in movies.itertuples()
              if taxonomy.lane(str(r.title_type), list(r.genres), r.original_language, None) == "anime_film"}
-    pairs = as_pairs(pd.read_csv(a.ratings or SRC / "rating.csv"))
-    m = mapping(movies, films, fetch=not a.ratings, sids=set(pairs["sid"].unique()) if a.ratings else None)
+    pairs = as_pairs(pd.read_csv(ratings))
+    m = mapping(movies, films, fetch=legacy, sids=None if legacy else set(pairs["sid"].unique()))
     titles = m.drop_duplicates(["format", "tmdb_id"]).reset_index(drop=True)
     col = {(f, t): i for i, (f, t) in enumerate(zip(titles["format"], titles["tmdb_id"]))}
     x = matrix(pairs, {int(sid): col[(f, t)] for sid, f, t in zip(m["sid"], m["format"], m["tmdb_id"])}, len(titles))
@@ -230,12 +251,16 @@ def main() -> None:
     for name, s in fit(x).items():
         models[name] = {str(tm[i]): [[tm[j], round(float(v), 6)] for j, v in sorted(zip(s[i].indices, s[i].data), key=lambda t: -t[1])]
                         for i in range(s.shape[0]) if s[i].nnz}
+    root = Path(__file__).resolve().parents[1]
+    rel = lambda p: Path(p).relative_to(root).as_posix() if Path(p).is_absolute() and Path(p).is_relative_to(root) else Path(p).as_posix()
     write_json(out, {"settings": {"lam_long": LAM, "lam_mid": LAM_MID, "cosine_shrink": SHRINK, "top": TOP,
-                                  "ratings": str(a.ratings or "data/raw/anime/rating.csv")},
+                                  "ratings": rel(ratings), "ratings_sha256": sha256(ratings),
+                                  "id_map": rel(MAP) if MAP.exists() else None,
+                                  "id_map_sha256": sha256(MAP) if MAP.exists() else None},
                      "series": int((titles.format == "series").sum()), "films": int((titles.format == "film").sum()),
                      "users": int(x.shape[0]), "models": models})
-    log.info("wrote anime model: %d series, %d films, %d list users (no users kept)",
-             int((titles.format == "series").sum()), int((titles.format == "film").sum()), x.shape[0])
+    log.info("wrote anime model %s: %d series, %d films, %d list users (no users kept); sha256 %s",
+             out, int((titles.format == "series").sum()), int((titles.format == "film").sum()), x.shape[0], sha256(out))
 
 
 if __name__ == "__main__":

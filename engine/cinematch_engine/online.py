@@ -12,6 +12,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 
+from cinematch_engine import anime_model_file
 from cinematch_engine.availability import AvailabilityMap, renormalized
 from cinematch_engine.blend import candidate_pool, contributions
 from cinematch_engine.config import event_weights
@@ -379,8 +380,7 @@ class OnlineEngine:
         if not sims:
             return None
         weight = self.anime_liked(st)
-        ref = sims["mid"]
-        liked = [r for r in weight if ref.indptr[r + 1] > ref.indptr[r]]
+        liked = anime_model_file.known_inputs(sims, weight)
         if not liked:
             return None
         tier = "short" if len(liked) <= ANIME_SHORT_MAX else "mid" if len(liked) <= ANIME_MID_MAX else "long"

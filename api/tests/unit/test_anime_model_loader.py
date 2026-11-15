@@ -32,3 +32,16 @@ def test_missing_broken_partial_or_disabled_means_no_model(tmp_path, monkeypatch
     assert rec._anime_model([98, 99]) is None                                    # nothing in this catalog
     monkeypatch.setenv("ANIME_MODEL_DISABLED", "true")
     assert rec._anime_model([10, 11]) is None                                    # off switch
+
+
+def test_valid_json_with_a_bad_structure_or_bad_votes_means_no_model(tmp_path, monkeypatch):
+    monkeypatch.setattr(rec, "MODELS", tmp_path)
+    monkeypatch.delenv("ANIME_MODEL_DISABLED", raising=False)
+    f = tmp_path / "anime_model.json"
+    for text in ('{"models": null}', '[]', '{"models": {"long": null, "mid": {}, "short": {}}}',
+                 '{"models": {"long": {"10": [[11, NaN]]}, "mid": {"10": [[11, 1]]}, "short": {"10": [[11, 1]]}}}',
+                 '{"models": {"long": {"10": [[11, Infinity]]}, "mid": {"10": [[11, 1]]}, "short": {"10": [[11, 1]]}}}',
+                 '{"models": {"long": {"10": [["x", 1]]}, "mid": {"10": [[11, 1]]}, "short": {"10": [[11, 1]]}}}',
+                 '{"models": {"long": {"10": [[11]]}, "mid": {"10": [[11, 1]]}, "short": {"10": [[11, 1]]}}}'):
+        f.write_text(text, encoding="utf-8")
+        assert rec._anime_model([10, 11]) is None, text

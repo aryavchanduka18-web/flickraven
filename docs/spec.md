@@ -921,7 +921,8 @@ Laptop tools checked on 2026-10-07: Git, Python 3.12, Node 24, Docker and WSL2 a
 - One model for anime series and anime films, learned from real MyAnimeList lists (2023 Kaggle dump, usernames dropped; `pipeline/anime_model.py`, file `artifacts/models/anime_model.json`, about 8 MB in memory for the three settings). Three settings: "long" (EASE, lambda 300), "mid" (EASE, lambda 30,000), "short" (half "mid", half cosine neighbours by percentile), each keeping the top 200 votes per title.
 - Used by `OnlineEngine.anime_order`: inside `kind_rank("anime")`, the mixed Home anime-film lane and the Anime page films row. Anime the model knows are re-ordered only inside the places they already hold; others do not move; scores stay with the places.
 - Setting by the number of distinct catalog anime the person likes that the model knows (ratings 7+, likes, onboarding picks; watched and My List are not taste): 0 = unchanged, 1 to 7 short, 8 to 24 mid, 25+ long (`ANIME_SHORT_MAX`, `ANIME_MID_MAX`).
-- Off: missing, unreadable or partial file, or `ANIME_MODEL_DISABLED=true`: today's order exactly. Evidence: `docs/anime-model-eval.md`.
+- Off: missing, unreadable, partial or malformed file (every entry checked by `engine/cinematch_engine/anime_model_file.parse`: tiers are objects, votes are `[integer id, finite number]`), or `ANIME_MODEL_DISABLED=true`: today's order exactly, and the site still starts. The "known liked anime" rule (a vote in the "mid" model inside the catalog) lives in the same module and is shared by the engine and the real-user count (`pipeline/anime_tier_counts.py`).
+- Build: `python -m pipeline.anime_model --ratings data/raw/anime2023/rating.csv --out artifacts/models/anime_model.json` (the default is the 2023 file); the file records the ratings file, the id map and their SHA-256. Evidence: `docs/anime-model-eval.md`.
 
 ### 14.2g Perfect Pick v2 (2026-11-11)
 

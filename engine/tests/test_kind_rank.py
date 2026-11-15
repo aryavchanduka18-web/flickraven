@@ -245,3 +245,25 @@ def test_anime_model_tier_is_deterministic_and_follows_the_current_ratings():
         assert OnlineEngine.anime_scores(e, st)[0] == "short"
     finally:
         online.ANIME_SHORT_MAX = old
+
+
+def test_the_real_user_tier_count_uses_the_engines_own_tier():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from pipeline.anime_tier_counts import tier_of
+    from cinematch_engine import anime_model_file
+    n = 40
+    sim = sp.lil_matrix((n, n), dtype=np.float32)
+    for i in range(30):
+        sim[i, i + 1] = 0.5                                      # rows 0..29 vote; 30..39 only get votes or nothing
+    c = cat(["anime"] * n, [5.0] * n)
+    c.anime_sim = {"long": sim.tocsr(), "mid": sim.tocsr(), "short": sim.tocsr()}
+    e = engine(c)
+    for st in (UserState(), UserState(likes={35}), UserState(ratings={0: 9.0, 1: 6.0}, likes={0}),
+               UserState(likes=set(range(0, 8)), watched={9}), UserState(likes=set(range(0, 9))),
+               UserState(ratings={r: 8.0 for r in range(25)}, picks={39}), UserState(ratings={r: 8.0 for r in range(30)})):
+        got = OnlineEngine.anime_scores(e, st)
+        n_known = len(anime_model_file.known_inputs(c.anime_sim, OnlineEngine.anime_liked(None, st)))
+        want = "none 0" if got is None else {"short": "short 1-7", "mid": "mid 8-24", "long": "long 25+"}[got[0]]
+        assert tier_of(n_known) == want
