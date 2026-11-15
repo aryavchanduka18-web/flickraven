@@ -139,9 +139,8 @@ steady after #144.
 
 ## Tests
 
-Engine 128 passed, pipeline 120 passed, API 363 passed and 1 skipped on the laptop. Two API tests failed on the first
-run because their stand-in engines had no `anime_order`; fixed in the tests (the real engine always has it). In one of
-them the mixed Home caught the error and served the plain Home, which is the intended safety fallback.
+At the PR head 274777e on the laptop (local test database only): engine 162 passed, pipeline 120 passed, API 367
+passed and 1 skipped, 0 failed. No CI runs on this repository; this laptop run is the test evidence.
 
 ## Building the model file (provenance)
 
@@ -156,7 +155,9 @@ The served file is built from the 2023 lists only:
 - Review build (laptop, written to `work/anime-rank-eval-2023/anime_model.npz`, not to `artifacts/` and not uploaded):
   ratings `7d7566468f42a156b009e60ad88b6cdfcd951545844571825845d55073e40869`, id map
   `ffdd1d875cec04252813919634f7f82a5f9bb644c6ab0b7b34307fe945b596bd`, 1,235 series, 462 films, 224,704 list users.
-  Model file (`.npz`) SHA-256: PENDING (the earlier JSON build, now replaced, was `1c1a96e6…5e99c90`).
+  Model file `anime_model.npz` (4.69 MiB) SHA-256 `946c216f15dd7b600d782aa2a72e1c7bba7b7b1e373a5684015254c0936f48ba`.
+  Same votes as the earlier JSON build (339,400 per tier, same positions, largest weight difference 5e-7 from the
+  JSON's 6-decimal rounding).
 
 ## Loading safety
 
@@ -165,7 +166,8 @@ The served file is built from the 2023 lists only:
   after the parse; the matrices themselves are 8.1 MiB. A spike of about 220 MiB at startup, on a server that sits at
   about 362 of 512 MB, could restart it from lack of memory. The `.npz` holds three flat arrays per tier (`<tier>_src`,
   `<tier>_dst` tmdb ids, `<tier>_w` votes) and a `settings` JSON string, so loading costs about what the matrices cost.
-  Measured figures for the `.npz`: PENDING.
+  Measured for the `.npz` (bare process, two runs): 102 MiB before the load, 110 to 111 MiB after, peak 135 MiB
+  for the whole process (324 MiB with the JSON). Loading now adds about 8 MiB.
 - `engine/cinematch_engine/anime_model_file.load` opens it with `allow_pickle=False` and checks everything before a
   matrix is built: all nine arrays present, 1-D, one length per tier, ids positive integers, votes floating point and,
   after the float32 conversion (so 1e300 counts as infinite), finite and above 0. Anything else (or a missing, cut-off
