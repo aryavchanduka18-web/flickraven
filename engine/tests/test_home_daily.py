@@ -32,6 +32,8 @@ def make(seed_free=True):
         skip = set(extra_exclude or ())
         return [{"row": int(r), "score": float(score[r]), "match_pct": 80, "shares": {}} for r in order if int(r) not in skip][:k]
     e.top_picks = top_picks
+    for name in ("different_rows", "taste_top", "engaged_rows"):
+        setattr(e, name, getattr(OnlineEngine, name).__get__(e))
     return e
 
 

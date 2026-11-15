@@ -320,7 +320,7 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     scores = engine.scores(st)            # scored once: Home and the agreement numbers share it
     cat = engine.cat
     seen = {cat.row_of[m] for m in freshness.recently_shown_ids(db, uid) if m in cat.row_of}   # shown on earlier days: move back
-    plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine),
+    plan = engine.home(st, mode, tuning=rec.user_tuning(db, uid), recent_rows=rec.recent_positive_rows(db, uid, engine, st),
                        scores=scores, seed=daily.seed(uid, f"home:{mode}"), stale=seen)
     lanes = mixed_home_plan.active_lanes(get_settings())
     if lanes:                               # anime / series lanes on the first screen for their fans (HOME_MIX_DISABLED=true: plain film Home)
@@ -377,9 +377,14 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
                                                   "agreement": agreement(row)}
             items = cards(db, list(extra), uid, extra)
         subtitle = None
-        if r["key"] == "current_phase" and r["reason"].get("genre"):
-            subtitle = (f"You've been into {r['reason']['genre'].lower()} films lately. "
-                        "Recent likes, ratings and saves count more here than your older history.")
+        if r["key"] == "current_phase":
+            # The genre is named only when most of the row really is that genre (fix brief issue 4: "You've been into
+            # horror films lately" above a row of action films, because the horror titles were filtered out).
+            genre = r["reason"].get("genre")
+            in_genre = sum(1 for it in items if genre and genre in (it["movie"].get("genres") or []))
+            subtitle = (f"You've been into {genre.lower()} films lately. " if genre and items and in_genre * 2 > len(items)
+                        else "Close to what you have liked lately. ") + \
+                "Recent likes, ratings and saves count more here than your older history."
         rails.append({"key": r["key"], "title": r["title"], "subtitle": subtitle, "source": r["source"], "items": items,
                       "learned": learned.get(rec_feedback.base_key(f"rail:{r['key']}"))})
         log_shown(db, uid, request_id, page_id, r["key"], mode, items)
@@ -534,8 +539,12 @@ def explain(movie_id: int, user=Depends(current_user), db: Session = Depends(get
     shares = _shares(engine, st, row)
     s = float(engine.rail_scores(st)[row])
     logged = db.execute(text("SELECT count(*) FROM interactions WHERE user_id = :u"), {"u": user["id"]}).scalar() or 0
+    # A title the person already rated is never recommended to them, so it gets no "because" reasons; the rating is
+    # returned so the page can say so (fix brief, lower-priority note).
+    rated = st.ratings.get(row)
     return {"movie_id": movie_id, "stage": st.stage, "behavioral_count": st.behavioral_count,
             "logged_interactions": int(logged), "onboarding_count": len(st.picks), "shares": shares,
             "match_pct": match_display.shown(engine.match(st.stage, s) if np.isfinite(s) else None),
-            "reasons": engine.reasons(st, row, shares), "weights": engine.weights[st.stage],
+            "your_rating": rated, "reasons": [] if rated is not None else engine.reasons(st, row, shares),
+            "weights": engine.weights[st.stage],
             "confidence": confidence(engine, st, row, match_display.shown(engine.match(st.stage, s) if np.isfinite(s) else None))}

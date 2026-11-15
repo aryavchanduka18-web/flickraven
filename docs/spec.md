@@ -183,6 +183,7 @@ Knowledge/constraint-based recommendation is covered by onboarding constraints, 
 - Implicit: events turned into a weight per film (section 6.2), then ALS confidence.
 - **Onboarding answers are preference signals, not behavior.** The picked films feed the content profile and ALS with the same weight as a like, and the chosen languages and genres feed the constraints. They are counted separately as `onboarding_count` and **never** add to the stage counter.
 - **Behavioral interaction count b** = distinct films the user has rated, liked, disliked, added to My List or marked watched on the site. Views, Quick Views and search clicks still feed ALS, but they do not count toward b (opening 11 pages is not 11 opinions).
+- **b is the current state, not the log (2026-11-15).** b counts titles that are rated, liked, disliked, saved or marked watched *now*. Deleting a rating, clearing a like or removing a save takes the title out again, so deleting everything returns the account to cold. The interactions log keeps every event for analysis; Your Current Phase, its subtitle and the implicit taste weights use only actions that still stand.
 - **User stage** comes from b only: **cold** (b = 0–2), **warming** (3–10), **established** (11+).
 - So a new user who picks 5 films in onboarding is still **cold** (onboarding_count = 5, b = 0) and gets onboarding + content + popularity. They move to warming only after 3 real actions.
 
@@ -207,7 +208,7 @@ Three tiers (2026-11-10, `cinematch_engine/profile.py`): **weak** (opening a pag
 About 50 films from each source: popularity, content, item CF, user CF, SVD, ALS. Merged into one pool of up to ~300.
 
 ### 6.4 Filters
-Remove: films already rated, marked watched, or disliked; films in disliked genres (hard rule); films already placed higher on the same page (section 7.2); films outside the catalog.
+Remove: films already rated, marked watched, or disliked; films in disliked genres (hard rule, **except** a genre the person's own ratings overrule: once they have 3 or more titles in it rated 8+ or liked, and more of those than titles in it rated 5 or lower or disliked, the genre is lifted on every request. The saved dislike is not changed, and deleting those ratings brings the filter back); films already placed higher on the same page (section 7.2); films outside the catalog.
 
 ### 6.5 Normalization
 Each source's scores become a 0–1 percentile rank within the user's candidate pool. A source that didn't propose a film gives it 0. Raw scores from different models are never added directly.
@@ -218,6 +219,8 @@ Each source's scores become a 0–1 percentile rank within the user's candidate 
 - **Stage tuning uses simulated users that match the live definition.** Each validation user gets simulated onboarding (5 of their earliest films rated ≥ 8/10, plus those films' genres and languages, counted as onboarding, not as b), then: cold = onboarding + 0–2 further ratings; warming = onboarding + 3–10; established = full training history. (Every MovieLens user has 20+ ratings, so without this, the cold and warming stages would be tuned on nothing.)
 - Expected pattern (the real numbers come from tuning and are shown in the lab): cold = popularity + content; warming = content, item CF, ALS rising; established = SVD, ALS, item CF, user CF, small content, little popularity.
 - This is a **switching hybrid** (weights change with stage) inside a **weighted hybrid** (the blend) inside a **cascade** (candidates, then blend, then rerank). Use those three names in the report.
+
+**Content profile with a few dislikes (2026-11-15).** The content profile is L (average of liked titles) minus D (average of disliked titles). With 3 or fewer dislikes, D is scaled by disliked/liked (2 of 7 gives 0.29), so two 1/10 ratings on Japanese animation no longer cancel five 9-10 ratings on Japanese animation; the disliked titles still push away their own franchise and close neighbours. Four or more dislikes, or none: unchanged. **Movies In Your Languages** keeps at least a 1/(2 x languages) share of each chosen language (onboarding languages are a floor). "Because You Liked" rows skip anchors in a still-disliked genre and rows with fewer than 8 survivors; the Current Phase subtitle names a genre only if most of the row is in it; cold Top Picks is called "Popular Picks To Start You Off".
 
 ### 6.7 Match %
 - One-feature logistic regression per stage, fitted on validation: blend score → probability the user rates the film ≥ 7/10.
@@ -293,7 +296,7 @@ Hero: the top 5 picks (hybrid + MMR in the user's current mode), rotating; the f
 | 10 | Perfect Popcorn Films | For Tonight preset | Action, Adventure, Comedy, Animation or Sci-Fi; 90–130 min; Bayesian rating ≥ 6.5/10; ranked by hybrid | always |
 | 11 | International Cinema | Hybrid + language constraint | films **outside** the user's chosen languages | always |
 | 12 | Most Loved | Popularity baseline | Bayesian average, language-aware | always |
-| 13 | Discover Something Different | Discover-mode MMR | λ = 0.55, β = 0.20 whatever the slider says | always |
+| 13 | Discover Something Different | Discover-mode MMR | λ = 0.55, β = 0.20 whatever the slider says. Since 2026-11-15 at most 30% of the row is in the person's top language and at most 30% carries one of their two top genres; the rest are well-rated films (community 7+) from other languages and genres | always |
 
 Dropped from v1.0: **Trending Now** (no live trend data; merged into New & Notable) and **Critically Acclaimed** (no critic data; would copy Most Loved).
 
