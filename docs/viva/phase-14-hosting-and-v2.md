@@ -88,3 +88,33 @@ Directing / Writing tabs. Match % appears only where the engine scores the film.
   own reason), which the site showed as "Film not found". Fixed; scenario test 14 guards it.
 - Genre and Discover pages showed only the first 40 films (Thriller has 3,379). They now page through
   every film.
+- A disliked film stayed on Home until a reload, and the hover card showed the old like/dislike state.
+  Every cached list is now patched the moment you act (optimistic update), and the hover card reads the
+  same fresh state as the film page.
+
+## Final fixes (Oct 10)
+- **Films you acted on are never recommended back.** The engine's `excluded()` set is every film you
+  rated, liked, disliked, watched or picked in onboarding (plus disliked genres). Top Picks, the hero,
+  every Home row, Discover's personal sorts, For Tonight and Surprise Me all leave them out. Two leaks
+  were found and closed: "Continue Exploring" (recently opened films) brought back liked or watched
+  films, and the themed collection rows hid only disliked or watched films, not rated ones. Scenario
+  tests 16 and 18 check every Home row and collection after each action.
+- **More Like This still shows them.** It is similarity alone (same for every user), so a film you rated
+  can appear under a similar film. That is intended: it answers "what is like this film", not "what
+  should I watch next".
+- **One Match % per film.** Home used to compute Match % from the candidate-pool score (each source's
+  percentile among its own top 50), while the film page, Why? and lists used the catalog-wide score
+  (percentile among every film). The same film could read 87% on Home and 91% on its page. Every page now
+  uses the catalog-wide score; the pool score still decides what is picked and in what order. Honest
+  caveat if asked: the calibrator was fitted on pool scores, so on this scale Match % reads a few points
+  high; it is a guide, and ranking is unaffected. Scenario 17 checks Home = film page = Why?.
+- **Match % is the headline, agreement is secondary.** Cards, the hero and the film page show the Match %
+  big and bold; model agreement is small text ("17% model agreement · low"). They answer different
+  questions: Match % = how likely you are to rate it 7+; agreement = how much the separate models agree
+  on that. A high match with low agreement means one strong signal (for example your watch history)
+  carries it while the others are less sure.
+- **Final live check** (guest account on the Render site): crime and thriller picks gave 10 of 10 top
+  picks in crime, thriller or mystery, no Horror (the disliked genre), no duplicates, Match % and reasons
+  on every pick; after a dislike, like, 9/10 rating and watched mark, none of the four came back.
+- **Declined:** a filmography rule that would have added 2,357 films (for example 20 more Shah Rukh Khan
+  films) was built and tested but not merged, at Aryav's choice; the catalog stays at 14,762 films.
