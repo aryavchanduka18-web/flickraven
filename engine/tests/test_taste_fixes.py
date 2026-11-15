@@ -168,3 +168,17 @@ def test_different_row_caps_top_language_and_top_genres():
         assert sum(language[r] == "ja" for r in out) <= 6
         assert sum(bool({"Animation", "Fantasy"} & set(genres[r])) for r in out) <= 6
         assert not set(out) & set(range(10))               # nothing already on the page or rated
+
+
+def test_different_row_quality_floor_holds_for_the_discover_picks_too():
+    """The Discover-mode picks (disc_rows) have no quality floor of their own; a title under 7 must not get in through them."""
+    n = 60
+    popularity = [6.0 if i % 2 == 0 else 8.0 for i in range(n)]
+    cat = catalog(sp.identity(n, format="csr"), genres=[["Drama"]] * n, language=["fr"] * n, popularity=popularity)
+    e = engine(cat)
+    rail = np.linspace(1, 0, n).astype(np.float32)
+    st = UserState(languages=["en"])
+    disc = list(range(0, 30))                       # the Discover picks include 15 titles rated 6.0
+    for rng in (None, np.random.default_rng(1)):
+        out = OnlineEngine.different_rows(e, st, disc, set(), rail, 20, rng)
+        assert out and all(popularity[r] >= 7.0 for r in out)

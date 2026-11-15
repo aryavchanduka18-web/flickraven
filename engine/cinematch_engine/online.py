@@ -972,7 +972,9 @@ class OnlineEngine:
         ok = np.isfinite(rail) & (cat.popularity >= min_quality)
         idx = np.nonzero(ok)[0]
         more = idx[np.argsort(-rail[idx], kind="stable")].tolist()
-        cands = [int(r) for r in dict.fromkeys([*disc_rows, *more]) if int(r) not in used and np.isfinite(rail[int(r)])]
+        # The quality floor applies to every candidate, including the Discover-mode picks (they carry no floor of their own).
+        cands = [int(r) for r in dict.fromkeys([*disc_rows, *more])
+                 if int(r) not in used and np.isfinite(rail[int(r)]) and cat.popularity[int(r)] >= min_quality]
         if rng is not None and len(cands) > k:            # a daily draw from the best candidates, the rest behind them
             head = refresh(cands, 3 * k, rng, pool_mult=2)
             seen = set(head)
