@@ -133,7 +133,7 @@ anime fans start.
 
 The model's own step costs under 7 ms at p95, against 17 to 645 ms median for the whole `kind_rank` call it sits in.
 The with/without `kind_rank` timings were too noisy to use (warm caches on the second call). Memory: 8.2 MiB for the
-three models together (the earlier 4 MB estimate was for one). Render's limit is 512 MB; the app sat at about 362 MB
+three models together. Render's limit is 512 MB; the app sat at about 362 MB
 steady after #144.
 
 ## Tests
