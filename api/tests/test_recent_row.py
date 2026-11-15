@@ -229,3 +229,17 @@ def test_a_failure_in_the_mix_never_breaks_home(home_client, monkeypatch):
     monkeypatch.setattr(recs_router.mixed_home_plan, "mix", boom)
     r = home_client.get("/api/recs/home")
     assert r.status_code == 200 and r.json()["hero"]
+
+
+def test_hero_lead_changes_by_day_but_not_within_a_day(home_client, monkeypatch):
+    import datetime as dt
+    from app.services import daily
+    leads = set()
+    for d in range(12):
+        day = dt.date(2026, 11, 1) + dt.timedelta(days=d)
+        monkeypatch.setattr(daily, "today", lambda day=day: day)
+        a = [i["movie"]["id"] for i in home_client.get("/api/recs/home").json()["hero"]]
+        b = [i["movie"]["id"] for i in home_client.get("/api/recs/home").json()["hero"]]
+        assert a == b and len(a) == len(set(a))                          # same day: same hero
+        leads.add(a[0])
+    assert len(leads) > 1                                                 # the first slide is not the same every day

@@ -86,3 +86,10 @@ def test_stale_titles_move_behind_fresh_ones_but_are_never_removed():
 
 def test_no_stale_set_changes_nothing():
     assert rows_of(OnlineEngine.home(make(), UserState(), "balanced", seed=3, stale=set())) == rows_of(plan(3))
+
+
+def test_hero_keeps_only_the_best_pick_and_stays_among_the_top_12():
+    top = [p["row"] for p in make().top_picks(None, "balanced", k=12)]
+    heroes = [[h["row"] for h in plan(s)["hero"]] for s in range(20)]
+    assert all(h[0] == top[0] and len(h) == 5 and set(h) <= set(top) for h in heroes)   # best first, only strong picks
+    assert len({tuple(h[1:]) for h in heroes}) > 5                                      # the other four change day to day

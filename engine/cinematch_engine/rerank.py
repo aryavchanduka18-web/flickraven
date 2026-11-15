@@ -80,6 +80,19 @@ def refresh(items, k: int, rng: np.random.Generator, pool_mult: int = 3, keep: i
     return head + [rest[i] for i in chosen]
 
 
+def lead_of_day(items, rng: np.random.Generator | None, pool: int = 5) -> list:
+    """Today's first hero slide. One of the first `pool` items (all strong picks: the hero is already the best of the
+    ranking) moves to the front, drawn with a lean towards the top (weight 1 / (1 + rank / pool)); the others keep their
+    order behind it. Nothing is added or removed. Without an rng (tests, evaluation) the order is unchanged."""
+    items = list(items)
+    n = min(pool, len(items))
+    if rng is None or n < 2:
+        return items
+    w = 1.0 / (1.0 + np.arange(n) / pool)
+    i = int(rng.choice(n, p=w / w.sum()))
+    return [items[i]] + items[:i] + items[i + 1:]
+
+
 def spread_languages(items: list, languages: list[str], cap: float = 0.5, window: int = 12) -> list:
     """Within the first `window` places no single language takes more than `cap` of them; the extras move just after the
     window. Order is otherwise kept. (So a list is not a dozen Korean dramas in a row.)"""

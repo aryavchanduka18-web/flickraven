@@ -725,7 +725,7 @@ class OnlineEngine:
         picks = self.top_picks(st, mode, k=5 + rail_size * (3 if rng is not None else 1), scores=scores, tuning=tuning)
         if stale:                           # fresh titles first, same order inside each group
             picks = [p for p in picks if p["row"] not in stale] + [p for p in picks if p["row"] in stale]
-        hero = refresh(picks[:12], 5, rng, pool_mult=2, keep=2) if rng is not None else picks[:5]
+        hero = refresh(picks[:12], 5, rng, pool_mult=2, keep=1) if rng is not None else picks[:5]   # only the very best always stays
         picks = [p for p in picks if p not in hero]
         picks = hero + picks
         used |= {p["row"] for p in hero}
