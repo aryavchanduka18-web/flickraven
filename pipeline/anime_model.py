@@ -31,6 +31,7 @@ OUT = MODELS / "anime_model.json"
 ALT_TV = RAW / "tmdb_alt_titles"
 ALT_MOVIE = RAW / "tmdb_alt_titles_movie"
 SERIES_TYPES = ("TV", "ONA")
+MAP = PROCESSED / "anime_model_map.csv"
 FRIBB = SRC / "anime-list-full.json"
 FRIBB_URL = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json"
 LAM = 300.0          # chosen on validation users in pipeline/anime_rank_eval.py
@@ -121,6 +122,16 @@ def mapping(movies: pd.DataFrame, film_ids: set[int], fetch: bool = False, use_i
     series = movies[movies["title_type"] == "anime"]
     films = movies[movies["tmdb_id"].isin(film_ids)]
     known = set(anime["anime_id"])
+    if use_ids and MAP.exists():
+        # The reviewed id map (built by the anime-data kit: TMDB and IMDb ids, seasons/OVAs/specials merged into their
+        # series) is the one matching path when it is there; the code below is only the fallback without it.
+        m = pd.read_csv(MAP)[["tmdb_id", "sid", "format"]]
+        ok = set(series["tmdb_id"]) | set(films["tmdb_id"])
+        m = m[m["sid"].isin(known) & m["tmdb_id"].isin(ok)].drop_duplicates("sid").reset_index(drop=True)
+        t = m.drop_duplicates("tmdb_id")
+        log.info("id map file: matched %d of %d anime series and %d of %d anime films in this dataset (%d dataset entries)",
+                 int((t.format == "series").sum()), len(series), int((t.format == "film").sum()), len(films), len(m))
+        return m
     ids = [x for x in id_matches(fribb() if use_ids else [], set(series["tmdb_id"]), set(films["tmdb_id"])) if x["sid"] in known]
     done = {(x["format"], x["tmdb_id"]) for x in ids}
     s = match(anime, series[[("series", int(t)) not in done for t in series["tmdb_id"]]], SERIES_TYPES,
@@ -179,7 +190,6 @@ def main() -> None:
     films = {int(r.tmdb_id) for r in movies.itertuples()
              if taxonomy.lane(str(r.title_type), list(r.genres), r.original_language, None) == "anime_film"}
     m = mapping(movies, films, fetch=True)
-    m.to_csv(PROCESSED / "anime_model_map.csv", index=False)
     pairs = as_pairs(pd.read_csv(SRC / "rating.csv"))
     titles = m.drop_duplicates(["format", "tmdb_id"]).reset_index(drop=True)
     col = {(f, t): i for i, (f, t) in enumerate(zip(titles["format"], titles["tmdb_id"]))}
