@@ -12,6 +12,7 @@ import os
 import logging
 import sys
 import threading
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -77,21 +78,21 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
 
 
 def _anime_model(tmdb_ids: list[int]) -> dict | None:
-    """The anime model (artifacts/models/anime_model.json, pipeline/anime_model.py: votes between anime series and anime
+    """The anime model (artifacts/models/anime_model.npz, pipeline/anime_model.py: votes between anime series and anime
     films learned from real anime lists; no users kept) as {"long", "mid", "short": n x n matrix over the catalog rows,
     row = the anime that votes}. None when the file is missing, unreadable, malformed in any way (engine
     anime_model_file.parse checks every entry) or switched off (ANIME_MODEL_DISABLED=true): the anime lists then keep
     the earlier order and the site still starts."""
-    path = MODELS / "anime_model.json"
+    path = MODELS / "anime_model.npz"
     if os.environ.get("ANIME_MODEL_DISABLED", "").lower() in ("1", "true", "yes") or not path.exists():
         return None
     try:
-        return anime_model_file.parse(json.loads(path.read_text(encoding="utf-8")), tmdb_ids)
-    except (OSError, ValueError) as e:            # BadModelFile is a ValueError, and so is a JSON syntax error
-        log.warning("anime_model.json not used (%s); anime lists keep the earlier order", e)
+        return anime_model_file.load(path, tmdb_ids)
+    except (OSError, ValueError, zipfile.BadZipFile) as e:      # BadModelFile is a ValueError
+        log.warning("anime_model.npz not used (%s); anime lists keep the earlier order", e)
         return None
     except Exception:                             # a last guard: the anime model must never stop the site from starting
-        log.exception("anime_model.json not used; anime lists keep the earlier order")
+        log.exception("anime_model.npz not used; anime lists keep the earlier order")
         return None
 
 

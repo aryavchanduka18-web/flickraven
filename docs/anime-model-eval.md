@@ -147,22 +147,31 @@ them the mixed Home caught the error and served the plain Home, which is the int
 
 The served file is built from the 2023 lists only:
 
-    python -m pipeline.anime_model --ratings data/raw/anime2023/rating.csv --out artifacts/models/anime_model.json
+    python -m pipeline.anime_model --ratings data/raw/anime2023/rating.csv --out artifacts/models/anime_model.npz
 
 - `--ratings` now defaults to the 2023 file, so a plain run cannot build a 2017 model by accident (it used to default
   to `data/raw/anime/rating.csv`, the 2017 lists).
 - The file records `settings.ratings`, `settings.ratings_sha256`, `settings.id_map` and `settings.id_map_sha256`; the
   build log prints the model file's own SHA-256.
-- Review build (laptop, written to `work/anime-rank-eval-2023/anime_model.json`, not to `artifacts/` and not uploaded):
-  PENDING checksums.
+- Review build (laptop, written to `work/anime-rank-eval-2023/anime_model.npz`, not to `artifacts/` and not uploaded):
+  ratings `7d7566468f42a156b009e60ad88b6cdfcd951545844571825845d55073e40869`, id map
+  `ffdd1d875cec04252813919634f7f82a5f9bb644c6ab0b7b34307fe945b596bd`, 1,235 series, 462 films, 224,704 list users.
+  Model file (`.npz`) SHA-256: PENDING (the earlier JSON build, now replaced, was `1c1a96e6…5e99c90`).
 
 ## Loading safety
 
-`engine/cinematch_engine/anime_model_file.parse` checks the whole file before any matrix is built: a `models` object,
-the three tiers as objects, numeric title ids, every vote a `[integer tmdb id, finite number]` pair. Anything else
-(for example `{"models": null}`, a NaN or infinite weight, a string id) rejects the whole file and the site serves
-today's order; a last catch-all guard in the loader means the anime model can never stop the site from starting.
-The same module holds the one "known liked anime" rule used by the engine and by the real-user count.
+- **Format: NumPy `.npz`, not JSON (changed 2026-11-15 after a laptop measurement).** The first JSON build was 61.7 MiB
+  on disk. Reading it in a bare process went 103 to 266 MiB at `json.loads`, peaked at 324 MiB, and settled at 115 MiB
+  after the parse; the matrices themselves are 8.1 MiB. A spike of about 220 MiB at startup, on a server that sits at
+  about 362 of 512 MB, could restart it from lack of memory. The `.npz` holds three flat arrays per tier (`<tier>_src`,
+  `<tier>_dst` tmdb ids, `<tier>_w` votes) and a `settings` JSON string, so loading costs about what the matrices cost.
+  Measured figures for the `.npz`: PENDING.
+- `engine/cinematch_engine/anime_model_file.load` opens it with `allow_pickle=False` and checks everything before a
+  matrix is built: all nine arrays present, 1-D, one length per tier, ids positive integers, votes floating point and,
+  after the float32 conversion (so 1e300 counts as infinite), finite and above 0. Anything else (or a missing, cut-off
+  or non-zip file) rejects the whole file and the site serves today's order; a last catch-all in the loader means the
+  anime model can never stop the site from starting.
+- The same module holds the one "known liked anime" rule used by the engine and by the real-user count.
 
 ## Limits
 

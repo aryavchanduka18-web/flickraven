@@ -1,12 +1,12 @@
 """How many real site users fall in each anime-model tier (no model change, aggregate counts only).
 
-    python -m pipeline.anime_tier_counts --model work/anime-rank-eval-2023/anime_model.json --db-env DATABASE_URL
+    python -m pipeline.anime_tier_counts --model work/anime-rank-eval-2023/anime_model.npz --db-env DATABASE_URL
 
 Read-only: the connection is opened with default_transaction_read_only. Uses the site's own rules end to end, so the
 count is the engine's count:
 - catalog rows: artifacts/models/content_rows.parquet joined with the database's movies, in the engine's row order
   (api recommender.load_engine);
-- the model: the given model file read by the engine's reader (anime_model_file.parse, the same as the site);
+- the model: the given model file read by the engine's reader (anime_model_file.load, the same as the site);
 - each person's liked anime: their current ratings, likes and onboarding picks turned into the engine's input
   (OnlineEngine.anime_liked: rated 7+, liked or picked; one entry per title);
 - known: anime_model_file.known_inputs, the rule OnlineEngine.anime_scores uses to pick the tier.
@@ -37,7 +37,6 @@ def tier_of(n: int) -> str:
 
 
 def main() -> None:
-    import json
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True, help="the anime model file to count against (built by pipeline.anime_model)")
     ap.add_argument("--db-env", default="DATABASE_URL", help="name of the .env entry with the database URL")
@@ -49,7 +48,7 @@ def main() -> None:
         rows = pd.read_parquet(MODELS / "content_rows.parquet")
         movies = rows.merge(movies, on="tmdb_id", how="inner").sort_values("row").reset_index(drop=True)
         row_of = {int(m): i for i, m in enumerate(movies["id"])}
-        sims = anime_model_file.parse(json.loads(Path(a.model).read_text(encoding="utf-8")), movies["tmdb_id"].tolist())
+        sims = anime_model_file.load(Path(a.model), movies["tmdb_id"].tolist())
         users = [u for (u,) in c.execute(text("SELECT id FROM users"))]
         st = collections.defaultdict(UserState)
         for u, m, r in c.execute(text("SELECT user_id, movie_id, rating FROM ratings")):
