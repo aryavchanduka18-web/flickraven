@@ -110,7 +110,11 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=11)
     ap.add_argument("--lams", default="300,3000,10000,30000")
     ap.add_argument("--fetch", action="store_true", help="fetch missing TMDB alternative titles of anime films")
+    ap.add_argument("--ratings", help="another ratings file in the same format (user_id, anime_id, rating); default data/raw/anime/rating.csv")
+    ap.add_argument("--out", help="output folder; default work/anime-rank-eval")
     a = ap.parse_args()
+    global OUT
+    OUT = (ROOT / a.out) if a.out else OUT
     OUT.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     engine, row_of_tmdb = load()
@@ -120,11 +124,12 @@ def main() -> None:
     film_rows = {r for r in range(cat.n) if lane_of[r] == "anime_film"}
     tmdb_of_row = {r: t for t, r in row_of_tmdb.items()}
     movies = pd.read_parquet(PROCESSED / "movies_clean.parquet", columns=["tmdb_id", "title", "original_title", "title_type"])
-    m = am.mapping(movies, {tmdb_of_row[r] for r in film_rows if r in tmdb_of_row}, fetch=a.fetch)
+    pairs = am.as_pairs(pd.read_csv(a.ratings or RAW / "anime" / "rating.csv"))
+    m = am.mapping(movies, {tmdb_of_row[r] for r in film_rows if r in tmdb_of_row}, fetch=a.fetch,
+                   sids=set(pairs["sid"].unique()) if a.ratings else None)
     m = m[m["tmdb_id"].isin(row_of_tmdb)].reset_index(drop=True)
     m["row"] = m["tmdb_id"].map(row_of_tmdb)
     old = pd.read_csv(PROCESSED / "anime_mal_map.csv")
-    pairs = am.as_pairs(pd.read_csv(RAW / "anime" / "rating.csv"))
     row_of_sid = dict(zip(m["sid"], m["row"]))
 
     val, n_ok = users(pairs, row_of_sid, a.val, a.seed)

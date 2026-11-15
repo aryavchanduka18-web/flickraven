@@ -8,6 +8,7 @@ onboarding, events) and asks the engine. Nothing personal is cached (spec 6.12 f
 import ctypes
 import gc
 import json
+import os
 import logging
 import sys
 import threading
@@ -73,6 +74,29 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
     n = len(tmdb_ids)
     sim = sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32)
     return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
+
+
+def _anime_model(tmdb_ids: list[int]) -> sp.csr_matrix | None:
+    """The anime model (artifacts/models/anime_model.json, pipeline/anime_model.py: votes between anime series and anime
+    films learned from real anime lists; no users kept) as an n x n matrix over the catalog rows, row = the anime that
+    votes. None when the file is missing, unreadable or switched off (ANIME_MODEL_DISABLED=true): the anime lists then
+    keep the earlier order."""
+    path = MODELS / "anime_model.json"
+    if os.environ.get("ANIME_MODEL_DISABLED", "").lower() in ("1", "true", "yes") or not path.exists():
+        return None
+    try:
+        votes = json.loads(path.read_text(encoding="utf-8"))["votes"]
+    except (OSError, ValueError, KeyError):
+        log.warning("anime_model.json could not be read; anime lists keep the earlier order")
+        return None
+    row_of = {t: i for i, t in enumerate(tmdb_ids)}
+    rows, cols, vals = [], [], []
+    for a, out in votes.items():
+        for b, v in out:
+            if int(a) in row_of and b in row_of:
+                rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
+    n = len(tmdb_ids)
+    return sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32) if vals else None
 
 
 def _gemini_similarities(movies: pd.DataFrame) -> sp.csr_matrix | None:
@@ -200,7 +224,8 @@ def load_engine(db: Session) -> OnlineEngine:
             part=movies["catalog_part"].to_numpy(), popularity=movies["popularity"].astype(float).to_numpy(),
             votes=movies["votes"].astype(float).to_numpy(), has_award=movies["has_award"].fillna(False).to_numpy(),
             content=content, universe_rows=universe_rows, recent=(movies["catalog_part"] == "C").to_numpy(),
-            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim, gemini_sim=gemini_sim)
+            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim, gemini_sim=gemini_sim,
+            anime_sim=_anime_model(movies["tmdb_id"].tolist()))
         train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
         uc, ic, sv, al = _settings("user_cf"), _settings("item_cf"), _settings("svd"), _settings("als")
         nb = (f["item_nb_idx"], f["item_nb_vals"])     # read once: every npz access decompresses a new copy

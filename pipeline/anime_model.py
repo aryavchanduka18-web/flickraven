@@ -114,14 +114,17 @@ def id_matches(entries: list[dict], series_ids: set[int], film_ids: set[int]) ->
     return out
 
 
-def mapping(movies: pd.DataFrame, film_ids: set[int], fetch: bool = False, use_ids: bool = True) -> pd.DataFrame:
+def mapping(movies: pd.DataFrame, film_ids: set[int], fetch: bool = False, use_ids: bool = True, sids=None) -> pd.DataFrame:
     """sid, tmdb_id, format ('series' or 'film'): dataset entries of the catalog's anime series and anime films. First
     the id map (exact ids; seasons of one series all point at it), then exact normalized titles for catalog titles the
     id map did not reach. One dataset entry maps to one title; one title can have several entries."""
-    anime = pd.read_csv(SRC / "anime.csv")
     series = movies[movies["title_type"] == "anime"]
     films = movies[movies["tmdb_id"].isin(film_ids)]
-    known = set(anime["anime_id"])
+    if use_ids and MAP.exists() and sids is not None:      # another ratings file in the same format: only the id map applies
+        anime, known = None, set(sids)
+    else:
+        anime = pd.read_csv(SRC / "anime.csv")
+        known = set(anime["anime_id"])
     if use_ids and MAP.exists():
         # The reviewed id map (built by the anime-data kit: TMDB and IMDb ids, seasons/OVAs/specials merged into their
         # series) is the one matching path when it is there; the code below is only the fallback without it.

@@ -84,6 +84,7 @@ class Catalog:
     kind: np.ndarray | None = None   # 'movie', 'series' or 'anime' per film (all 'movie' when not given)
     series_sim: sp.csr_matrix | None = None   # learned series-to-series similarity (n x n, mostly empty), see kind_rank
     gemini_sim: sp.csr_matrix | None = None   # series and anime that Google Gemini names as similar (n x n), see ai_graph.py
+    anime_sim: sp.csr_matrix | None = None    # the anime model: row i = the votes anime i gives to other anime (series and films), see anime_order
 
     def __post_init__(self):
         if self.kind is None:
@@ -274,7 +275,50 @@ class OnlineEngine:
         if len(rows) and kind != "anime":      # anime are all Japanese: a language lift means nothing there, and must not stand in for anime interest
             score = np.maximum(score, self.language_floor(st, rows, score))
         order = np.argsort(-score, kind="stable")
-        return rows[order], score[order].astype(float)
+        rows, score = rows[order], score[order].astype(float)
+        if kind == "anime":       # anime the anime model knows are re-ordered inside the places they hold; the scores stay with the places
+            rows = np.asarray(self.anime_order(st, rows.tolist()), dtype=rows.dtype)
+        return rows, score
+
+    def anime_scores(self, st: UserState) -> np.ndarray | None:
+        """The anime model's score of every catalog row for this person (pipeline/anime_model.py, learned from real anime
+        lists, series and films together): the sum of the votes of the anime they rated 7+ (weight 0.6..1), liked or
+        picked (1). None when there is no model or they liked no anime it knows. Watched and My List are not taste."""
+        sim = self.cat.anime_sim
+        if sim is None:
+            return None
+        weight = {r: 0.6 + 0.4 * (min(v, 10) - 7) / 3 for r, v in st.ratings.items() if v >= 7}
+        weight.update({r: 1.0 for r in st.likes | st.picks})
+        liked = [r for r in weight if sim.indptr[r + 1] > sim.indptr[r]]
+        if not liked:
+            return None
+        v = sp.csr_matrix(([weight[r] for r in liked], ([0] * len(liked), liked)), shape=(1, self.cat.n))
+        return np.asarray((v @ sim).todense()).ravel()
+
+    def anime_known(self) -> np.ndarray:
+        """Which catalog rows the anime model knows (it gives or gets a vote)."""
+        known = self.cat.__dict__.get("_anime_known")
+        if known is None:
+            sim = self.cat.anime_sim
+            known = (np.diff(sim.indptr) > 0) | (np.bincount(sim.indices, minlength=self.cat.n) > 0)
+            self.cat.__dict__["_anime_known"] = known
+        return known
+
+    def anime_order(self, st: UserState, rows: list[int]) -> list[int]:
+        """`rows` (an anime list, best first) with the anime the model knows re-ordered by the model, inside the places
+        they already hold. Anime it does not know (most titles from 2018 on) do not move, so the share of new and old
+        anime on screen is unchanged; equal model scores keep their earlier order. Unchanged without a model or
+        without a liked anime it knows. Measured offline in pipeline/anime_rank_eval.py."""
+        s = self.anime_scores(st)
+        if s is None:
+            return rows
+        known = self.anime_known()
+        slots = [i for i, r in enumerate(rows) if known[r]]
+        ranked = sorted((rows[i] for i in slots), key=lambda r: -s[r])       # stable: ties keep today's order
+        out = list(rows)
+        for i, r in zip(slots, ranked):
+            out[i] = r
+        return out
 
     def engaged_rows(self, st: UserState) -> set[int]:
         """Titles the person has shown they like: rated 7+, liked, picked in onboarding or saved to My List."""

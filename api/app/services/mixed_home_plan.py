@@ -94,7 +94,10 @@ def mix(engine, st, plan: dict, skip: set[int], stale: set[int] | None = None, l
         """A film lane from the film hybrid's own scores (rail_scores), best first, for the rows of one taxonomy lane."""
         cand = [r for r in range(len(lane_of)) if lane_of[r] == name and r not in skip and r not in acted and np.isfinite(rail[r])]
         cand.sort(key=lambda r: -float(rail[r]))
-        return fresh_first([(r, float(rail[r])) for r in cand[:POOL]])
+        scores = [float(rail[r]) for r in cand]
+        if name == "anime_film":       # the anime model re-orders the anime films it knows inside their places; scores stay with the places
+            cand = engine.anime_order(st, cand)
+        return fresh_first(list(zip(cand, scores))[:POOL])
 
     # Each film belongs to exactly ONE lane, so how it is presented never depends on which list happened to win it: films of
     # an active anime or film lane leave the base film list and are shown by their own lane.
