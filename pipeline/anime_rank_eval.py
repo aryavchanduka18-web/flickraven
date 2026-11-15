@@ -115,6 +115,8 @@ def main() -> None:
     ap.add_argument("--fetch", action="store_true", help="fetch missing TMDB alternative titles of anime films")
     ap.add_argument("--ratings", help="another ratings file in the same format (user_id, anime_id, rating); default data/raw/anime/rating.csv")
     ap.add_argument("--out", help="output folder; default work/anime-rank-eval")
+    ap.add_argument("--restrict-ratings", help="common-catalogue check: only titles that also have ratings in this file "
+                    "(for example data/raw/anime/rating.csv, the 2017 lists) may be re-ordered; the rest keep their places")
     a = ap.parse_args()
     global OUT
     OUT = (ROOT / a.out) if a.out else OUT
@@ -162,6 +164,11 @@ def main() -> None:
     col_of_sid = {int(sid): col_of_row[int(r)] for sid, r in zip(m["sid"], m["row"])}
     n_items = len(rows_of_col)
     known = set(col_of_row)
+    if a.restrict_ratings:
+        other = set(pd.read_csv(a.restrict_ratings, usecols=["anime_id"])["anime_id"].unique())
+        keep_rows = {int(r) for sid, r in zip(m["sid"], m["row"]) if int(sid) in other}
+        known &= keep_rows
+        log.info("common catalogue: %d of %d titles also have ratings in %s", len(known), len(col_of_row), a.restrict_ratings)
     xt = am.matrix(pairs, col_of_sid, n_items, drop_uids=held)
     log.info("training matrix %s, %d entries", xt.shape, xt.nnz)
     models = {}
@@ -183,7 +190,9 @@ def main() -> None:
     served = {}
     for name, sm in am.fit(xt).items():
         coo = sm.tocoo()
-        served[name] = sp.csr_matrix((coo.data, (rows_of_col[coo.row], rows_of_col[coo.col])), shape=(cat.n, cat.n), dtype=np.float32)
+        keep = np.array([int(rows_of_col[i]) in known and int(rows_of_col[j]) in known for i, j in zip(coo.row, coo.col)], dtype=bool)
+        served[name] = sp.csr_matrix((coo.data[keep], (rows_of_col[coo.row[keep]], rows_of_col[coo.col[keep]])),
+                                     shape=(cat.n, cat.n), dtype=np.float32)
     engine.cat.anime_sim = None                  # "today" is measured without the model; "served" switches it on per call
     log.info("models ready (%.0fs)", time.time() - t0)
 
@@ -218,11 +227,14 @@ def main() -> None:
 
     names_full = list(models)
 
+    skipped = []
+
     def evaluate(sample, seed):
         rng = np.random.default_rng(seed)
         res = {"series": {}, "films": {}}
         for n_done, (uid, rated, watched) in enumerate(sample):
             if not any(v >= a.like for v in rated.values()):
+                skipped.append(uid)
                 continue
             full, hide, five, fifteen = split(rated, rng, a.like)
             for scen, prof in (("full", full), ("light15", fifteen), ("light5", five)):
@@ -282,7 +294,8 @@ def main() -> None:
     meta = {"eligible_users": n_ok, "val_users": len(val), "test_users": len(test), "train_matrix": list(xt.shape),
             "matched_series": int(is_series.sum()), "matched_films": int((~is_series).sum()),
             "catalog_anime_series": len(series_rows), "catalog_anime_films": len(film_rows),
-            "old_matched_series": len(old), "seconds": round(time.time() - t0)}
+            "old_matched_series": len(old), "like": a.like, "users_without_a_target_skipped_val_plus_test": len(skipped),
+            "reorderable_titles": len(known), "restrict_ratings": a.restrict_ratings, "seconds": round(time.time() - t0)}
     write_json(OUT / "test.json", {"meta": meta, "results": t})
     log.info("done: %s", meta)
 
