@@ -99,9 +99,22 @@ Best settings per profile, NDCG@10 test: series today 0.147 / 0.170 / 0.152 (ful
 worse than plain popularity (about 0.19). It carried 30% to 70% of today's anime score, which is the main reason
 today's ranking is weak.
 
-## Common catalogue
+## Ranking versus coverage (common catalogue)
 
-PENDING
+Same 2023 model, users and hidden titles, but it may only re-order the 1,043 titles (of 1,697) that the 2017 lists also
+know; everything else keeps today's places. Served NDCG@10, full 2023 set vs common set (today unchanged):
+
+| List | Profile | Today | Common only | Full 2023 | Share of the gain kept |
+|---|---|---|---|---|---|
+| Series | full | 0.137 | 0.372 | 0.394 | 91% |
+| Series | light15 | 0.149 | 0.300 | 0.313 | 92% |
+| Series | light5 | 0.138 | 0.244 | 0.259 | 88% |
+| Films | full | 0.170 | 0.498 | 0.519 | 94% |
+| Films | light15 | 0.116 | 0.352 | 0.375 | 91% |
+| Films | light5 | 0.060 | 0.151 | 0.262 | 45% |
+
+So about 90% of the gain is better ordering of titles both datasets know; the extra 2023 titles add the rest, and
+matter most for anime films with short profiles (7.2 of today's top 10 films are outside the common set there).
 
 ## Real FlickRaven users per tier (live database, read-only count, 2026-11-15)
 
