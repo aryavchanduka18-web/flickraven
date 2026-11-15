@@ -25,6 +25,10 @@ def engine(c, content_scores=None):
     e.engaged_rows = lambda st: OnlineEngine.engaged_rows(e, st)
     e.language_floor = lambda st, rows, base: OnlineEngine.language_floor(e, st, rows, base)
     e.anime_interest = lambda st: OnlineEngine.anime_interest(e, st)
+    e.anime_scores = lambda st: OnlineEngine.anime_scores(e, st)
+    e.anime_liked = lambda st: OnlineEngine.anime_liked(e, st)
+    e.anime_known = lambda: OnlineEngine.anime_known(e)
+    e.anime_order = lambda st, rows: OnlineEngine.anime_order(e, st, rows)
     return e
 
 
@@ -159,3 +163,107 @@ def test_japanese_language_choice_is_not_anime_interest_and_does_not_reorder_ani
     assert OnlineEngine.kind_rank(e, st, "anime")[0].tolist() == OnlineEngine.kind_rank(e, UserState(), "anime")[0].tolist()
     assert OnlineEngine.anime_interest(e, UserState(likes={3})) == 0       # a liked Japanese live-action series
     assert OnlineEngine.anime_interest(e, UserState(likes={1})) == 1
+
+
+# ------------------------------------------------------------------ the anime model (series and films, learned from real lists)
+def anime_cat():
+    #          0        1        2        3        4        5 (new anime, unknown to the model)   6 anime film
+    c = cat(["movie", "anime", "anime", "anime", "anime", "anime", "movie"], [9.0, 5.0, 8.0, 7.0, 6.0, 9.5, 6.0])
+    sim = sp.lil_matrix((7, 7), dtype=np.float32)
+    sim[1, 4], sim[1, 3], sim[1, 6] = 0.9, 0.2, 0.5            # people who liked anime 1 liked 4 most, then film 6, then 3
+    sim[2, 3] = 0.1
+    c.anime_sim = {"long": sim.tocsr(), "mid": sim.tocsr(), "short": sim.tocsr()}
+    return c
+
+
+def test_anime_model_reorders_known_anime_inside_their_places_and_leaves_unknown_ones():
+    e = engine(anime_cat())
+    before, s0 = OnlineEngine.kind_rank(e, UserState(), "anime")              # nothing liked: the earlier order
+    assert before.tolist() == [5, 2, 4, 3, 1]
+    rows, s1 = OnlineEngine.kind_rank(e, UserState(likes={1}), "anime")
+    assert rows.tolist() == [5, 4, 3, 2]            # 5 (unknown to the model) keeps first place; 4 > 3 > 2 by the model
+    assert list(s1) == sorted(s1, reverse=True)     # scores stay with the places
+
+
+def test_anime_model_is_ignored_without_a_file_or_without_a_liked_anime_it_knows():
+    c = anime_cat()
+    e = engine(c)
+    assert OnlineEngine.anime_order(e, UserState(likes={5}), [2, 3, 4]) == [2, 3, 4]      # liked anime unknown to the model
+    assert OnlineEngine.anime_order(e, UserState(ratings={1: 6.0}), [2, 3, 4]) == [2, 3, 4]   # rated under 7: not a like
+    assert OnlineEngine.anime_order(e, UserState(watched={1}, in_list={1}), [2, 3, 4]) == [2, 3, 4]   # watched / saved: not taste
+    c.anime_sim = None
+    assert OnlineEngine.anime_order(e, UserState(likes={1}), [2, 3, 4]) == [2, 3, 4]
+
+
+def test_anime_model_orders_anime_films_too_and_ties_keep_their_order():
+    e = engine(anime_cat())
+    assert OnlineEngine.anime_order(e, UserState(ratings={1: 9.0}), [0, 3, 6, 2]) == [0, 6, 3, 2]   # row 0 unknown: stays; 6 > 3 > 2
+    assert OnlineEngine.anime_order(e, UserState(likes={2}), [4, 6, 3]) == [3, 4, 6]               # 4 and 6 tie at zero: order kept
+
+
+def test_anime_model_tier_follows_the_number_of_liked_anime_it_knows():
+    from cinematch_engine import online
+    c = anime_cat()
+    n = 7
+    big = sp.lil_matrix((n, n), dtype=np.float32)
+    big[1, 3] = 1.0                               # "long" prefers 3 over 4
+    big[1, 4] = 0.5
+    mid = sp.lil_matrix((n, n), dtype=np.float32)
+    mid[1, 4] = 1.0                               # "mid" prefers 4 over 3
+    mid[1, 3] = 0.5
+    short = sp.lil_matrix((n, n), dtype=np.float32)
+    short[1, 4] = 1.0                             # "short" prefers 4 over 3 as well
+    short[1, 3] = 0.2
+    c.anime_sim = {"long": big.tocsr(), "mid": mid.tocsr(), "short": short.tocsr()}
+    e = engine(c)
+    st = UserState(likes={1})
+    assert OnlineEngine.anime_scores(e, st)[0] == "short"
+    assert OnlineEngine.anime_order(e, st, [3, 4]) == [4, 3]
+    old = online.ANIME_SHORT_MAX, online.ANIME_MID_MAX
+    try:
+        online.ANIME_SHORT_MAX, online.ANIME_MID_MAX = 0, 0       # one liked anime now counts as a long list
+        assert OnlineEngine.anime_scores(e, st)[0] == "long"
+        assert OnlineEngine.anime_order(e, st, [4, 3]) == [3, 4]
+    finally:
+        online.ANIME_SHORT_MAX, online.ANIME_MID_MAX = old
+
+
+def test_anime_model_tier_is_deterministic_and_follows_the_current_ratings():
+    from cinematch_engine import online
+    c = anime_cat()
+    e = engine(c)
+    st = UserState(ratings={1: 9.0, 2: 8.0})
+    first = OnlineEngine.anime_order(e, st, [3, 4, 6])
+    assert all(OnlineEngine.anime_order(e, st, [3, 4, 6]) == first for _ in range(5))       # same state, same order
+    old = online.ANIME_SHORT_MAX
+    try:
+        online.ANIME_SHORT_MAX = 1                                  # 2 liked anime -> "mid"; delete one rating -> "short"
+        assert OnlineEngine.anime_scores(e, st)[0] == "mid"
+        del st.ratings[2]
+        assert OnlineEngine.anime_scores(e, st)[0] == "short"
+        st.likes.add(1)                                             # liking the same title again counts it once
+        assert OnlineEngine.anime_scores(e, st)[0] == "short"
+    finally:
+        online.ANIME_SHORT_MAX = old
+
+
+def test_the_real_user_tier_count_uses_the_engines_own_tier():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from pipeline.anime_tier_counts import tier_of
+    from cinematch_engine import anime_model_file
+    n = 40
+    sim = sp.lil_matrix((n, n), dtype=np.float32)
+    for i in range(30):
+        sim[i, i + 1] = 0.5                                      # rows 0..29 vote; 30..39 only get votes or nothing
+    c = cat(["anime"] * n, [5.0] * n)
+    c.anime_sim = {"long": sim.tocsr(), "mid": sim.tocsr(), "short": sim.tocsr()}
+    e = engine(c)
+    for st in (UserState(), UserState(likes={35}), UserState(ratings={0: 9.0, 1: 6.0}, likes={0}),
+               UserState(likes=set(range(0, 8)), watched={9}), UserState(likes=set(range(0, 9))),
+               UserState(ratings={r: 8.0 for r in range(25)}, picks={39}), UserState(ratings={r: 8.0 for r in range(30)})):
+        got = OnlineEngine.anime_scores(e, st)
+        n_known = len(anime_model_file.known_inputs(c.anime_sim, OnlineEngine.anime_liked(None, st)))
+        want = "none 0" if got is None else {"short": "short 1-7", "mid": "mid 8-24", "long": "long 25+"}[got[0]]
+        assert tier_of(n_known) == want

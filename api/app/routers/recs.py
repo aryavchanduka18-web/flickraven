@@ -240,6 +240,7 @@ def anime_page(user=Depends(current_user), db: Session = Depends(get_db)) -> dic
     film_rows = [r for r in np.nonzero(np.isfinite(rail))[0]
                  if cat.kind[r] == "movie" and ar.is_anime_film(list(cat.genres[r]), cat.language[r])]
     film_rows.sort(key=lambda r: (-float(rail[r]), int(r)))
+    film_rows = engine.anime_order(st, [int(r) for r in film_rows])     # anime films the anime model knows, in its order
     films = [title(r, "film") for r in film_rows if int(cat.movie_ids[r]) not in skip]
 
     # "Because you liked X": the anime (series or film) this person liked or rated highest, and the anime most like it.

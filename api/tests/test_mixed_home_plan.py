@@ -18,6 +18,7 @@ def engine(anime_fan: bool):
     e.engaged_rows = lambda st: set(st.liked)
     e.excluded = lambda st: np.array(sorted(set(st.liked) | set(st.ratings)), dtype=np.int64)
     e.kind_rank = lambda st, fmt: (np.arange(N_MOVIE, N_MOVIE + N_ANIME), np.linspace(0.95, 0.2, N_ANIME)) if fmt == "anime" else (np.array([], dtype=int), np.array([]))
+    e.anime_order = lambda st, rows: list(rows)          # no anime model in these tests
     return e
 
 
@@ -112,6 +113,7 @@ def lane_engine():
     e.excluded = lambda st: np.array(sorted(set(st.liked) | set(st.ratings)), dtype=np.int64)
     ks = [r for r in range(len(kinds)) if kinds[r] == "series"]
     e.kind_rank = lambda st, fmt: (np.array(ks), np.linspace(0.95, 0.2, len(ks))) if fmt == "series" else (np.array([], dtype=int), np.array([]))
+    e.anime_order = lambda st, rows: list(rows)
     return e, {"ko": range(60, 75), "en_series": range(75, 90), "hi_series": range(90, 105), "hi_film": range(40, 50), "fr_film": range(50, 60)}
 
 
@@ -236,3 +238,12 @@ def test_lift_adds_anime_series_when_the_mix_gave_one(monkeypatch):
     out = mh.mix(engine(True), state(20), plan(), set())
     assert sum(1 for e in out["hero"] if e.get("format") == "anime") == 3
     assert [e["row"] for e in out["hero"]][:2] == [0, 1]                    # the best films keep their places
+
+
+def test_the_anime_model_orders_the_anime_film_lane_and_scores_stay_with_the_places():
+    e = engine(True)
+    e.anime_order = lambda st, rows: [r for r in rows if r == 39] + [r for r in rows if r != 39]     # the model likes film 39 most
+    out = mh.mix(e, state(20), plan(), set())
+    films = [x["row"] for x in out["hero"] + [{"row": r} for r in next(r for r in out["rails"] if r["key"] == "top_picks")["rows"]]
+             if x["row"] in ANIME_FILMS]
+    assert films and films[0] == 39

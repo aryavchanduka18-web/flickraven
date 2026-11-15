@@ -183,6 +183,9 @@ def test_mixed_home_can_be_switched_on_and_off_per_request_setting(home_client, 
         def kind_rank(self, st, fmt):
             return (np.arange(30, 40), np.linspace(0.95, 0.2, 10)) if fmt == "anime" else (np.array([], dtype=int), np.array([]))
 
+        def anime_order(self, st, rows):      # no anime model in this test
+            return list(rows)
+
     class FanState(HomeState):
         liked = list(range(30, 38))
         dislikes = set()

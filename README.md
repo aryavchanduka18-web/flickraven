@@ -35,6 +35,8 @@ Not available (no email service): email verification and password reset.
 
 Other folders: `notebooks/` (experiments), `data/` and `artifacts/` (big local files, not in git), `docs/viva/` (viva notes).
 
+**Anime model (2026-11-15, under review).** Anime series and films are re-ordered by one model learned from real anime lists, for people who like anime it knows; offline it roughly doubles to triples NDCG@10 over the old anime ranking on held-out list users (`docs/anime-model-eval.md`). Everyone else, and the site without the model file, keeps the old order.
+
 **Honest result.** On the offline test the hybrid (NDCG@10 0.163) and Implicit ALS (0.157) have overlapping 95% intervals: the hybrid is not shown to be more accurate than ALS. It adds cold-start handling, explanations, diversity control, films without MovieLens data and a long-tail channel.
 
 ## What you need installed (once)

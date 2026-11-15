@@ -12,6 +12,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 
+from cinematch_engine import anime_model_file
 from cinematch_engine.availability import AvailabilityMap, renormalized
 from cinematch_engine.blend import candidate_pool, contributions
 from cinematch_engine.config import event_weights
@@ -52,6 +53,9 @@ PERSISTENT_LANGUAGE_RERANK_BOOST = 0.24
 # MovieLens users, NDCG@10 vs the old probability map): cold 2 ratings +0.010, 5 onboarding picks +0.029, warming +0.001 with no
 # cap. Established: no cap -0.029 (34% of Top Picks without MovieLens factors), 0.999 -0.011, 0.997 +0.001 (1.7%), 0.99 +0.003
 # but none at all. 0.997 keeps them in reach without letting content-only scores crowd out what ALS knows.
+# Anime model tiers by the number of liked anime it knows (pipeline/anime_rank_eval.py, 2026-11-15): up to 7 = "short"
+# (high-regularised EASE + cosine neighbours), 8 to 24 = "mid" (high-regularised EASE), 25+ = "long" (low-regularised EASE).
+ANIME_SHORT_MAX, ANIME_MID_MAX = 7, 24
 UNAVAILABLE_QUANTILE_CAP = {"cold": 1.0, "warming": 1.0, "established": 0.997}
 
 
@@ -129,6 +133,7 @@ class Catalog:
     kind: np.ndarray | None = None   # 'movie', 'series' or 'anime' per film (all 'movie' when not given)
     series_sim: sp.csr_matrix | None = None   # learned series-to-series similarity (n x n, mostly empty), see kind_rank
     gemini_sim: sp.csr_matrix | None = None   # series and anime that Google Gemini names as similar (n x n), see ai_graph.py
+    anime_sim: dict | None = None             # the anime model {"long", "mid", "short": n x n csr, row i = the votes anime i gives}, see anime_order
 
     def __post_init__(self):
         if self.kind is None:
@@ -354,7 +359,68 @@ class OnlineEngine:
         if len(rows) and kind != "anime":      # anime are all Japanese: a language lift means nothing there, and must not stand in for anime interest
             score = np.maximum(score, self.language_floor(st, rows, score))
         order = np.argsort(-score, kind="stable")
-        return rows[order], score[order].astype(float)
+        rows, score = rows[order], score[order].astype(float)
+        if kind == "anime":       # anime the anime model knows are re-ordered inside the places they hold; the scores stay with the places
+            rows = np.asarray(self.anime_order(st, rows.tolist()), dtype=rows.dtype)
+        return rows, score
+
+    def anime_liked(self, st: UserState) -> dict[int, float]:
+        """The anime model's input: titles rated 7..10 (weight 0.6..1), liked or picked (1). Watched and My List are not taste."""
+        weight = {r: 0.6 + 0.4 * (min(v, 10) - 7) / 3 for r, v in st.ratings.items() if v >= 7}
+        weight.update({r: 1.0 for r in st.likes | st.picks})
+        return weight
+
+    def anime_scores(self, st: UserState) -> tuple[str, dict[str, np.ndarray]] | None:
+        """The anime model's scores of every catalog row for this person (pipeline/anime_model.py, learned from real anime
+        lists, series and films together), as (tier, {model: scores}). The model used depends on how many liked anime it
+        knows (measured in pipeline/anime_rank_eval.py: the low-regularised EASE model is best for long lists, the
+        high-regularised one for about 15 titles, and for about 5 titles that one half and half with cosine neighbours).
+        None when there is no model or no liked anime it knows."""
+        sims = self.cat.anime_sim
+        if not sims:
+            return None
+        weight = self.anime_liked(st)
+        liked = anime_model_file.known_inputs(sims, weight)
+        if not liked:
+            return None
+        tier = "short" if len(liked) <= ANIME_SHORT_MAX else "mid" if len(liked) <= ANIME_MID_MAX else "long"
+        v = sp.csr_matrix(([weight[r] for r in liked], ([0] * len(liked), liked)), shape=(1, self.cat.n))
+        names = ("mid", "short") if tier == "short" else (tier,)
+        return tier, {m: np.asarray((v @ sims[m]).todense()).ravel() for m in names}
+
+    def anime_known(self) -> np.ndarray:
+        """Which catalog rows the anime model knows (they give or get a vote)."""
+        known = self.cat.__dict__.get("_anime_known")
+        if known is None:
+            known = np.zeros(self.cat.n, dtype=bool)
+            for sim in self.cat.anime_sim.values():
+                known |= (np.diff(sim.indptr) > 0) | (np.bincount(sim.indices, minlength=self.cat.n) > 0)
+            self.cat.__dict__["_anime_known"] = known
+        return known
+
+    def anime_order(self, st: UserState, rows: list[int]) -> list[int]:
+        """`rows` (an anime list, best first) with the anime the model knows re-ordered by the model, inside the places
+        they already hold. Anime it does not know (most titles from 2018 on) do not move, so the share of new and old
+        anime on screen is unchanged; equal model scores keep their earlier order. Unchanged without a model or
+        without a liked anime it knows. Measured offline in pipeline/anime_rank_eval.py."""
+        got = self.anime_scores(st)
+        if got is None:
+            return rows
+        tier, sc = got
+        known = self.anime_known()
+        slots = [i for i, r in enumerate(rows) if known[r]]
+        cand = [rows[i] for i in slots]
+        if tier == "short":       # half and half by percentile inside this list
+            from scipy.stats import rankdata
+            pct = lambda v: rankdata(v) / max(len(v), 1)        # tie-aware: equal scores get equal percentiles
+            key = dict(zip(cand, 0.5 * pct(sc["mid"][cand]) + 0.5 * pct(sc["short"][cand]))) if cand else {}
+        else:
+            key = dict(zip(cand, sc[tier][cand]))
+        ranked = sorted(cand, key=lambda r: -key[r])       # stable: ties keep today's order
+        out = list(rows)
+        for i, r in zip(slots, ranked):
+            out[i] = r
+        return out
 
     def engaged_rows(self, st: UserState) -> set[int]:
         """Titles the person has shown they like: rated 7+, liked, picked in onboarding or saved to My List."""

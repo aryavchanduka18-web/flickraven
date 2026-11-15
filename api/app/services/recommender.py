@@ -8,9 +8,11 @@ onboarding, events) and asks the engine. Nothing personal is cached (spec 6.12 f
 import ctypes
 import gc
 import json
+import os
 import logging
 import sys
 import threading
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,7 +24,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from cinematch_engine import ai_graph
+from cinematch_engine import ai_graph, anime_model_file
 from cinematch_engine.availability import AvailabilityMap
 from cinematch_engine.online import Catalog, OnlineEngine, Tuning, UserState
 from cinematch_engine.sources import SourceModels
@@ -73,6 +75,25 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
     n = len(tmdb_ids)
     sim = sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32)
     return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
+
+
+def _anime_model(tmdb_ids: list[int]) -> dict | None:
+    """The anime model (artifacts/models/anime_model.npz, pipeline/anime_model.py: votes between anime series and anime
+    films learned from real anime lists; no users kept) as {"long", "mid", "short": n x n matrix over the catalog rows,
+    row = the anime that votes}. None when the file is missing, unreadable, malformed in any way (engine
+    anime_model_file.parse checks every entry) or switched off (ANIME_MODEL_DISABLED=true): the anime lists then keep
+    the earlier order and the site still starts."""
+    path = MODELS / "anime_model.npz"
+    if os.environ.get("ANIME_MODEL_DISABLED", "").lower() in ("1", "true", "yes") or not path.exists():
+        return None
+    try:
+        return anime_model_file.load(path, tmdb_ids)
+    except (OSError, ValueError, zipfile.BadZipFile) as e:      # BadModelFile is a ValueError
+        log.warning("anime_model.npz not used (%s); anime lists keep the earlier order", e)
+        return None
+    except Exception:                             # a last guard: the anime model must never stop the site from starting
+        log.exception("anime_model.npz not used; anime lists keep the earlier order")
+        return None
 
 
 def _gemini_similarities(movies: pd.DataFrame) -> sp.csr_matrix | None:
@@ -200,7 +221,8 @@ def load_engine(db: Session) -> OnlineEngine:
             part=movies["catalog_part"].to_numpy(), popularity=movies["popularity"].astype(float).to_numpy(),
             votes=movies["votes"].astype(float).to_numpy(), has_award=movies["has_award"].fillna(False).to_numpy(),
             content=content, universe_rows=universe_rows, recent=(movies["catalog_part"] == "C").to_numpy(),
-            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim, gemini_sim=gemini_sim)
+            kind=movies["title_type"].to_numpy(dtype=object), series_sim=series_sim, gemini_sim=gemini_sim,
+            anime_sim=_anime_model(movies["tmdb_id"].tolist()))
         train = sp.load_npz(MODELS / "train_ratings.npz").tocsr()
         uc, ic, sv, al = _settings("user_cf"), _settings("item_cf"), _settings("svd"), _settings("als")
         nb = (f["item_nb_idx"], f["item_nb_vals"])     # read once: every npz access decompresses a new copy
