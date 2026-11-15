@@ -5,15 +5,15 @@ from sqlalchemy.orm import Session
 
 from app.auth import check_password, clear, current_user
 from app.db import get_db
-from cinematch_engine.profile import BEHAVIORAL_EVENTS, stage_of
+from app.services.events import current_behavioral_count
+from cinematch_engine.profile import stage_of
 
 router = APIRouter(tags=["me"])
 
 
 def counts(db: Session, uid: int) -> dict:
     q = lambda sql: db.execute(text(sql), {"u": uid}).scalar()
-    b = q(f"""SELECT count(DISTINCT movie_id) FROM interactions WHERE user_id = :u
-             AND event_type IN ({", ".join(f"'{e}'" for e in sorted(BEHAVIORAL_EVENTS))})""")
+    b = current_behavioral_count(db, uid)
     return {"ratings": q("SELECT count(*) FROM ratings WHERE user_id = :u"),
             "likes": q("SELECT count(*) FROM reactions WHERE user_id = :u AND value = 1"),
             "dislikes": q("SELECT count(*) FROM reactions WHERE user_id = :u AND value = -1"),

@@ -129,7 +129,7 @@ def home_client(test_engine, monkeypatch):
     monkeypatch.setattr(recs_router.rec, "user_state", lambda db, u, e: HomeState())
     monkeypatch.setattr(recs_router, "get_settings", lambda: SimpleNamespace(home_mix_disabled=True, anime_home_mix=True, mixed_home=True, home_lanes="korean_series", imdb_ratings=True))   # these tests are about the plain Home
     monkeypatch.setattr(recs_router.rec, "user_tuning", lambda db, u: None)
-    monkeypatch.setattr(recs_router.rec, "recent_positive_rows", lambda db, u, e: [])
+    monkeypatch.setattr(recs_router.rec, "recent_positive_rows", lambda db, u, e, st=None: [])
     monkeypatch.setattr(recs_router, "agreement_all", lambda e, s, sc: np.full(N, np.nan))
     monkeypatch.setattr(daily, "today", lambda: __import__("datetime").date(2026, 11, 12))
     app.dependency_overrides[current_user] = lambda: {"id": uid, "email": "x@example.com", "display_name": "x", "is_guest": False}

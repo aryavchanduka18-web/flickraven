@@ -29,6 +29,18 @@ LOCAL_LANGUAGES = {"en", "hi", "ta", "te", "ml", "kn", "bn", "mr"}
 # Hindi cold-start short-list backfill: appended films must score at or above this percentile of the pool (see backfill_short_list).
 BACKFILL_PERCENTILE = 90
 
+# A genre the person disliked (in onboarding or with a "wrong genre" dislike) stops being filtered out once their own
+# ratings say otherwise: at least LIFT_MIN_HIGH titles in that genre rated LIFT_HIGH_RATING+ or liked, and more of those
+# than titles in it rated 5 or lower or disliked (2026-11-15, fix brief issue 4). Judgement, not tuned.
+LIFT_MIN_HIGH, LIFT_HIGH_RATING = 3, 8
+# Content taste profile with dislikes (see OnlineEngine._content_scores): "floor" keeps at least this share of the liked
+# weight on features the liked titles carry. "separate" (the old rule) and "proportional" are kept for the offline check.
+CONTENT_NEGATIVE_RULE = "few"
+CONTENT_SHARED_FLOOR = 0.5
+CONTENT_RATIO_SCALE = 1.0
+# "Discover Something Different": at most this share of the row may be in the person's top language, and at most this
+# share may carry one of their two top genres (fix brief issue 2).
+DIFFERENT_MAX_SHARE = 0.3
 # Popularity points (1-10 scale) added to films in the user's onboarding languages, by stage (language_lift).
 LANGUAGE_LIFT = {"cold": 1.2, "warming": 0.6, "established": 0.0}
 # Explicit language preferences persist after onboarding. The candidate lift only helps retrieval;
@@ -41,6 +53,39 @@ PERSISTENT_LANGUAGE_RERANK_BOOST = 0.24
 # cap. Established: no cap -0.029 (34% of Top Picks without MovieLens factors), 0.999 -0.011, 0.997 +0.001 (1.7%), 0.99 +0.003
 # but none at all. 0.997 keeps them in reach without letting content-only scores crowd out what ALS knows.
 UNAVAILABLE_QUANTILE_CAP = {"cold": 1.0, "warming": 1.0, "established": 0.997}
+
+
+def language_floor_order(rows: list[int], language, chosen: list[str], limit: int = 300) -> list[int]:
+    """Movies In Your Languages: every chosen language keeps a floor in the row. Going down the ranked list, a language
+    that has fewer than 1 / (2 x number of chosen languages) of the places so far (rounded down) takes the next place
+    with its own best title; otherwise the best remaining title does. One chosen language: the order is unchanged. (Fix brief issue 3: an
+    anime fan who chose Japanese and English got 0 of 20 Japanese films here once English films scored higher.)"""
+    langs = list(dict.fromkeys(chosen))
+    if len(langs) < 2:
+        return list(rows)
+    share = 1.0 / (2 * len(langs))
+    queues = {l: [r for r in rows if language[r] == l] for l in langs}
+    taken, out, counts = set(), [], {l: 0 for l in langs}
+    pos = {l: 0 for l in langs}
+    rest = iter(rows)
+
+    def next_of(l):
+        q = queues[l]
+        while pos[l] < len(q) and q[pos[l]] in taken:
+            pos[l] += 1
+        return q[pos[l]] if pos[l] < len(q) else None
+
+    while len(out) < min(len(rows), limit):
+        need = [l for l in langs if counts[l] < int(share * (len(out) + 1)) and next_of(l) is not None]
+        if need:
+            r = next_of(min(need, key=lambda l: counts[l]))
+        else:
+            r = next(x for x in rest if x not in taken)
+        taken.add(r)
+        out.append(r)
+        if language[r] in counts:
+            counts[language[r]] += 1
+    return out
 
 
 @dataclass
@@ -113,6 +158,7 @@ class UserState:
     liked_genres: list[str] = field(default_factory=list)
     disliked_genres: list[str] = field(default_factory=list)
     recent_views: list[int] = field(default_factory=list)       # newest first, last 14 days
+    lifted_genres: list[str] = field(default_factory=list)      # disliked genres that the person's own ratings overrule
 
     @property
     def stage(self) -> str:
@@ -165,8 +211,13 @@ class OnlineEngine:
     def implicit_strength(self, st: UserState) -> dict[int, float]:
         w: dict[int, float] = {}
         # Each kind of event counts once per title: opening the same page ten times is not ten times the interest.
+        # A strong action counts only while it still stands (2026-11-15, fix brief issue 1): a like that was cleared, a
+        # save that was removed or a watched mark that was taken back no longer shapes the profile. The interactions
+        # log keeps every event for analysis; taste comes from the current state.
+        standing = {"like": st.likes, "dislike": st.dislikes, "list_add": st.in_list, "watched": st.watched}
         for kind, row in dict.fromkeys(st.events):
-            if kind in self.event_weights and kind != "rate" and kind not in WEAK_EVENTS:
+            if kind in self.event_weights and kind != "rate" and kind not in WEAK_EVENTS and kind in standing \
+                    and row in standing[kind]:
                 w[row] = w.get(row, 0.0) + self.event_weights[kind]
         # A rating is the confirmed tier: 7+ adds interest (as in offline training, sources.Profiles.implicit); anything
         # lower means "not for me" and the title is no ALS positive at all, even if it was saved or marked watched.
@@ -179,6 +230,41 @@ class OnlineEngine:
             w[row] = max(w.get(row, 0.0), 4.0)
         return {r: v for r, v in w.items() if v > 0 and r not in st.dislikes}
 
+    def _content_scores(self, liked: list[tuple[int, float]], disliked: list[tuple[int, float]]) -> np.ndarray:
+        """Content score of every title: cosine with the taste profile L - k*D, where L is the weighted average of the liked
+        titles and D of the disliked ones (each averaged on its own).
+
+        Few dislikes among many likes (2026-11-15, fix brief issue 3): D used to count as much as L however few titles it
+        came from, so two 1/10 ratings on Japanese animated films outweighed five 9-10 ratings on Japanese animated films
+        and turned "Japanese" and "animation" negative for the whole profile. With 3 or fewer dislikes, k is the share of
+        disliked to liked titles (2 of 7 gives 0.29): the disliked titles still push away their own franchise and close
+        neighbours, but they no longer cancel the shared taste. With more dislikes, or none, nothing changes.
+        Measured offline on 300 MovieLens test users: established profiles 0.1061 -> 0.1062 NDCG@10; the 5-high-2-low slice
+        0.0359 -> 0.0310 (the behaviour change asked for). Other rules tried: "proportional", "floor", "ratio" (all cost
+        more on established users, see docs/decisions-log.md)."""
+        cat = self.cat
+
+        def average(group):
+            rows, w = zip(*group)
+            w = np.asarray(w, dtype=np.float32) / np.sum(w)
+            return np.asarray((sp.csr_matrix(w[None, :]) @ cat.content[list(rows)]).todense()).ravel()
+
+        L = average(liked) if liked else np.zeros(cat.content.shape[1], dtype=np.float32)
+        D = average(disliked) if disliked else np.zeros_like(L)
+        rule = CONTENT_NEGATIVE_RULE
+        if not disliked or rule == "separate":
+            p = L - D
+        elif rule == "few":
+            p = L - (min(1.0, len(disliked) / max(len(liked), 1) * CONTENT_RATIO_SCALE) if len(disliked) <= 3 else 1.0) * D
+        elif rule == "ratio":
+            p = L - min(1.0, len(disliked) / max(len(liked), 1) * CONTENT_RATIO_SCALE) * D
+        elif rule == "proportional":
+            wl, wd = sum(w for _, w in liked), sum(w for _, w in disliked)
+            p = (wl * L - wd * D) / (wl + wd)
+        else:
+            p = np.where(L > 0, np.maximum(L - D, CONTENT_SHARED_FLOOR * L), -D)
+        return np.asarray(cat.content @ p.astype(np.float32)).ravel().astype(np.float32)
+
     def scores(self, st: UserState) -> dict[str, np.ndarray]:
         n, cat = self.cat.n, self.cat
         out = {s: np.full(n, -np.inf, dtype=np.float32) for s in SOURCES}
@@ -190,13 +276,7 @@ class OnlineEngine:
         liked = [(r, v - 6) for r, v in content_r.items() if v >= 7]
         disliked = [(r, 6 - v) for r, v in content_r.items() if v <= 5]
         if liked or disliked:
-            p = sp.csr_matrix((1, cat.content.shape[1]), dtype=np.float32)
-            for group, sign in ((liked, 1.0), (disliked, -1.0)):
-                if group:
-                    rows, w = zip(*group)
-                    w = np.asarray(w, dtype=np.float32) / np.sum(w)
-                    p = p + sign * sp.csr_matrix(w[None, :]) @ cat.content[list(rows)]
-            out["content"] = np.asarray((cat.content @ p.T).todense()).ravel().astype(np.float32)
+            out["content"] = self._content_scores(liked, disliked)
         # universe models: explicit ratings and implicit strengths on MovieLens films only
         uni = lambda rows: [(cat.universe_of_row[r], r) for r in rows if cat.universe_of_row[r] >= 0]
         n_u = len(cat.universe_rows)
@@ -279,6 +359,26 @@ class OnlineEngine:
     def engaged_rows(self, st: UserState) -> set[int]:
         """Titles the person has shown they like: rated 7+, liked, picked in onboarding or saved to My List."""
         return {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.picks | st.in_list
+
+    def lift_disliked_genres(self, st: UserState) -> UserState:
+        """Explicit ratings outweigh an older genre dislike. A disliked genre is lifted (no longer filtered) while the
+        person has at least LIFT_MIN_HIGH titles in it rated LIFT_HIGH_RATING+ or liked, and more of those than titles
+        in it rated 5 or lower or disliked. It is worked out from the current ratings on every request, so deleting
+        those ratings brings the filter back. The saved preference itself is not changed. Returns `st` (changed in place:
+        the lifted genres move from disliked_genres to lifted_genres)."""
+        if not st.disliked_genres:
+            return st
+        high = {r for r, v in st.ratings.items() if v >= LIFT_HIGH_RATING} | st.likes
+        low = {r for r, v in st.ratings.items() if v <= 5} | st.dislikes
+        lifted = []
+        for g in st.disliked_genres:
+            h = sum(1 for r in high if g in self.cat.genres[r])
+            if h >= LIFT_MIN_HIGH and h > sum(1 for r in low if g in self.cat.genres[r]):
+                lifted.append(g)
+        if lifted:
+            st.lifted_genres = lifted
+            st.disliked_genres = [g for g in st.disliked_genres if g not in lifted]
+        return st
 
     def anime_interest(self, st: UserState) -> int:
         """How many anime the person has shown they like (see engaged_rows). This is separate from language:
@@ -731,11 +831,15 @@ class OnlineEngine:
         used |= {p["row"] for p in hero}
         rails = []
 
-        def take(key, title, rows, source, reason=None, scored=None):
+        def take(key, title, rows, source, reason=None, scored=None, reorder=None):
             rows = [int(r) for r in rows if int(r) not in used and np.isfinite(rail[int(r)])]
             if stale:
                 rows = [r for r in rows if r not in stale] + [r for r in rows if r in stale]
+            pool = rows
             rows = refresh(rows, rail_size, rng) if rng is not None else rows[:rail_size]
+            if reorder is not None:         # a row rule (e.g. a language floor) applied to the final list, refreshed titles first
+                chosen = set(rows)
+                rows = reorder(rows + [r for r in pool if r not in chosen])[:rail_size]
             if len(rows) < min_rail:
                 return
             used.update(rows)
@@ -747,7 +851,10 @@ class OnlineEngine:
             return idx[np.argsort(-rail[idx])]
 
         tp = [p for p in picks[5:] if p["row"] not in used]
-        take("top_picks", "Top Picks For You", [p["row"] for p in tp], "hybrid", scored={p["row"]: p for p in tp})
+        # At cold start the blend leans on popularity (most reasons read "Loved by FlickRaven viewers"), so the row does not
+        # call itself "For You" yet (fix brief, lower-priority note). Same key, same items.
+        take("top_picks", "Popular Picks To Start You Off" if st.stage == "cold" else "Top Picks For You",
+             [p["row"] for p in tp], "hybrid", scored={p["row"]: p for p in tp})
 
         ph = self.phase(st, recent_rows or [], k=60, scores=scores)
         if ph:
@@ -755,8 +862,16 @@ class OnlineEngine:
                  reason={"code": "current_phase", "source": "recent_content", "share": 0, "genre": ph["genre"],
                          "text": "Close to the films you liked in the last three weeks"})
 
-        anchors = [r for r in self._recent_likes(st)][:2]
-        for a in anchors:
+        # Up to 2 "Because You Liked" rows. An anchor in a genre the person still filters out is skipped (its neighbours
+        # would mostly be removed, and the row would promise something the filter takes away), and so is any anchor whose
+        # 20 nearest titles leave fewer than min_rail after the filters: what is left are weak neighbours (fix brief issue 4).
+        bad_genres = set(st.disliked_genres)
+        n_byl = 0
+        for a in self._recent_likes(st)[:6]:
+            if n_byl == 2:
+                break
+            if bad_genres & set(cat.genres[a]):
+                continue
             u = cat.universe_of_row[a]
             if u >= 0:
                 neigh = [int(cat.universe_rows[j]) for j, v in zip(self.nb_idx[u], self.nb_vals[u]) if v > 0]
@@ -766,8 +881,12 @@ class OnlineEngine:
                 sims[a] = -1
                 neigh = np.argsort(-sims)[:60].tolist()
                 src = "content"
+            if sum(1 for r in neigh[:rail_size] if np.isfinite(rail[int(r)])) < min_rail:
+                continue
+            before = len(rails)
             take(f"because_you_liked:{int(cat.movie_ids[a])}", f'Because You Liked "{cat.titles[a]}"', neigh, src,
                  reason={"code": "because_you_liked", "anchor_movie_id": int(cat.movie_ids[a])})
+            n_byl += len(rails) > before
 
         acted = set(self.excluded(st).tolist()) | st.in_list   # rated, liked, disliked, watched, picked or saved
         cont = [r for r in st.recent_views if r not in acted]
@@ -794,7 +913,8 @@ class OnlineEngine:
                 take("people_like_you", "People With Your Taste Loved", idx[np.argsort(-v[idx])], "user_cf")
         langs = st.languages or ["en"]
         in_lang = np.array([l in langs for l in cat.language])
-        take("your_languages", "Movies In Your Languages", ranked(in_lang), "hybrid")
+        take("your_languages", "Movies In Your Languages", ranked(in_lang), "hybrid",
+             reorder=lambda rows: language_floor_order(rows, cat.language, langs))
         gems = (cat.popularity >= 7.5) & (cat.fame_pct < 50)
         rt = np.nan_to_num(cat.runtime, nan=0)
         popcorn = np.array([bool(set(g) & POPCORN_GENRES) for g in cat.genres]) & (rt >= 90) & (rt <= 130) & (cat.popularity >= 6.5)
@@ -820,9 +940,55 @@ class OnlineEngine:
         for add in themed:
             add()
         disc = self.top_picks(st, "discover", k=rail_size + len(used), scores=scores, extra_exclude=used, tuning=tuning)
-        take("different", "Discover Something Different", [p["row"] for p in disc], "discover_mmr",
-             scored={p["row"]: p for p in disc})
+        diff = self.different_rows(st, [p["row"] for p in disc], used, rail, rail_size, rng)
+        take("different", "Discover Something Different", diff, "discover_mmr",
+             reason={"code": "different", "source": "discover_mmr", "share": 0,
+                     "text": "Outside the languages and genres you usually pick"})
         return {"stage": st.stage, "hero": hero, "rails": rails, "rail_scores": rail}
+
+    def taste_top(self, st: UserState) -> tuple[str | None, set[str]]:
+        """The person's top language and two top genres, from the titles they engage with (rated 7+, liked, picked, saved);
+        their onboarding languages and liked genres when there are none yet."""
+        rows = self.engaged_rows(st)
+        langs = [self.cat.language[r] for r in rows if self.cat.language[r]]
+        genres: dict[str, int] = {}
+        for r in rows:
+            for g in self.cat.genres[r]:
+                genres[g] = genres.get(g, 0) + 1
+        top_lang = max(set(langs), key=langs.count) if langs else (st.languages[0] if st.languages else None)
+        top_genres = {g for g, _ in sorted(genres.items(), key=lambda kv: (-kv[1], kv[0]))[:2]} or set(st.liked_genres[:2])
+        return top_lang, top_genres
+
+    def different_rows(self, st: UserState, disc_rows: list[int], used: set[int], rail: np.ndarray, k: int,
+                       rng: np.random.Generator | None = None, min_quality: float = 7.0) -> list[int]:
+        """Discover Something Different: the Discover-mode picks first, then well-rated films (community score
+        min_quality+) by the person's hybrid score, keeping at most DIFFERENT_MAX_SHARE of the row in their top language
+        and at most that share with one of their two top genres (fix brief issue 2: the row was 19 of 20 Japanese
+        animation for an anime fan). Disliked genres, rated titles and titles already on the page never appear (rail is
+        -inf for excluded titles; `used` is the page so far). Returns at most k rows."""
+        cat = self.cat
+        top_lang, top_genres = self.taste_top(st)
+        cap = max(int(DIFFERENT_MAX_SHARE * k), 1)
+        ok = np.isfinite(rail) & (cat.popularity >= min_quality)
+        idx = np.nonzero(ok)[0]
+        more = idx[np.argsort(-rail[idx], kind="stable")].tolist()
+        cands = [int(r) for r in dict.fromkeys([*disc_rows, *more]) if int(r) not in used and np.isfinite(rail[int(r)])]
+        if rng is not None and len(cands) > k:            # a daily draw from the best candidates, the rest behind them
+            head = refresh(cands, 3 * k, rng, pool_mult=2)
+            seen = set(head)
+            cands = head + [r for r in cands if r not in seen]
+        out, n_lang, n_genre = [], 0, 0
+        for r in cands:
+            same_lang = top_lang is not None and cat.language[r] == top_lang
+            same_genre = bool(top_genres & set(cat.genres[r]))
+            if (same_lang and n_lang >= cap) or (same_genre and n_genre >= cap):
+                continue
+            out.append(r)
+            n_lang += same_lang
+            n_genre += same_genre
+            if len(out) == k:
+                break
+        return out
 
     def _recent_likes(self, st: UserState) -> list[int]:
         order = [row for kind, row in reversed(st.events) if kind in ("like", "rate", "onboarding_pick")]

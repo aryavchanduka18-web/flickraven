@@ -9,7 +9,7 @@ import ConfidenceCard, { SOURCE_NAME, type Confidence } from "./ConfidenceCard";
 
 type Explain = {
   movie_id: number; stage: string; behavioral_count: number; onboarding_count: number; logged_interactions: number; match_pct: number | null;
-  shares: Record<string, number>; reasons: Reason[]; weights: Record<string, number>; confidence: Confidence;
+  shares: Record<string, number>; reasons: Reason[]; weights: Record<string, number>; confidence: Confidence; your_rating?: number | null;
 };
 
 const SOURCE = SOURCE_NAME;
@@ -47,6 +47,9 @@ export default function WhyPanel() {
                     <div>Onboarding picks: {q.data.onboarding_count} (not counted toward the stage)</div>
                   </div>
                 </div>
+                {q.data.your_rating != null && (
+                  <p className="rounded-lg bg-white/5 p-3 text-white/85">You rated this {q.data.your_rating}/10, so it is not recommended to you. The blend below shows how your profile scores it.</p>
+                )}
                 {q.data.reasons.length > 0 && (
                   <ul className="space-y-1.5">
                     {q.data.reasons.map((r) => (
