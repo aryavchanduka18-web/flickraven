@@ -121,7 +121,8 @@ matter most for anime films with short profiles (7.2 of today's top 10 films are
 First count (superseded): 42 users; 37 none, 4 short, 0 mid, 1 long. That count treated a title as known when it had
 any rating in the 2023 lists, which is not exactly the engine's rule (a vote in the trained "mid" model, inside the
 catalog). `pipeline/anime_tier_counts.py` now uses the engine's own reader, input and rule against the built model
-file. Recount: PENDING.
+file. Recount (live database, read-only, run by Aryav 2026-11-15 against the review `.npz`): 41 users; 37 none, 3
+short (1 to 7), 0 mid, 1 long (25+). So the model would change anime order for 4 people today.
 
 ## Speed and memory (laptop, 75 list users per size, 2023 models)
 
