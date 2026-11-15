@@ -122,7 +122,9 @@ First count (superseded): 42 users; 37 none, 4 short, 0 mid, 1 long. That count 
 any rating in the 2023 lists, which is not exactly the engine's rule (a vote in the trained "mid" model, inside the
 catalog). `pipeline/anime_tier_counts.py` now uses the engine's own reader, input and rule against the built model
 file. Recount (live database, read-only, run by Aryav 2026-11-15 against the review `.npz`): 41 users; 37 none, 3
-short (1 to 7), 0 mid, 1 long (25+). So the model would change anime order for 4 people today.
+short (1 to 7), 0 mid, 1 long (25+). So the model would change anime order for 4 people today. (A run against the laptop's local
+development database, a separate older copy with 42 users, gave 40 none and 2 long; that only checked that the script
+runs and is not the live figure.)
 
 ## Speed and memory (laptop, 75 list users per size, 2023 models)
 
