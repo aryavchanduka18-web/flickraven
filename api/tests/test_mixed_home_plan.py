@@ -214,3 +214,25 @@ def test_film_lane_gate_boundaries():
     assert not mh.film_lane_gate(10, 20)         # exactly half of their films is not over half
     assert mh.film_lane_gate(11, 20)
     assert not mh.film_lane_gate(0, 0)
+
+
+def test_a_strong_anime_fan_gets_up_to_three_anime_in_the_hero_and_a_casual_one_is_unchanged(monkeypatch):
+    is_anime = lambda e: e.get("format") == "anime"                         # anime series and Japanese animated films
+    rows_of = lambda out: [e["row"] for e in out["hero"]] + next(r for r in out["rails"] if r["key"] == "top_picks")["rows"]
+    strong = mh.mix(engine(True), state(20), plan(), set())                # 20 liked anime, 3 films: share 0.87
+    casual = mh.mix(engine(True), state(4), plan(), set())                 # weight 0.33: no lift
+    monkeypatch.setattr(mh, "hero_target", lambda *a, **k: 0)              # the mix without the lift
+    base_strong = mh.mix(engine(True), state(20), plan(), set())
+    base_casual = mh.mix(engine(True), state(4), plan(), set())
+    assert sum(1 for e in strong["hero"] if is_anime(e)) == 3               # capped at 3, films keep 2
+    assert sum(1 for e in base_strong["hero"] if is_anime(e)) <= 3
+    assert len(rows_of(strong)) == len(set(rows_of(strong)))
+    assert {r for r in rows_of(base_strong) if r < N_MOVIE} <= set(rows_of(strong))   # no film lost, only moved down
+    assert rows_of(casual) == rows_of(base_casual)
+
+
+def test_lift_adds_anime_series_when_the_mix_gave_one(monkeypatch):
+    monkeypatch.setattr(mh, "compose", lambda lanes, w, k, lang, genres: [(r, "movie") for r in range(4)] + [(40, "anime")] + [(r, "movie") for r in range(4, 15)])
+    out = mh.mix(engine(True), state(20), plan(), set())
+    assert sum(1 for e in out["hero"] if e.get("format") == "anime") == 3
+    assert [e["row"] for e in out["hero"]][:2] == [0, 1]                    # the best films keep their places

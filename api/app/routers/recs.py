@@ -97,10 +97,20 @@ def kind_rail(kind: str, limit: int = 24, offset: int = 0, user=Depends(current_
     page = slice(max(offset, 0), max(offset, 0) + min(limit, 60))
     rows, scores = list(rows), list(scores)
     if offset <= 0 and len(rows) > limit:
-        # The first page changes a little every day (a strong core stays) and no language fills the first twelve places.
+        # The first page changes every day: titles shown in the first places of any Home row or the hero on the last 3
+        # days move behind fresh ones (services/freshness.py), only the best fresh title always stays, one of the first five
+        # leads, and no language fills the first twelve places. Same person, same day: same row.
         from cinematch_engine.rerank import refresh, spread_languages
-        keep = refresh(list(zip(rows, scores)), min(limit, 60), daily.rng(user["id"], f"kind:{kind}"))
+        shown = freshness.recently_shown_ids(db, user["id"])
+        seen = {engine.cat.row_of[m] for m in shown if m in engine.cat.row_of} if shown else set()
+        ranked = list(zip(rows, scores))
+        if seen:
+            ranked = [x for x in ranked if int(x[0]) not in seen] + [x for x in ranked if int(x[0]) in seen]
+        day_rng = daily.rng(user["id"], f"kind:{kind}")
+        keep = refresh(ranked, min(limit, 60), day_rng, keep=1)
         keep = spread_languages(keep, [engine.cat.language[r] for r, _ in keep])
+        keep = lead_of_day(keep, day_rng)
+        rows, scores = [r for r, _ in ranked], [s for _, s in ranked]
         picked = {r for r, _ in keep}
         rows, scores = [r for r, _ in keep] + [r for r in rows if r not in picked], [s for _, s in keep] + [s for r, s in zip(rows, scores) if r not in picked]
     extra = {int(engine.cat.movie_ids[r]): {"score": float(s)} for r, s in zip(rows[page], scores[page])}

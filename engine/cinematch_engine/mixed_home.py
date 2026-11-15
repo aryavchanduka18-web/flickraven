@@ -82,3 +82,51 @@ def compose(lanes: dict[str, list[tuple[int, float]]], weights: dict[str, float]
         for g in genres.get(row, [])[:2]:
             count_genre[g] = count_genre.get(g, 0) + 1
     return picked
+
+
+STRONG_FAN_WEIGHT = 0.5   # about 6+ liked anime with few dislikes
+HERO_FORMAT_CAP = 3       # films always keep at least 2 of the 5 hero slides
+
+
+def hero_target(liked_format: int, liked_films: int, weight: float, hero: int = 5, cap: int = HERO_FORMAT_CAP) -> int:
+    """How many hero slides a strong fan of a format (anime) should get: their share of liked titles in that format times
+    the hero size, rounded, at most `cap`. 0 below STRONG_FAN_WEIGHT, so casual fans and film-only people are unchanged.
+    50 liked anime and 10 liked films: 3 of 5. 12 and 12: 3. 6 and 30: 1."""
+    if weight < STRONG_FAN_WEIGHT or liked_format <= 0:
+        return 0
+    share = liked_format / (liked_format + max(liked_films, 0))
+    return min(cap, int(np.floor(hero * share + 0.5)))
+
+
+def lift_in_hero(picked: list[tuple[int, str]], lanes: dict[str, list[tuple[int, float]]], fmts: tuple[str, ...],
+                 target: int, hero: int = 5, floor: float = FLOOR) -> list[tuple[int, str]]:
+    """Make sure the first `hero` places hold at least `target` titles of `fmts`. Candidates are taken in order from the
+    rest of `picked`, then from the lanes themselves, and only above the quality `floor` of their own list (fresh-first
+    order is kept, so stale titles come last). They replace the lowest FILM places in the hero; those films move to the
+    front of the rest, so nothing is lost. Series slides are never displaced. Returns the new list."""
+    head, rest = list(picked[:hero]), list(picked[hero:])
+    need = target - sum(1 for _, f in head if f in fmts)
+    if need <= 0:
+        return list(picked)
+    taken = {r for r, _ in picked}
+    cands = [x for x in rest if x[1] in fmts]
+    extra = []
+    for fmt in fmts:
+        items = lanes.get(fmt, [])
+        n = len(items)
+        extra += [(1.0 - i / n, row, fmt) for i, (row, _) in enumerate(items) if row not in taken and 1.0 - i / n >= floor]
+    cands += [(row, fmt) for _, row, fmt in sorted(extra, key=lambda c: -c[0])]
+    seen, add = set(), []
+    for row, fmt in cands:
+        if row not in seen:
+            seen.add(row)
+            add.append((row, fmt))
+        if len(add) == need:
+            break
+    film_slots = [i for i in range(len(head) - 1, -1, -1) if head[i][1] == "movie"][:len(add)]
+    add = add[:len(film_slots)]
+    displaced = [head[i] for i in film_slots]
+    for i, x in zip(film_slots, add):
+        head[i] = x
+    added = set(add)
+    return head + displaced + [x for x in rest if x not in added]
