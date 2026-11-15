@@ -122,9 +122,25 @@ matter most for anime films with short profiles (7.2 of today's top 10 films are
 today the model reaches 5 people. Small risk, small benefit until more anime fans join; the "short" tier is where new
 anime fans start.
 
-## Speed and memory
+## Speed and memory (laptop, 75 list users per size, 2023 models)
 
-PENDING (memory: about 4 MB resident for the three models).
+| Liked anime | Tier | `anime_order` median | p95 |
+|---|---|---|---|
+| 1 | short | 2.8 ms | 5.9 ms |
+| 5 | short | 3.9 ms | 6.8 ms |
+| 15 | mid | 1.5 ms | 2.1 ms |
+| 60 | long | 1.8 ms | 2.2 ms |
+
+The model's own step costs under 7 ms at p95, against 17 to 645 ms median for the whole `kind_rank` call it sits in.
+The with/without `kind_rank` timings were too noisy to use (warm caches on the second call). Memory: 8.2 MiB for the
+three models together (the earlier 4 MB estimate was for one). Render's limit is 512 MB; the app sat at about 362 MB
+steady after #144.
+
+## Tests
+
+Engine 128 passed, pipeline 120 passed, API 363 passed and 1 skipped on the laptop. Two API tests failed on the first
+run because their stand-in engines had no `anime_order`; fixed in the tests (the real engine always has it). In one of
+them the mixed Home caught the error and served the plain Home, which is the intended safety fallback.
 
 ## Limits
 

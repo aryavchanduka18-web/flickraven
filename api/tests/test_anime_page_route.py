@@ -40,6 +40,9 @@ class Engine:
         s[list(self.seen)] = -np.inf
         return s
 
+    def anime_order(self, st, rows):          # no anime model in this test: the order is kept
+        return list(rows)
+
     def similar(self, row, k=20):
         return [i for i, kd in enumerate(self.cat.kind) if i != row and kd == self.cat.kind[row]][:k]
 
