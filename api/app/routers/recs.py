@@ -25,6 +25,7 @@ from app.services import series_rails as series_rails_service
 from app.services import title_class as tc
 from app.services.confidence import agreement_all, confidence
 from app.services.movies import cards
+from cinematch_engine.rerank import lead_of_day
 from cinematch_engine.tonight import Request as TonightRequest
 
 router = APIRouter(prefix="/recs", tags=["recs"])
@@ -341,6 +342,9 @@ def home(mode: str | None = None, user=Depends(current_user), db: Session = Depe
     skip = {cat.row_of[m] for m in rec_feedback.hidden_titles(db, uid) if m in cat.row_of}
     hidden_rows = rec_feedback.hidden_rows(db, uid)
     hero_entries, skip = rec_feedback.hero_without_hidden(plan, skip)
+    # The first slide changes every day (same all day): one of the hero's strong picks leads, so even someone who opens
+    # Home once a week does not land on the same title. Order only; which titles are in the hero is unchanged.
+    hero_entries = lead_of_day(hero_entries, daily.rng(uid, f"hero-lead:{mode}"))
     hero = scored_items(hero_entries)
     # A separate row of recent films (services/recent_row.py); built last so it never takes a title from another row.
     on_page = {e["row"] for e in hero_entries} | {row for r in plan["rails"] for row in r["rows"]}
