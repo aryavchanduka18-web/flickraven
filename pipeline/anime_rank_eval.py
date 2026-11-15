@@ -94,13 +94,15 @@ def users(pairs, row_of_sid, n, seed, exclude=()):
     return out, len(cand)
 
 
-def split(rated: dict, rng) -> tuple[dict, set, dict]:
-    good = sorted(r for r, v in rated.items() if v >= 7)
+def split(rated: dict, rng, like: float = 7) -> tuple[dict, set, dict, dict]:
+    """(full profile, hidden targets, 5-title profile, 15-title profile). Targets are 20% of the titles rated `like`+;
+    the short profiles are random liked (7+) titles of the rest."""
+    good = sorted(r for r, v in rated.items() if v >= like)
     hide = set(int(x) for x in rng.choice(good, size=max(1, int(round(0.2 * len(good)))), replace=False))
     full = {r: v for r, v in rated.items() if r not in hide}
-    rest_good = [r for r in good if r not in hide]
-    five = set(int(x) for x in rng.choice(rest_good, size=min(5, len(rest_good)), replace=False))
-    return full, hide, {r: full[r] for r in five}
+    rest_good = sorted(r for r, v in full.items() if v >= 7)
+    order = [int(x) for x in rng.permutation(rest_good)]
+    return full, hide, {r: full[r] for r in order[:5]}, {r: full[r] for r in order[:15]}
 
 
 def main() -> None:
@@ -108,7 +110,8 @@ def main() -> None:
     ap.add_argument("--val", type=int, default=500)
     ap.add_argument("--test", type=int, default=1200)
     ap.add_argument("--seed", type=int, default=11)
-    ap.add_argument("--lams", default="300,3000,10000,30000")
+    ap.add_argument("--lams", default="300,3000,30000")
+    ap.add_argument("--like", type=float, default=7, help="a hidden target is a title rated this or higher (8 = stricter check)")
     ap.add_argument("--fetch", action="store_true", help="fetch missing TMDB alternative titles of anime films")
     ap.add_argument("--ratings", help="another ratings file in the same format (user_id, anime_id, rating); default data/raw/anime/rating.csv")
     ap.add_argument("--out", help="output folder; default work/anime-rank-eval")
@@ -165,8 +168,7 @@ def main() -> None:
     for lam in [float(v) for v in a.lams.split(",")]:
         b = am.ease(xt, lam)
         models[f"ease{int(lam)}"] = b
-        for top in (60, 200):
-            models[f"ease{int(lam)}_top{top}"] = am.sparsify(b, top).toarray()
+        models[f"ease{int(lam)}_top200"] = am.sparsify(b, 200).toarray()
     is_series = np.array([int(r) in series_rows for r in rows_of_col])
     # cosine item CF on the new mapping (series + films), for a like-for-like comparison with EASE
     present = (xt > 0).astype(np.float64)
@@ -179,7 +181,6 @@ def main() -> None:
     pop_col = np.asarray((xt > 0).sum(axis=0)).ravel().astype(float)
     log.info("models ready (%.0fs)", time.time() - t0)
 
-    gem = cat.gemini_sim
 
     def candidates(st, base_rows, which):
         """{name: {row: score}} over the known rows of base_rows."""
@@ -191,25 +192,22 @@ def main() -> None:
         content = engine.scores(st)["content"][kr]
         content = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]) if np.isfinite(content).any() else 0)
         fame = cat.fame_pct[kr]
-        g = np.zeros(len(kr))
-        if gem is not None:
-            w = {r: (v - 6) / 4 for r, v in st.ratings.items() if v >= 7}
-            liked = [r for r in w if gem[r].nnz]
-            if liked:
-                vec = sp.csr_matrix(([w[r] for r in liked], ([0] * len(liked), liked)), shape=(1, cat.n))
-                g = np.asarray((vec @ gem[:, kr]).todense()).ravel()
         out = {"popularity_lists": dict(zip(kr, pop_col[cols])), "content": dict(zip(kr, content))}
-        pc, pf, pg = pct(content), pct(fame), pct(g)
+        pf = pct(fame)
         raw = {}
         for name in which:
             sc = u @ models[name][:, cols] if u.any() else np.zeros(len(kr))
             raw[name] = pct(sc + 1e-9 * fame)
             out[name] = dict(zip(kr, sc + 1e-9 * fame))
-        for name in which:                      # the two model families together, and one fame blend for the record
-            if name.startswith("ease"):
-                for we in (0.5, 0.7):
-                    out[f"{name}+cosine|e{we}"] = dict(zip(kr, we * raw[name] + (1 - we) * raw["cosine"]))
-        out["ease3000|m0.85f0.15"] = dict(zip(kr, 0.85 * raw["ease3000"] + 0.15 * pf)) if "ease3000" in raw else out["cosine"]
+        # one model for every profile size: the low-lam model for long profiles, the high-lam one for short ones,
+        # mixed by how many liked anime the model knows (n / T, capped at 1)
+        lams = sorted(int(k[4:-7]) for k in which if k.endswith("_top200"))
+        lo, hi, n_liked = raw[f"ease{lams[0]}_top200"], raw[f"ease{lams[-1]}_top200"], int((u > 0).sum())
+        for t in (15, 30, 60):
+            w = min(1.0, n_liked / t)
+            out[f"adaptive_T{t}"] = dict(zip(kr, w * lo + (1 - w) * hi))
+        out[f"ease{lams[-1]}_top200+cosine|e0.5"] = dict(zip(kr, 0.5 * hi + 0.5 * raw["cosine"]))
+        out[f"ease{lams[0]}|m0.85f0.15"] = dict(zip(kr, 0.85 * raw[f"ease{lams[0]}"] + 0.15 * pf))
         return out
 
     names_full = list(models)
@@ -218,8 +216,10 @@ def main() -> None:
         rng = np.random.default_rng(seed)
         res = {"series": {}, "films": {}}
         for n_done, (uid, rated, watched) in enumerate(sample):
-            full, hide, five = split(rated, rng)
-            for scen, prof in (("full", full), ("light5", five)):
+            if not any(v >= a.like for v in rated.values()):
+                continue
+            full, hide, five, fifteen = split(rated, rng, a.like)
+            for scen, prof in (("full", full), ("light15", fifteen), ("light5", five)):
                 # light5: the rest of the list is excluded (as if watched) so both scenarios rank the same unseen titles
                 seen = set(watched) | (set(full) - set(prof))
                 st = UserState(ratings=dict(prof), watched=seen, behavioral_count=len(prof))
@@ -239,7 +239,7 @@ def main() -> None:
                         rec.setdefault(name, []).append(ndcg(slot_preserving(today, set(sc), sc), tg))
                     kn = [r for r in today if r in known]
                     rec.setdefault("_known_only_today", []).append(ndcg(kn, tg))
-                    for name in ("ease300", "cosine"):
+                    for name in (f"ease{int(float(a.lams.split(',')[0]))}", "cosine"):
                         if name in cands:
                             rec.setdefault(f"_known_only_{name}", []).append(ndcg(sorted(kn, key=lambda r: -cands[name][r]), tg))
                     rec.setdefault("_unknown_in_today_top10", []).append((sum(1 for r in today[:K] if r not in known), 0.0))
