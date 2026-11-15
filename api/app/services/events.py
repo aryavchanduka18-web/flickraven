@@ -5,6 +5,16 @@ from sqlalchemy.orm import Session
 IMPLICIT_EVENTS = {"detail_view", "quick_view", "search_click", "hero_view"}
 
 
+def current_behavioral_count(db: Session, user_id: int) -> int:
+    """The stage counter b (spec 6.1) from what stands now: distinct titles the person has rated, liked, disliked,
+    saved to My List or marked watched. Deleting a rating, clearing a like or removing a save takes that title out
+    again (fix brief issue 1: b used to be counted from the append-only log, so a deleted rating kept counting)."""
+    return db.execute(text("""SELECT count(*) FROM (
+        SELECT movie_id FROM ratings WHERE user_id = :u UNION SELECT movie_id FROM reactions WHERE user_id = :u
+        UNION SELECT movie_id FROM user_movie_list WHERE user_id = :u UNION SELECT movie_id FROM watched WHERE user_id = :u) t"""),
+                      {"u": user_id}).scalar() or 0
+
+
 def log(db: Session, user_id: int, movie_id: int | None, event_type: str, value: float | None = None,
         source: str | None = None, position: int | None = None, origin: str | None = None) -> None:
     """`source` = where the action happened (a row, the film page); `origin` = the row or page that led there."""

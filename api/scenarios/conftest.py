@@ -19,6 +19,16 @@ if not artifacts_ready():
 CREATED: list[int] = []
 
 
+@pytest.fixture(autouse=True)
+def _same_daily_seed_for_everyone(monkeypatch):
+    """Home draws part of each row with a seed made from the user id and the date, and every test creates a new guest, so a
+    scenario that compares two lists could pass or fail depending on the guest's id (test_7 did, 2026-11-15). The seed is
+    pinned to the label alone: the same page for every test user, the same on every run."""
+    import hashlib
+    from app.services import daily
+    monkeypatch.setattr(daily, "seed", lambda user_id, label="", day=None: int(hashlib.sha256(label.encode()).hexdigest()[:12], 16))
+
+
 @pytest.fixture
 def client():
     c = TestClient(app)

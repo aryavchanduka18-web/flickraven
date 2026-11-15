@@ -26,10 +26,10 @@ from sqlalchemy.orm import Session
 from cinematch_engine import ai_graph
 from cinematch_engine.availability import AvailabilityMap
 from cinematch_engine.online import Catalog, OnlineEngine, Tuning, UserState
-from cinematch_engine.profile import BEHAVIORAL_EVENTS
 from cinematch_engine.sources import SourceModels
 
 from app.services import artifact_store
+from app.services.events import current_behavioral_count
 
 log = logging.getLogger(__name__)
 
@@ -275,7 +275,7 @@ def user_state(db: Session, user_id: int, engine: OnlineEngine) -> UserState:
     st.watched = {row_of[m] for (m,) in q("SELECT movie_id FROM watched WHERE user_id = :u") if m in row_of}
     events = q("SELECT event_type, movie_id, created_at FROM interactions WHERE user_id = :u ORDER BY created_at")
     st.events = [(e, row_of[m]) for e, m, _ in events if m in row_of]
-    st.behavioral_count = len({m for e, m, _ in events if e in BEHAVIORAL_EVENTS and m is not None})
+    st.behavioral_count = current_behavioral_count(db, user_id)     # what stands now, not the log (fix brief issue 1)
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     views = [row_of[m] for e, m, t in reversed(events) if e in ("detail_view", "quick_view") and m in row_of and t >= cutoff]
     st.recent_views = list(dict.fromkeys(views))
@@ -286,7 +286,7 @@ def user_state(db: Session, user_id: int, engine: OnlineEngine) -> UserState:
         st.languages = list(pref[0] or [])
         st.liked_genres = [names[g] for g in (pref[1] or []) if g in names]
         st.disliked_genres = [names[g] for g in (pref[2] or []) if g in names]
-    return st
+    return engine.lift_disliked_genres(st)      # the person's own high ratings overrule an older genre dislike (issue 4)
 
 def match_for(db: Session, user_id: int | None, movie_ids: list[int]) -> dict[int, dict]:
     """Match % (and the hybrid score) for each film the engine can score for this user. Films it cannot
@@ -316,11 +316,17 @@ def user_tuning(db: Session, user_id: int) -> Tuning:
     return Tuning(**{k: int(raw[k]) for k in TUNING_KEYS if k in raw})
 
 
-def recent_positive_rows(db: Session, user_id: int, engine: OnlineEngine) -> list[int]:
-    """Films liked, rated 7+, saved or marked watched in the last PHASE_DAYS days, newest first."""
+def recent_positive_rows(db: Session, user_id: int, engine: OnlineEngine, st: UserState | None = None) -> list[int]:
+    """Films liked, rated 7+, saved or marked watched in the last PHASE_DAYS days, newest first. With the person's
+    current state `st`, only titles that are still liked, rated 7+, saved or watched now count: a deleted rating or a
+    cleared like no longer shapes Your Current Phase or its subtitle (fix brief issue 1)."""
     rows = db.execute(text(f"""SELECT movie_id FROM interactions WHERE user_id = :u AND movie_id IS NOT NULL
         AND created_at >= now() - interval '{PHASE_DAYS} days'
         AND (event_type IN ('like', 'list_add', 'watched') OR (event_type = 'rate' AND value >= 7))
         ORDER BY created_at DESC"""), {"u": user_id}).scalars().all()
     row_of = engine.cat.row_of
-    return list(dict.fromkeys(row_of[m] for m in rows if m in row_of))
+    out = list(dict.fromkeys(row_of[m] for m in rows if m in row_of))
+    if st is not None:
+        still = {r for r, v in st.ratings.items() if v >= 7} | st.likes | st.in_list | st.watched
+        out = [r for r in out if r in still]
+    return out

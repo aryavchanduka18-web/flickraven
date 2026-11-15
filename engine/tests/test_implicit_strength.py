@@ -14,14 +14,14 @@ def test_weak_events_are_not_taste():
 
 
 def test_strong_and_confirmed_events_count_once_per_title():
-    once, many = UserState(), UserState()
+    once, many = UserState(in_list={3}), UserState(in_list={3})
     once.events = [("list_add", 3)]
     many.events = [("list_add", 3)] * 5
     assert _engine().implicit_strength(many) == _engine().implicit_strength(once) == {3: 2.0}
 
 
 def test_views_add_nothing_on_top_of_a_strong_action():
-    st = UserState()
+    st = UserState(in_list={3})
     st.events = [("detail_view", 3), ("detail_view", 3), ("list_add", 3)]
     assert _engine().implicit_strength(st) == {3: 2.0}
 
@@ -31,6 +31,7 @@ def test_only_ratings_of_7_or_more_are_interest():
     rating also cancels a save or watched mark on that title."""
     st = UserState()
     st.ratings = {1: 3.0, 2: 6.0, 3: 7.0, 4: 9.0, 5: 4.0}
+    st.in_list = {5}
     st.events = [("list_add", 5)]
     assert _engine().implicit_strength(st) == {3: 2.0, 4: 4.0}
 

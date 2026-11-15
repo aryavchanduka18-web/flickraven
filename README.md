@@ -10,6 +10,8 @@ The site has an Apple TV style: a floating dark-glass sidebar (hide it with the 
 
 An "Ask FlickRaven" chat assistant (Google Gemini; needs `GEMINI_API_KEY`, see `docs/spec.md` 14.2d, 14.2n and 14.2o; no taste data is sent to Google unless the person turns on the opt-in taste summary in Account) answers questions about films and series, and can add the titles it recommends to My List when the person taps + My List or types "add it".
 
+Taste rules worth knowing (2026-11-15): deleting a rating, like or save removes its effect (stage included); explicit high ratings in a genre disliked at onboarding lift that dislike automatically; one or two low ratings demote similar titles without flipping the person's language or genre; Discover Something Different stays outside the usual language and genres. Details in `docs/spec.md` 6.1, 6.4, 6.6 and 7.1.
+
 What a visitor can do: create an account (or browse as a guest), rate, like, dislike (with a reason), tap ✕ "Not interested" on a recommendation (a light hide that is not a dislike), hide a whole Home row (rows you use move up and rows you skip move down; see `docs/spec.md` 14.2p), save to My
 List, tune the recommendations, open "Why?" on any recommendation (what each model contributed, how much the
 models agree), browse franchises ("More from John Wick", "More from Marvel"), cast and crew pages, themed rows
