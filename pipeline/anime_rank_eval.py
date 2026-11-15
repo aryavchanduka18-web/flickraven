@@ -80,16 +80,16 @@ def users(pairs, row_of_sid, n, seed, exclude=()):
     """[(uid, rated {row: score}, watched rows, liked rows)] for list users with 10+ liked matched anime."""
     p = pairs[pairs["sid"].isin(row_of_sid) & ~pairs["uid"].isin(set(exclude))].copy()
     p["row"] = p["sid"].map(row_of_sid)
-    liked = p[p["score"] >= 7].groupby("uid").size()
+    liked = p[p["score"] >= 7].groupby("uid")["row"].nunique()
     cand = sorted(liked[liked >= 10].index)
     rng = np.random.default_rng(seed)
     chosen = rng.choice(cand, size=min(n, len(cand)), replace=False)
     by = p[p["uid"].isin(chosen)].groupby("uid")
     out = []
     for u in chosen:
-        g = by.get_group(u).drop_duplicates("row", keep="last")
+        g = by.get_group(u).sort_values("score").drop_duplicates("row", keep="last")     # seasons of one title: the best score
         rated = {int(r): float(np.clip(round(s), 1, 10)) for r, s in zip(g["row"], g["score"]) if s > 0}
-        watched = {int(r) for r, s, c in zip(g["row"], g["score"], g["completed"]) if s == 0}
+        watched = {int(r) for r, s in zip(g["row"], g["score"]) if s == 0}
         out.append((int(u), rated, watched))
     return out, len(cand)
 
@@ -149,21 +149,23 @@ def main() -> None:
     engine.cat.series_sim = s.maximum(s.T).tocsr()
 
     # candidate models on the new mapping (series + films), fitted without the held-out users
-    items = m["sid"].tolist()
-    rows_of_col = m["row"].to_numpy()
+    rows_of_col = np.array(sorted(set(m["row"])))
     col_of_row = {int(r): i for i, r in enumerate(rows_of_col)}
+    col_of_sid = {int(sid): col_of_row[int(r)] for sid, r in zip(m["sid"], m["row"])}
+    n_items = len(rows_of_col)
     known = set(col_of_row)
-    xt = am.matrix(pairs, items, drop_uids=held)
+    xt = am.matrix(pairs, col_of_sid, n_items, drop_uids=held)
     log.info("training matrix %s, %d entries", xt.shape, xt.nnz)
     models = {}
     for lam in [float(v) for v in a.lams.split(",")]:
         b = am.ease(xt, lam)
         models[f"ease{int(lam)}"] = b
         models[f"ease{int(lam)}_top{am.TOP}"] = am.sparsify(b).toarray()
-    is_series = np.array([m.at[i, "format"] == "series" for i in range(len(m))])
-    xs = am.matrix(pairs, [s_ for s_, f in zip(items, is_series) if f], drop_uids=held)
-    bs = np.zeros((len(items), len(items)))
+    is_series = np.array([int(r) in series_rows for r in rows_of_col])
     idx = np.nonzero(is_series)[0]
+    sub = {int(c): i for i, c in enumerate(idx)}
+    xs = am.matrix(pairs, {sid: sub[c] for sid, c in col_of_sid.items() if c in sub}, len(idx), drop_uids=held)
+    bs = np.zeros((n_items, n_items))
     bs[np.ix_(idx, idx)] = am.ease(xs, am.LAM)
     models["ease_series_only"] = bs
     # cosine item CF on the new mapping (series + films), for a like-for-like comparison with EASE
@@ -185,7 +187,7 @@ def main() -> None:
         if not kr:
             return {}
         cols = np.array([col_of_row[r] for r in kr])
-        u = profile_vector(st, col_of_row, len(items))
+        u = profile_vector(st, col_of_row, n_items)
         content = engine.scores(st)["content"][kr]
         content = np.where(np.isfinite(content), content, np.nanmin(content[np.isfinite(content)]) if np.isfinite(content).any() else 0)
         fame = cat.fame_pct[kr]
@@ -265,7 +267,7 @@ def main() -> None:
     log.info("validation done (%.0fs)", time.time() - t0)
     t = summary(evaluate(test, a.seed + 200))
     meta = {"eligible_users": n_ok, "val_users": len(val), "test_users": len(test), "train_matrix": list(xt.shape),
-            "matched_series": int((m.format == "series").sum()), "matched_films": int((m.format == "film").sum()),
+            "matched_series": int(is_series.sum()), "matched_films": int((~is_series).sum()),
             "catalog_anime_series": len(series_rows), "catalog_anime_films": len(film_rows),
             "old_matched_series": len(old), "seconds": round(time.time() - t0)}
     write_json(OUT / "test.json", {"meta": meta, "results": t})
