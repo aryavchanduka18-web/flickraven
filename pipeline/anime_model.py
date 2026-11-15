@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from pipeline.common import ARTIFACTS, PROCESSED, RAW, get_logger, write_json
+from pipeline.common import PROCESSED, RAW, get_logger, write_json
 from pipeline.drama_cf import norm, weights
 from pipeline.models_io import MODELS
 from pipeline.series import TV_OFFSET
@@ -34,8 +34,13 @@ SERIES_TYPES = ("TV", "ONA")
 MAP = PROCESSED / "anime_model_map.csv"
 FRIBB = SRC / "anime-list-full.json"
 FRIBB_URL = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json"
-LAM = 300.0          # chosen on validation users in pipeline/anime_rank_eval.py
-TOP = 60             # votes kept per anime
+# Chosen on validation users in pipeline/anime_rank_eval.py (2026-11-15, 2017 and 2023 lists): the low-regularised EASE
+# model is best for long lists, the high-regularised one for about 15 liked anime, and for about 5 that one half and
+# half with cosine neighbours. The engine picks by the number of liked anime it knows (ANIME_SHORT_MAX, ANIME_MID_MAX).
+LAM = 300.0          # "long"
+LAM_MID = 30000.0    # "mid" (and half of "short")
+SHRINK = 25.0        # cosine co-count shrinkage ("short"), as pipeline/drama_cf.py
+TOP = 200            # votes kept per anime and model
 
 
 def as_pairs(ratings: pd.DataFrame) -> pd.DataFrame:
@@ -184,26 +189,53 @@ def sparsify(b: np.ndarray, k: int = TOP) -> sp.csr_matrix:
     return sp.csr_matrix((vals, (rows, cols)), shape=b.shape, dtype=np.float32)
 
 
+def cosine(x: sp.csr_matrix, shrink: float = SHRINK) -> np.ndarray:
+    """Item-item cosine of the entry weights, shrunk by how many users have both titles, zero diagonal."""
+    present = (x > 0).astype(np.float64)
+    xn = x @ sp.diags(1 / np.sqrt(np.maximum(np.asarray(x.multiply(x).sum(axis=0)).ravel(), 1e-9)))
+    cos = (xn.T @ xn).toarray()
+    both = (present.T @ present).toarray()
+    cos = cos * both / (both + shrink)
+    np.fill_diagonal(cos, 0)
+    return cos
+
+
+def fit(x: sp.csr_matrix) -> dict[str, sp.csr_matrix]:
+    """The three served models over the columns of x, each with the top TOP votes per title."""
+    return {"long": sparsify(ease(x, LAM)), "mid": sparsify(ease(x, LAM_MID)), "short": sparsify(cosine(x))}
+
+
 def main() -> None:
+    import argparse
     import sys
     from pathlib import Path
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ratings", help="ratings file (user_id, anime_id, rating); default data/raw/anime/rating.csv")
+    ap.add_argument("--out", help="where to write the model (default artifacts/models/anime_model.json, which the site loads)")
+    a = ap.parse_args()
+    out = Path(a.out) if a.out else OUT
+    out.parent.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
     from cinematch_engine import taxonomy
     movies = pd.read_parquet(PROCESSED / "movies_clean.parquet")
     films = {int(r.tmdb_id) for r in movies.itertuples()
              if taxonomy.lane(str(r.title_type), list(r.genres), r.original_language, None) == "anime_film"}
-    m = mapping(movies, films, fetch=True)
-    pairs = as_pairs(pd.read_csv(SRC / "rating.csv"))
+    pairs = as_pairs(pd.read_csv(a.ratings or SRC / "rating.csv"))
+    m = mapping(movies, films, fetch=not a.ratings, sids=set(pairs["sid"].unique()) if a.ratings else None)
     titles = m.drop_duplicates(["format", "tmdb_id"]).reset_index(drop=True)
     col = {(f, t): i for i, (f, t) in enumerate(zip(titles["format"], titles["tmdb_id"]))}
     x = matrix(pairs, {int(sid): col[(f, t)] for sid, f, t in zip(m["sid"], m["format"], m["tmdb_id"])}, len(titles))
-    s = sparsify(ease(x))
     tm = titles["tmdb_id"].tolist()
-    votes = {str(tm[i]): [[tm[j], round(float(v), 5)] for j, v in sorted(zip(s[i].indices, s[i].data), key=lambda t: -t[1])]
-             for i in range(s.shape[0]) if s[i].nnz}
-    write_json(OUT, {"settings": {"method": "ease", "lam": LAM, "top": TOP}, "series": int((titles.format == "series").sum()),
-                     "films": int((titles.format == "film").sum()), "users": int(x.shape[0]), "votes": votes})
-    log.info("wrote anime model: %d anime, %d votes, %d list users (no users kept)", len(votes), s.nnz, x.shape[0])
+    models = {}
+    for name, s in fit(x).items():
+        models[name] = {str(tm[i]): [[tm[j], round(float(v), 6)] for j, v in sorted(zip(s[i].indices, s[i].data), key=lambda t: -t[1])]
+                        for i in range(s.shape[0]) if s[i].nnz}
+    write_json(out, {"settings": {"lam_long": LAM, "lam_mid": LAM_MID, "cosine_shrink": SHRINK, "top": TOP,
+                                  "ratings": str(a.ratings or "data/raw/anime/rating.csv")},
+                     "series": int((titles.format == "series").sum()), "films": int((titles.format == "film").sum()),
+                     "users": int(x.shape[0]), "models": models})
+    log.info("wrote anime model: %d series, %d films, %d list users (no users kept)",
+             int((titles.format == "series").sum()), int((titles.format == "film").sum()), x.shape[0])
 
 
 if __name__ == "__main__":

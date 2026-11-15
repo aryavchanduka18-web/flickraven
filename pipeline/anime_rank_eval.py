@@ -179,6 +179,12 @@ def main() -> None:
     np.fill_diagonal(cos, 0)
     models["cosine"] = cos
     pop_col = np.asarray((xt > 0).sum(axis=0)).ravel().astype(float)
+    # the served rule, run through the engine's own code: the three models as fitted without the held-out users
+    served = {}
+    for name, sm in am.fit(xt).items():
+        coo = sm.tocoo()
+        served[name] = sp.csr_matrix((coo.data, (rows_of_col[coo.row], rows_of_col[coo.col])), shape=(cat.n, cat.n), dtype=np.float32)
+    engine.cat.anime_sim = None                  # "today" is measured without the model; "served" switches it on per call
     log.info("models ready (%.0fs)", time.time() - t0)
 
 
@@ -223,6 +229,7 @@ def main() -> None:
                 # light5: the rest of the list is excluded (as if watched) so both scenarios rank the same unseen titles
                 seen = set(watched) | (set(full) - set(prof))
                 st = UserState(ratings=dict(prof), watched=seen, behavioral_count=len(prof))
+                engine.cat.anime_sim = None
                 rows, _ = engine.kind_rank(st, "anime")
                 gone = st.watched
                 today_s = [int(r) for r in rows if int(r) not in gone]
@@ -237,6 +244,9 @@ def main() -> None:
                     rec.setdefault("today", []).append(ndcg(today, tg))
                     for name, sc in cands.items():
                         rec.setdefault(name, []).append(ndcg(slot_preserving(today, set(sc), sc), tg))
+                    engine.cat.anime_sim = served
+                    rec.setdefault("served", []).append(ndcg(engine.anime_order(st, list(today)), tg))
+                    engine.cat.anime_sim = None
                     kn = [r for r in today if r in known]
                     rec.setdefault("_known_only_today", []).append(ndcg(kn, tg))
                     for name in (f"ease{int(float(a.lams.split(',')[0]))}", "cosine"):

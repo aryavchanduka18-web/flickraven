@@ -76,27 +76,33 @@ def _series_similarities(tmdb_ids: list[int]) -> sp.csr_matrix | None:
     return sim.maximum(sim.T).tocsr()            # symmetric: a similar-to b means b similar-to a
 
 
-def _anime_model(tmdb_ids: list[int]) -> sp.csr_matrix | None:
+def _anime_model(tmdb_ids: list[int]) -> dict | None:
     """The anime model (artifacts/models/anime_model.json, pipeline/anime_model.py: votes between anime series and anime
-    films learned from real anime lists; no users kept) as an n x n matrix over the catalog rows, row = the anime that
-    votes. None when the file is missing, unreadable or switched off (ANIME_MODEL_DISABLED=true): the anime lists then
-    keep the earlier order."""
+    films learned from real anime lists; no users kept) as {"long", "mid", "short": n x n matrix over the catalog rows,
+    row = the anime that votes}. None when the file is missing, unreadable or switched off (ANIME_MODEL_DISABLED=true):
+    the anime lists then keep the earlier order."""
     path = MODELS / "anime_model.json"
     if os.environ.get("ANIME_MODEL_DISABLED", "").lower() in ("1", "true", "yes") or not path.exists():
         return None
     try:
-        votes = json.loads(path.read_text(encoding="utf-8"))["votes"]
+        models = json.loads(path.read_text(encoding="utf-8"))["models"]
     except (OSError, ValueError, KeyError):
         log.warning("anime_model.json could not be read; anime lists keep the earlier order")
         return None
     row_of = {t: i for i, t in enumerate(tmdb_ids)}
-    rows, cols, vals = [], [], []
-    for a, out in votes.items():
-        for b, v in out:
-            if int(a) in row_of and b in row_of:
-                rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
     n = len(tmdb_ids)
-    return sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32) if vals else None
+    out = {}
+    for name in ("long", "mid", "short"):
+        rows, cols, vals = [], [], []
+        for a, votes in models.get(name, {}).items():
+            for b, v in votes:
+                if int(a) in row_of and b in row_of:
+                    rows.append(row_of[int(a)]); cols.append(row_of[b]); vals.append(v)
+        if not vals:
+            log.warning("anime_model.json has no usable %s model; anime lists keep the earlier order", name)
+            return None
+        out[name] = sp.csr_matrix((vals, (rows, cols)), shape=(n, n), dtype=np.float32)
+    return out
 
 
 def _gemini_similarities(movies: pd.DataFrame) -> sp.csr_matrix | None:

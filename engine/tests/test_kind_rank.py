@@ -26,6 +26,7 @@ def engine(c, content_scores=None):
     e.language_floor = lambda st, rows, base: OnlineEngine.language_floor(e, st, rows, base)
     e.anime_interest = lambda st: OnlineEngine.anime_interest(e, st)
     e.anime_scores = lambda st: OnlineEngine.anime_scores(e, st)
+    e.anime_liked = lambda st: OnlineEngine.anime_liked(e, st)
     e.anime_known = lambda: OnlineEngine.anime_known(e)
     e.anime_order = lambda st, rows: OnlineEngine.anime_order(e, st, rows)
     return e
@@ -171,7 +172,7 @@ def anime_cat():
     sim = sp.lil_matrix((7, 7), dtype=np.float32)
     sim[1, 4], sim[1, 3], sim[1, 6] = 0.9, 0.2, 0.5            # people who liked anime 1 liked 4 most, then film 6, then 3
     sim[2, 3] = 0.1
-    c.anime_sim = sim.tocsr()
+    c.anime_sim = {"long": sim.tocsr(), "mid": sim.tocsr(), "short": sim.tocsr()}
     return c
 
 
@@ -198,3 +199,30 @@ def test_anime_model_orders_anime_films_too_and_ties_keep_their_order():
     e = engine(anime_cat())
     assert OnlineEngine.anime_order(e, UserState(ratings={1: 9.0}), [0, 3, 6, 2]) == [0, 6, 3, 2]   # row 0 unknown: stays; 6 > 3 > 2
     assert OnlineEngine.anime_order(e, UserState(likes={2}), [4, 6, 3]) == [3, 4, 6]               # 4 and 6 tie at zero: order kept
+
+
+def test_anime_model_tier_follows_the_number_of_liked_anime_it_knows():
+    from cinematch_engine import online
+    c = anime_cat()
+    n = 7
+    big = sp.lil_matrix((n, n), dtype=np.float32)
+    big[1, 3] = 1.0                               # "long" prefers 3 over 4
+    big[1, 4] = 0.5
+    mid = sp.lil_matrix((n, n), dtype=np.float32)
+    mid[1, 4] = 1.0                               # "mid" prefers 4 over 3
+    mid[1, 3] = 0.5
+    short = sp.lil_matrix((n, n), dtype=np.float32)
+    short[1, 4] = 1.0                             # "short" prefers 4 over 3 as well
+    short[1, 3] = 0.2
+    c.anime_sim = {"long": big.tocsr(), "mid": mid.tocsr(), "short": short.tocsr()}
+    e = engine(c)
+    st = UserState(likes={1})
+    assert OnlineEngine.anime_scores(e, st)[0] == "short"
+    assert OnlineEngine.anime_order(e, st, [3, 4]) == [4, 3]
+    old = online.ANIME_SHORT_MAX, online.ANIME_MID_MAX
+    try:
+        online.ANIME_SHORT_MAX, online.ANIME_MID_MAX = 0, 0       # one liked anime now counts as a long list
+        assert OnlineEngine.anime_scores(e, st)[0] == "long"
+        assert OnlineEngine.anime_order(e, st, [4, 3]) == [3, 4]
+    finally:
+        online.ANIME_SHORT_MAX, online.ANIME_MID_MAX = old
