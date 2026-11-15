@@ -26,3 +26,12 @@ deploy-out/
 
 # Database backups of the live site (accounts, emails): never commit
 backups/
+
+# Anime dataset kit and Kaggle/MyAnimeList dumps (user data, usernames, licence-restricted): never commit
+flickraven_anime_multisource_v2/
+users-score-2023.csv
+users-details-2023.csv
+user-filtered.csv
+final_animedataset.csv
+anime-filtered.csv
+anime-dataset-2023.csv
