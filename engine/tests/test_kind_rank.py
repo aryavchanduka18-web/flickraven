@@ -226,3 +226,22 @@ def test_anime_model_tier_follows_the_number_of_liked_anime_it_knows():
         assert OnlineEngine.anime_order(e, st, [4, 3]) == [3, 4]
     finally:
         online.ANIME_SHORT_MAX, online.ANIME_MID_MAX = old
+
+
+def test_anime_model_tier_is_deterministic_and_follows_the_current_ratings():
+    from cinematch_engine import online
+    c = anime_cat()
+    e = engine(c)
+    st = UserState(ratings={1: 9.0, 2: 8.0})
+    first = OnlineEngine.anime_order(e, st, [3, 4, 6])
+    assert all(OnlineEngine.anime_order(e, st, [3, 4, 6]) == first for _ in range(5))       # same state, same order
+    old = online.ANIME_SHORT_MAX
+    try:
+        online.ANIME_SHORT_MAX = 1                                  # 2 liked anime -> "mid"; delete one rating -> "short"
+        assert OnlineEngine.anime_scores(e, st)[0] == "mid"
+        del st.ratings[2]
+        assert OnlineEngine.anime_scores(e, st)[0] == "short"
+        st.likes.add(1)                                             # liking the same title again counts it once
+        assert OnlineEngine.anime_scores(e, st)[0] == "short"
+    finally:
+        online.ANIME_SHORT_MAX = old

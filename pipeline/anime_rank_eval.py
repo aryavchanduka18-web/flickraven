@@ -228,6 +228,7 @@ def main() -> None:
     names_full = list(models)
 
     skipped = []
+    per_user = []
 
     def evaluate(sample, seed):
         rng = np.random.default_rng(seed)
@@ -257,8 +258,15 @@ def main() -> None:
                     for name, sc in cands.items():
                         rec.setdefault(name, []).append(ndcg(slot_preserving(today, set(sc), sc), tg))
                     engine.cat.anime_sim = served
-                    rec.setdefault("served", []).append(ndcg(engine.anime_order(st, list(today)), tg))
+                    got = engine.anime_scores(st)
+                    tier = got[0] if got else "none"
+                    sv, td = ndcg(engine.anime_order(st, list(today)), tg), ndcg(today, tg)
                     engine.cat.anime_sim = None
+                    rec.setdefault("served", []).append(sv)
+                    rec.setdefault(f"served@{tier}", []).append(sv)        # the served rule per tier, paired with today@tier
+                    rec.setdefault(f"today@{tier}", []).append(td)
+                    per_user.append({"uid": uid, "list": lst_name, "scenario": scen, "tier": tier, "targets": len(tg),
+                                     "today": round(td[0], 5), "served": round(sv[0], 5)})
                     kn = [r for r in today if r in known]
                     rec.setdefault("_known_only_today", []).append(ndcg(kn, tg))
                     for name in (f"ease{int(float(a.lams.split(',')[0]))}", "cosine"):
@@ -278,8 +286,11 @@ def main() -> None:
                 for name, vals in d.items():
                     v = np.array([x[0] for x in vals]); h = np.array([x[1] for x in vals])
                     e = {"ndcg10": round(float(v.mean()), 4), "hit10": round(float(h.mean()), 4), "users": len(v)}
-                    if not name.startswith("_") and name != "today":
-                        diff = v - base
+                    ref = base
+                    if "@" in name:
+                        ref = np.array([x[0] for x in d.get("today@" + name.split("@")[1], [])])
+                    if not name.startswith("_") and not name.startswith("today") and len(ref) == len(v):
+                        diff = v - ref
                         se = diff.std(ddof=1) / np.sqrt(len(diff)) if len(diff) > 1 else 0.0
                         e["diff"] = round(float(diff.mean()), 4)
                         e["ci95"] = [round(float(diff.mean() - 1.96 * se), 4), round(float(diff.mean() + 1.96 * se), 4)]
@@ -288,9 +299,12 @@ def main() -> None:
         return out
 
     v = summary(evaluate(val, a.seed + 100))
+    pd.DataFrame(per_user).to_csv(OUT / "per_user_validation.csv", index=False)
+    per_user.clear()
     write_json(OUT / "validation.json", v)
     log.info("validation done (%.0fs)", time.time() - t0)
     t = summary(evaluate(test, a.seed + 200))
+    pd.DataFrame(per_user).to_csv(OUT / "per_user_test.csv", index=False)
     meta = {"eligible_users": n_ok, "val_users": len(val), "test_users": len(test), "train_matrix": list(xt.shape),
             "matched_series": int(is_series.sum()), "matched_films": int((~is_series).sum()),
             "catalog_anime_series": len(series_rows), "catalog_anime_films": len(film_rows),
