@@ -15,6 +15,7 @@ from app.services import daily
 class Cat:
     def __init__(self, ids, kind, genres, lang, pop, keywords):
         self.movie_ids = np.array(ids)
+        self.row_of = {int(m): r for r, m in enumerate(ids)}       # as in the real Catalog
         self.kind, self.genres, self.language, self.keywords = kind, genres, lang, keywords
         self.popularity = np.array(pop, dtype=float)
         self.fame_pct = np.linspace(0, 100, len(ids))
@@ -105,7 +106,7 @@ def test_series_rails_have_anime_hits_first_and_the_new_rows(client):
     assert all(i["movie"]["title_type"] == "anime" for i in anime["items"])
 
 
-def test_kind_rail_keeps_a_core_and_changes_with_the_day(client, monkeypatch):
+def test_kind_rail_keeps_the_best_and_changes_with_the_day(client, monkeypatch):
     day = {"d": dt.date(2026, 11, 11)}
     monkeypatch.setattr(daily, "today", lambda: day["d"])
     first = [i["movie"]["id"] for i in client.get("/api/recs/kind/anime?limit=12").json()["items"]]
@@ -116,7 +117,7 @@ def test_kind_rail_keeps_a_core_and_changes_with_the_day(client, monkeypatch):
         day["d"] = dt.date(2026, 11, 11 + n)
         other = [i["movie"]["id"] for i in client.get("/api/recs/kind/anime?limit=12").json()["items"]]
         changed = changed or other != first
-        assert len(set(other) & set(first)) >= 3                         # a strong core stays
+        assert len(set(other) & set(first)) >= 1                         # the best title always stays (since 2026-11-15 only the best)
     assert changed
 
 

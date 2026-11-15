@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from cinematch_engine import lanes as lanes_mod
-from cinematch_engine.mixed_home import MIN_WEIGHT, compose, lane_weight
+from cinematch_engine.mixed_home import MIN_WEIGHT, compose, hero_target, lane_weight, lift_in_hero
 
 HERO, FIRST_PICKS, POOL = 5, 10, 150
 SERIES_FEEDS = lanes_mod.SERIES_LANES
@@ -125,6 +125,12 @@ def mix(engine, st, plan: dict, skip: set[int], stale: set[int] | None = None, l
                     w[name] = weights[name]
     rows_in = {row for items in lanes.values() for row, _ in items}
     picked = compose(lanes, w, HERO + FIRST_PICKS, {r: cat.language[r] for r in rows_in}, {r: list(cat.genres[r]) for r in rows_in})
+    # A strong anime fan gets anime in the hero in proportion to how much of what they like is anime (at most 3 of 5);
+    # compose alone gave them about one slide. Film-only people and casual fans (weight under 0.5) are unchanged.
+    real_films = sum(1 for r in liked_films if not lane_of[r].startswith("anime"))
+    target = hero_target(ev["anime"][0], real_films, weights["anime"], HERO)
+    if target:
+        picked = lift_in_hero(picked, lanes, ("anime", "anime_film"), target, HERO)
     if not any(f != "movie" for _, f in picked):
         return plan
     entry = {}
